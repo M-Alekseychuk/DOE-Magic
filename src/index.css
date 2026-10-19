@@ -16,5 +16,14 @@
   --color-brand-700: #0c75b3;
   --color-brand-800: #0a5f94;
   --color-brand-900: #094e79;
+  --color-brand-950: #042f2e;
 }
 @custom-variant dark (&:is(.dark *));
+
+html {
+  color-scheme: light;
+}
+
+html.dark {
+  color-scheme: dark;
+}

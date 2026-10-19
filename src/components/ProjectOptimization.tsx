@@ -797,7 +797,7 @@ export default function ProjectOptimization({ project, updateProject }: Props) {
                 value={targetValue}
                 onChange={e => setTargetValue(Number(e.target.value))}
                 placeholder="e.g. 70"
-                className="w-24 px-2 py-1 rounded bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-[11px] font-mono text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                className="w-24 px-2 py-1 rounded bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-[11px] font-mono text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-blue-500 [color-scheme:light] dark:[color-scheme:dark]"
               />
               <span className="text-[10px] text-slate-500">{activeResponse?.unit || '%'}</span>
             </div>
@@ -859,7 +859,7 @@ export default function ProjectOptimization({ project, updateProject }: Props) {
                     setExtrapolationMargin(num / 100);
                   }
                 }}
-                className="w-14 px-1.5 py-0.5 rounded bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-[10px] font-mono text-center focus:outline-none focus:ring-1 focus:ring-blue-500"
+                className="w-14 px-1.5 py-0.5 rounded bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-[10px] font-mono text-center text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-blue-500 [color-scheme:light] dark:[color-scheme:dark]"
               />
               <span className="ml-1">%</span>
             </div>

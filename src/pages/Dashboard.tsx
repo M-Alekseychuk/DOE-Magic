@@ -180,7 +180,7 @@ export default function Dashboard() {
               <button
                 onClick={resetSampleData}
                 title={locale === 'zh' ? '加载九洲药业标准实验设计示例 (铃木偶联工艺优化)' : 'Load standard demo study (Mixed-Level Suzuki-Miyaura Coupling)'}
-                className="h-8 px-3 bg-brand-50 dark:bg-brand-950/60 text-brand-700 dark:text-brand-300 border border-brand-200 dark:border-brand-800 rounded-md hover:bg-brand-100 dark:hover:bg-brand-900 font-medium flex items-center justify-center gap-1.5 text-[11px] transition-colors shrink-0"
+                className="h-8 px-3 bg-teal-50 dark:bg-teal-950/60 text-teal-700 dark:text-teal-300 border border-teal-200 dark:border-teal-800 rounded-md hover:bg-teal-100 dark:hover:bg-teal-900/60 font-medium flex items-center justify-center gap-1.5 text-[11px] transition-colors shrink-0"
               >
                 <Sparkles size={14} className="text-amber-500" />
                 {locale === 'zh' ? '示例项目' : 'Demo Studies'}
@@ -302,7 +302,7 @@ export default function Dashboard() {
               </div>
               
               <div className="flex flex-wrap gap-1.5 mt-auto">
-                <span className="inline-flex items-center rounded bg-brand-50 dark:bg-brand-950/40 px-1.5 py-0.5 text-[10px] font-mono text-brand-700 dark:text-brand-300 border border-brand-200 dark:border-brand-800">
+                <span className="inline-flex items-center rounded bg-teal-50 dark:bg-teal-950/40 px-1.5 py-0.5 text-[10px] font-mono text-teal-700 dark:text-teal-300 border border-teal-200 dark:border-teal-800">
                   {project.factors.length} {t('factors', 'Factors')}
                 </span>
                 {project.factors.some(f => f.type === 'categorical') && (
