@@ -1,0 +1,8 @@
+{
+  "name": "DOE Magic V.1.5.2 (current Version)",
+  "description": "Design of Experiments, Statistical Optimization, and Model Context Protocol (MCP) Server Endpoint for Jiuzhou Pharmaceutical",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

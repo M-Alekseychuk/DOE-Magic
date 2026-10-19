@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Remix DOE Magic V.1.5.2 (current Version)</title>
+    <link rel="icon" type="image/png" href="/logo.png" />
+    <script src="/plotly.min.js"></script>
+    <meta name="description" content="Design of Experiments, Statistical Optimization, and Model Context Protocol (MCP) Server Endpoint for Jiuzhou Pharmaceutical" />
+    <meta property="og:title" content="Remix DOE Magic V.1.5.2 (current Version)" />
+    <meta property="og:description" content="Design of Experiments, Statistical Optimization, and Model Context Protocol (MCP) Server Endpoint for Jiuzhou Pharmaceutical" />
+    <script>
+      // In AI Studio proxy / preview environments, suppress Vite HMR WebSocket transport rejections per environment constraints
+      window.addEventListener('unhandledrejection', (event) => {
+        const msg = event?.reason?.message || (typeof event?.reason === 'string' ? event.reason : '');
+        const stack = event?.reason?.stack || '';
+        if (
+          msg.includes('WebSocket') ||
+          stack.includes('createWebSocketModuleRunnerTransport') ||
+          stack.includes('@vite/client')
+        ) {
+          event.preventDefault();
+        }
+      });
+      window.addEventListener('error', (event) => {
+        const msg = event?.message || '';
+        const filename = event?.filename || '';
+        if (msg.includes('WebSocket') || filename.includes('@vite/client')) {
+          event.preventDefault();
+        }
+      });
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
+

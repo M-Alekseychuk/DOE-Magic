@@ -1,0 +1,400 @@
+import React, { useMemo, useState } from 'react';
+import { Project } from '../types';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, ScatterChart, Scatter, ZAxis, LineChart, Line, Legend, ReferenceLine } from 'recharts';
+import { Download } from 'lucide-react';
+import { toPng } from 'html-to-image';
+import createPlotlyComponent from 'react-plotly.js/factory';
+const Plot = createPlotlyComponent((window as any).Plotly);
+// @ts-ignore
+import jstat from 'jstat';
+const jStat = (jstat as any).default || jstat;
+
+
+interface Props {
+  project: Project;
+}
+
+// Normal inverse CDF approximation
+function normSInv(p: number): number {
+  if (p >= 1) return 3.5;
+  if (p <= 0) return -3.5;
+  const a1 = -39.6968302866538;
+  const a2 = 220.946098424521;
+  const a3 = -275.928510446969;
+  const a4 = 138.357751867269;
+  const a5 = -30.6647980661472;
+  const a6 = 2.50662827745924;
+  const b1 = -54.4760987982241;
+  const b2 = 161.585836858041;
+  const b3 = -155.698979859887;
+  const b4 = 66.8013118877197;
+  const b5 = -13.2806815528857;
+  const c1 = -0.00778489400243029;
+  const c2 = -0.322396458041136;
+  const c3 = -2.40075827716184;
+  const c4 = -2.54973253934373;
+  const c5 = 4.37466414146497;
+  const c6 = 2.93816398269878;
+  const d1 = 0.00778469570904146;
+  const d2 = 0.32246712907004;
+  const d3 = 2.445134137143;
+  const d4 = 3.75440866190742;
+
+  let q, r, x;
+
+  if (p < 0.02425) {
+      q = Math.sqrt(-2 * Math.log(p));
+      x = (((((c1 * q + c2) * q + c3) * q + c4) * q + c5) * q + c6) /
+          ((((d1 * q + d2) * q + d3) * q + d4) * q + 1);
+  } else if (p <= 0.97575) {
+      q = p - 0.5;
+      r = q * q;
+      x = (((((a1 * r + a2) * r + a3) * r + a4) * r + a5) * r + a6) * q /
+          (((((b1 * r + b2) * r + b3) * r + b4) * r + b5) * r + 1);
+  } else {
+      q = Math.sqrt(-2 * Math.log(1 - p));
+      x = -(((((c1 * q + c2) * q + c3) * q + c4) * q + c5) * q + c6) /
+          ((((d1 * q + d2) * q + d3) * q + d4) * q + 1);
+  }
+
+  return x;
+}
+
+// Matrix math utilities for OLS
+function transpose(m: number[][]) {
+    return m[0].map((_, i) => m.map(row => row[i]));
+}
+
+function multiply(m1: number[][], m2: number[][]) {
+    const res = Array(m1.length).fill(0).map(() => Array(m2[0].length).fill(0));
+    for (let i = 0; i < m1.length; i++) {
+        for (let j = 0; j < m2[0].length; j++) {
+            let sum = 0;
+            for (let k = 0; k < m1[0].length; k++) {
+                sum += m1[i][k] * m2[k][j];
+            }
+            res[i][j] = sum;
+        }
+    }
+    return res;
+}
+
+function solveOLS(X: number[][], Y: number[][]) {
+    const n = X.length;
+    const k = X[0].length;
+    
+    const Xt = transpose(X);
+    const XtX = multiply(Xt, X);
+    const XtY = multiply(Xt, Y);
+    
+    // Augment: [ XtX | XtY | I ]
+    const aug: number[][] = [];
+    for (let i = 0; i < k; i++) {
+        const row = [...XtX[i], XtY[i][0]];
+        for (let j = 0; j < k; j++) row.push(i === j ? 1 : 0);
+        aug.push(row);
+    }
+    
+    const aliased = new Array(k).fill(false);
+    let currentRow = 0;
+    const colToRow = new Array(k).fill(-1);
+    
+    for (let col = 0; col < k; col++) {
+        let pivotRow = currentRow;
+        let maxVal = 0;
+        for (let r = currentRow; r < k; r++) {
+            if (Math.abs(aug[r][col]) > maxVal) {
+                maxVal = Math.abs(aug[r][col]);
+                pivotRow = r;
+            }
+        }
+        
+        if (maxVal < 1e-9) {
+            aliased[col] = true;
+            continue;
+        }
+        
+        if (pivotRow !== currentRow) {
+            const temp = aug[currentRow];
+            aug[currentRow] = aug[pivotRow];
+            aug[pivotRow] = temp;
+        }
+        
+        const pivot = aug[currentRow][col];
+        for (let c = col; c < aug[currentRow].length; c++) {
+            aug[currentRow][c] /= pivot;
+        }
+        
+        for (let r = 0; r < k; r++) {
+            if (r !== currentRow) {
+                const factor = aug[r][col];
+                for (let c = col; c < aug[r].length; c++) {
+                    aug[r][c] -= factor * aug[currentRow][c];
+                }
+            }
+        }
+        
+        colToRow[col] = currentRow;
+        currentRow++;
+    }
+    
+    const rank = currentRow;
+    const beta = new Array(k).fill(0);
+    const diagInv = new Array(k).fill(0);
+    
+    for (let col = 0; col < k; col++) {
+        if (!aliased[col]) {
+            const r = colToRow[col];
+            beta[col] = aug[r][k];
+            diagInv[col] = Math.max(0, aug[r][k + 1 + col]);
+        }
+    }
+    
+    return { beta, diagInv, aliased, rank };
+}
+
+export default function ProjectAnalysis({ project }: Props) {
+  const handleDownloadSvg = (containerId: string, filename: string) => {
+    const container = document.getElementById(containerId);
+    if (!container) return;
+
+    const plotlyBtn = container.querySelector('.modebar-btn[data-title*="Download"]');
+    if (plotlyBtn) {
+      (plotlyBtn as HTMLElement).click();
+      return;
+    }
+
+    // Temporarily hide the download button so it doesn't appear in the image
+    const buttons = container.querySelectorAll('button[title="Download PNG"], button[title="Download PNG"]');
+    buttons.forEach(b => (b as HTMLElement).style.opacity = '0');
+
+    toPng(container, { backgroundColor: '#ffffff', pixelRatio: 2 })
+      .then((dataUrl) => {
+        const link = document.createElement('a');
+        link.download = filename + '.png';
+        link.href = dataUrl;
+        link.click();
+      })
+      .catch((err) => {
+        console.error('Oops, something went wrong!', err);
+        alert('Failed to generate image.');
+      })
+      .finally(() => {
+        // Restore buttons
+        buttons.forEach(b => (b as HTMLElement).style.opacity = '');
+      });
+  };
+  const [effectsPlotType, setEffectsPlotType] = useState<'pareto' | 'half-normal'>('pareto');
+  const [excludedTerms, setExcludedTerms] = useState<string[]>([]);
+  const [effectsLevelFilter, setEffectsLevelFilter] = useState<'both' | 'primary' | 'secondary'>('both');
+  const [selectedResponseId, setSelectedResponseId] = useState<string>('');
+  const [xAxisFactorId, setXAxisFactorId] = useState<string>('');
+  const [yAxisFactorId, setYAxisFactorId] = useState<string>('');
+  const [interactionF1Id, setInteractionF1Id] = useState<string>('');
+  const [interactionF2Id, setInteractionF2Id] = useState<string>('');
+  const [plot3dType, setPlot3dType] = useState<'scatter3d' | 'mesh3d' | 'contour'>('scatter3d');
+
+  const hasData = project.runs.length > 0 && project.responses.length > 0 && project.factors.length > 0;
+  const activeResponseId = selectedResponseId || (hasData ? project.responses[0].id : '');
+  const activeResponse = project.responses.find(r => r.id === activeResponseId);
+
+  // Compute effects and predictive model (Robust OLS Matrix Inversion with Aliasing Detection)
+  const analysisResults = useMemo(() => {
+    if (!hasData || !activeResponse) return null;
+
+    const validRuns = project.runs.filter(r => r.responses[activeResponse.id] !== null && r.responses[activeResponse.id] !== undefined && String(r.responses[activeResponse.id]) !== '');
+    if (validRuns.length === 0) return null;
+
+    const k = project.factors.length;
+    const nRuns = validRuns.length;
+    const overallMean = validRuns.reduce((sum, r) => sum + Number(r.responses[activeResponse.id]), 0) / validRuns.length;
+
+    // 1. Build Design Matrix X and Response Vector Y for OLS
+    
+    // Build term definitions based on what's NOT excluded
+    const activeTerms: any[] = [];
+    for (let i = 0; i < k; i++) {
+        if (!excludedTerms.includes(project.factors[i].id)) {
+            activeTerms.push({ type: 'main', factor: project.factors[i], idx: i });
+        }
+    }
+    for (let i = 0; i < k; i++) {
+        for (let j = i + 1; j < k; j++) {
+            const intId = `${project.factors[i].id}*${project.factors[j].id}`;
+            if (!excludedTerms.includes(intId)) {
+                activeTerms.push({ type: 'interaction', f1: project.factors[i], f2: project.factors[j], i, j, id: intId });
+            }
+        }
+    }
+
+    const X: number[][] = [];
+    const Y: number[][] = [];
+    
+    validRuns.forEach(run => {
+        const res = Number(run.responses[activeResponse.id]);
+        Y.push([res]);
+        
+        const row = [1]; // Intercept
+        
+        // Cache scaled x vals for this run
+        const x_scaled = project.factors.map(f => {
+            const val = Number(run.factors[f.id]);
+            const mid = (f.min + f.max) / 2;
+            const range = (f.max - f.min) || 1;
+            return 2 * (val - mid) / range;
+        });
+
+        activeTerms.forEach(term => {
+            if (term.type === 'main') {
+                row.push(x_scaled[term.idx]);
+            } else {
+                row.push(x_scaled[term.i] * x_scaled[term.j]);
+            }
+        });
+        
+        X.push(row);
+    });
+
+    // 2. Perform Robust OLS solving
+    const { beta, diagInv, aliased, rank } = solveOLS(X, Y);
+    const numTerms = X[0].length;
+
+    // 3. Map Beta back to UI objects
+    const effects: any[] = [];
+    const interactions: any[] = [];
+    
+    project.factors.forEach((factor, i) => {
+        let effectVal = 0;
+        let isAliased = false;
+        let isExcluded = true;
+        let betaIdx = -1;
+        
+        const termIndex = activeTerms.findIndex(t => t.type === 'main' && t.id === factor.id);
+        if (termIndex !== -1) {
+            betaIdx = 1 + termIndex;
+            effectVal = beta[betaIdx] * 2;
+            isAliased = aliased[betaIdx];
+            isExcluded = false;
+        }
+
+        let highSum = 0, highCount = 0;
+        let lowSum = 0, lowCount = 0;
+        const mid = (factor.min + factor.max) / 2;
+        validRuns.forEach(r => {
+            const v = Number(r.factors[factor.id]);
+            if (v > mid + 1e-6) { highSum += Number(r.responses[activeResponse.id]); highCount++; }
+            else if (v < mid - 1e-6) { lowSum += Number(r.responses[activeResponse.id]); lowCount++; }
+        });
+
+        effects.push({
+            factor, effect: effectVal, absEffect: Math.abs(effectVal),
+            direction: effectVal >= 0 ? 'Positive' : 'Negative',
+            lowAvg: lowCount > 0 ? lowSum / lowCount : 0,
+            highAvg: highCount > 0 ? highSum / highCount : 0,
+            highCount, lowCount, betaIdx, isAliased, isExcluded, id: factor.id
+        });
+    });
+
+    for (let i = 0; i < k; i++) {
+        for (let j = i + 1; j < k; j++) {
+            const intId = `${project.factors[i].id}*${project.factors[j].id}`;
+            const termIndex = activeTerms.findIndex(t => t.type === 'interaction' && t.id === intId);
+            
+            let effectVal = 0;
+            let isAliased = false;
+            let isExcluded = true;
+            let betaIdx = -1;
+            
+            if (termIndex !== -1) {
+                betaIdx = 1 + termIndex;
+                effectVal = beta[betaIdx] * 2;
+                isAliased = aliased[betaIdx];
+                isExcluded = false;
+            }
+            interactions.push({
+          f1: project.factors[i],
+          f2: project.factors[j],
+          effect: beta[k_main + 1 + interactions.length] * 2,
+          absEffect: Math.abs(beta[k_main + 1 + interactions.length] * 2),
+          direction: beta[k_main + 1 + interactions.length] >= 0 ? 'positive' : 'negative',
+          isAliased: aliasedTerms.has(k_main + 1 + interactions.length),
+          betaIdx: k_main + 1 + interactions.length,
+          id: project.factors[i].id + '*' + project.factors[j].id,
+          isExcluded: excludedTerms.includes(project.factors[i].id + '*' + project.factors[j].id)
+        });
+      }
+    });
+        
+        effects.push({
+            factor, effect: effectVal, absEffect: Math.abs(effectVal),
+            direction: effectVal >= 0 ? 'Positive' : 'Negative',
+            lowAvg: lowCount > 0 ? lowSum / lowCount : 0,
+            highAvg: highCount > 0 ? highSum / highCount : 0,
+            highCount, lowCount, betaIdx, isAliased, isExcluded, id: factor.id
+        });
+    }
+
+    for (let i = 0; i < k; i++) {
+        for (let j = i + 1; j < k; j++) {
+            const intId = `${project.factors[i].id}*${project.factors[j].id}`;
+            const termIndex = activeTerms.findIndex(t => t.type === 'interaction' && t.id === intId);
+            
+            let effectVal = 0;
+            let isAliased = false;
+            let isExcluded = true;
+            let betaIdx = -1;
+            
+            if (termIndex !== -1) {
+                betaIdx = 1 + termIndex;
+                effectVal = beta[betaIdx] * 2;
+                isAliased = aliased[betaIdx];
+                isExcluded = false;
+            }
+
+            interactions.push({
+                f1: project.factors[i],
+                f2: project.factors[j],
+                id: intId,
+                effect: effectVal, absEffect: Math.abs(effectVal),
+                direction: effectVal >= 0 ? 'Positive' : 'Negative',
+                betaIdx, isAliased, isExcluded
+            });
+        }
+    }
+
+    // 4. Calculate SSE, SST, and R-squared based on the exact OLS model
+
+    let sse = 0;
+    let sst = 0;
+    validRuns.forEach((run, idx) => {
+        const actual = Y[idx][0];
+        sst += Math.pow(actual - overallMean, 2);
+        
+        let pred = 0;
+        for (let i = 0; i < numTerms; i++) {
+            pred += beta[i] * X[idx][i];
+        }
+        sse += Math.pow(actual - pred, 2);
+    });
+
+    const p_model = rank - 1; // parameters excluding intercept
+    const df_error = Math.max(0, nRuns - rank);
+    const mse = df_error > 0 ? sse / df_error : 0;
+    
+    const rSquared = sst > 0 ? 1 - (sse / sst) : 0;
+    let adjRSquared = 0;
+    if (df_error > 0 && sst > 0 && nRuns > 1) {
+        adjRSquared = 1 - (1 - rSquared) * ((nRuns - 1) / df_error);
+    }
+
+    // 5. Lack Of Fit and Pure Error
+    
+    const runGroups: Record<string, number[]> = {};
+    
+    // Determine which factors are active in the model
+    const activeFactorIds = new Set<string>();
+    activeTerms.forEach(t => {
+        if (t.type === 'main') activeFactorIds.add(t.factor.id);
+        if (t.type === 'interaction') {
+            activeFactorIds.add(t.f1.id);
+            activeFactorIds.add(t.f2.id);

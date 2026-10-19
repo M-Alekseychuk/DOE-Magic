@@ -1,0 +1,6 @@
+{
+  "summary": "Comprehensive implementation plan for the multi-language localization system in DOE Magic, introducing an extensible i18n architecture with English and Simplified Chinese (zh-CN) translations across the sidebar, dashboard, setup, design matrix, regression analysis, optimization, simulations, and guides.",
+  "updatedAt": "2026-10-17T13:47:34.759265059Z",
+  "requestFeedback": true,
+  "userFacing": true
+}

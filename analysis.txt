@@ -1,0 +1,658 @@
+import React, { useMemo, useState } from 'react';
+import { Project } from '../types';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, ScatterChart, Scatter, ZAxis, LineChart, Line, Legend } from 'recharts';
+import Plot from 'react-plotly.js';
+
+interface Props {
+  project: Project;
+}
+
+// Normal inverse CDF approximation
+function normSInv(p: number): number {
+  if (p >= 1) return 3.5;
+  if (p <= 0) return -3.5;
+  const a1 = -39.6968302866538;
+  const a2 = 220.946098424521;
+  const a3 = -275.928510446969;
+  const a4 = 138.357751867269;
+  const a5 = -30.6647980661472;
+  const a6 = 2.50662827745924;
+  const b1 = -54.4760987982241;
+  const b2 = 161.585836858041;
+  const b3 = -155.698979859887;
+  const b4 = 66.8013118877197;
+  const b5 = -13.2806815528857;
+  const c1 = -0.00778489400243029;
+  const c2 = -0.322396458041136;
+  const c3 = -2.40075827716184;
+  const c4 = -2.54973253934373;
+  const c5 = 4.37466414146497;
+  const c6 = 2.93816398269878;
+  const d1 = 0.00778469570904146;
+  const d2 = 0.32246712907004;
+  const d3 = 2.445134137143;
+  const d4 = 3.75440866190742;
+
+  let q, r, x;
+
+  if (p < 0.02425) {
+      q = Math.sqrt(-2 * Math.log(p));
+      x = (((((c1 * q + c2) * q + c3) * q + c4) * q + c5) * q + c6) /
+          ((((d1 * q + d2) * q + d3) * q + d4) * q + 1);
+  } else if (p <= 0.97575) {
+      q = p - 0.5;
+      r = q * q;
+      x = (((((a1 * r + a2) * r + a3) * r + a4) * r + a5) * r + a6) * q /
+          (((((b1 * r + b2) * r + b3) * r + b4) * r + b5) * r + 1);
+  } else {
+      q = Math.sqrt(-2 * Math.log(1 - p));
+      x = -(((((c1 * q + c2) * q + c3) * q + c4) * q + c5) * q + c6) /
+          ((((d1 * q + d2) * q + d3) * q + d4) * q + 1);
+  }
+
+  return x;
+}
+
+export default function ProjectAnalysis({ project }: Props) {
+  const [selectedResponseId, setSelectedResponseId] = useState<string>('');
+  const [xAxisFactorId, setXAxisFactorId] = useState<string>('');
+  const [yAxisFactorId, setYAxisFactorId] = useState<string>('');
+  const [interactionF1Id, setInteractionF1Id] = useState<string>('');
+  const [interactionF2Id, setInteractionF2Id] = useState<string>('');
+  const [plot3dType, setPlot3dType] = useState<'scatter3d' | 'mesh3d' | 'contour'>('scatter3d');
+
+  const hasData = project.runs.length > 0 && project.responses.length > 0 && project.factors.length > 0;
+  const activeResponseId = selectedResponseId || (hasData ? project.responses[0].id : '');
+  const activeResponse = project.responses.find(r => r.id === activeResponseId);
+
+  // Compute effects and predictive model
+  const analysisResults = useMemo(() => {
+    if (!hasData || !activeResponse) return null;
+
+    const validRuns = project.runs.filter(r => r.responses[activeResponse.id] !== null);
+    if (validRuns.length === 0) return null;
+
+    const effects = project.factors.map(factor => {
+      const mid = (factor.min + factor.max) / 2;
+      let highSum = 0, highCount = 0;
+      let lowSum = 0, lowCount = 0;
+
+      validRuns.forEach(run => {
+        const val = Number(run.factors[factor.id]);
+        const res = Number(run.responses[activeResponse.id]);
+
+        if (val > mid + 1e-6) {
+          highSum += res;
+          highCount++;
+        } else if (val < mid - 1e-6) {
+          lowSum += res;
+          lowCount++;
+        }
+      });
+
+      const highAvg = highCount > 0 ? highSum / highCount : 0;
+      const lowAvg = lowCount > 0 ? lowSum / lowCount : 0;
+      const effect = (highCount > 0 && lowCount > 0) ? (highAvg - lowAvg) : 0;
+
+      return {
+        factor,
+        effect,
+        absEffect: Math.abs(effect),
+        direction: effect >= 0 ? 'Positive' : 'Negative',
+        lowAvg,
+        highAvg
+      };
+    });
+
+    effects.sort((a, b) => b.absEffect - a.absEffect);
+
+    // Half Normal calculation
+    const sortedForHalfNormal = [...effects].sort((a, b) => a.absEffect - b.absEffect);
+    const n = sortedForHalfNormal.length;
+    const halfNormalData = sortedForHalfNormal.map((e, index) => {
+      const i = index + 1;
+      const p = 0.5 + 0.5 * ((i - 0.5) / n);
+      const expected = normSInv(p);
+      return {
+        ...e,
+        expected,
+        // Calculate a pseudo-significance threshold (just for visualization, normally needs alpha/Lenth's method)
+        significant: e.absEffect > (sortedForHalfNormal[Math.floor(n * 0.5)]?.absEffect || 0) * 2
+      };
+    });
+
+    // --- Predictive Model with Interactions ---
+    const overallMean = validRuns.reduce((sum, r) => sum + Number(r.responses[activeResponse.id]), 0) / validRuns.length;
+    const interactions: any[] = [];
+    for (let i = 0; i < project.factors.length; i++) {
+      for (let j = i + 1; j < project.factors.length; j++) {
+        const f1 = project.factors[i];
+        const f2 = project.factors[j];
+        const mid1 = (f1.min + f1.max) / 2;
+        const mid2 = (f2.min + f2.max) / 2;
+        
+        let hhSum = 0, hhCount = 0;
+        let hlSum = 0, hlCount = 0;
+        let lhSum = 0, lhCount = 0;
+        let llSum = 0, llCount = 0;
+
+        validRuns.forEach(run => {
+          const v1 = Number(run.factors[f1.id]);
+          const v2 = Number(run.factors[f2.id]);
+          const res = Number(run.responses[activeResponse.id]);
+          if (v1 > mid1 + 1e-6 && v2 > mid2 + 1e-6) { hhSum += res; hhCount++; }
+          else if (v1 > mid1 + 1e-6 && v2 < mid2 - 1e-6) { hlSum += res; hlCount++; }
+          else if (v1 < mid1 - 1e-6 && v2 > mid2 + 1e-6) { lhSum += res; lhCount++; }
+          else if (v1 < mid1 - 1e-6 && v2 < mid2 - 1e-6) { llSum += res; llCount++; }
+        });
+
+        const hhAvg = hhCount > 0 ? hhSum / hhCount : 0;
+        const hlAvg = hlCount > 0 ? hlSum / hlCount : 0;
+        const lhAvg = lhCount > 0 ? lhSum / lhCount : 0;
+        const llAvg = llCount > 0 ? llSum / llCount : 0;
+        
+        const intEffect = (hhCount>0 && llCount>0 && hlCount>0 && lhCount>0) ? (hhAvg + llAvg - hlAvg - lhAvg) / 2 : 0;
+        interactions.push({ f1, f2, effect: intEffect });
+      }
+    }
+
+    const k = project.factors.length;
+    let bestCombo: number[] = [];
+    let bestPred = activeResponse.goal === 'maximize' ? -Infinity : Infinity;
+    let closestToTarget = Infinity;
+
+    const numCombos = Math.pow(2, k);
+    for (let c = 0; c < numCombos; c++) {
+      const combo = [];
+      for (let i = 0; i < k; i++) {
+        combo.push((c >> i) & 1);
+      }
+      
+      let pred = overallMean;
+      
+      // Add main effects
+      for (let i = 0; i < k; i++) {
+        const x_i = combo[i] === 1 ? 1 : -1;
+        pred += (effects.find(e => e.factor.id === project.factors[i].id)?.effect || 0) / 2 * x_i;
+      }
+      
+      // Add interactions
+      let intIdx = 0;
+      for (let i = 0; i < k; i++) {
+        for (let j = i + 1; j < k; j++) {
+          const x_i = combo[i] === 1 ? 1 : -1;
+          const x_j = combo[j] === 1 ? 1 : -1;
+          pred += (interactions[intIdx].effect / 2) * (x_i * x_j);
+          intIdx++;
+        }
+      }
+      
+      if (activeResponse.goal === 'maximize') {
+        if (pred > bestPred) { bestPred = pred; bestCombo = combo; }
+      } else if (activeResponse.goal === 'minimize') {
+        if (pred < bestPred) { bestPred = pred; bestCombo = combo; }
+      } else {
+        const target = activeResponse.targetValue ?? 0;
+        const dist = Math.abs(pred - target);
+        if (dist < closestToTarget) { closestToTarget = dist; bestPred = pred; bestCombo = combo; }
+      }
+    }
+
+    let optimalSettings: any[] = [];
+    if (bestCombo.length === k && k > 0) {
+      optimalSettings = project.factors.map((f, i) => {
+        const isHigh = bestCombo[i] === 1;
+        return {
+          factor: f,
+          optimalValue: isHigh ? f.max : f.min,
+          effectValue: effects.find(e => e.factor.id === f.id)?.effect || 0
+        };
+      });
+    }
+
+    return { response: activeResponse, effects, optimalSettings, halfNormalData, bestPred };
+  }, [project, hasData, activeResponse]);
+
+  const interactionData = useMemo(() => {
+    if (!hasData || project.factors.length < 2 || !activeResponse) return null;
+    const validRuns = project.runs.filter(r => r.responses[activeResponse.id] !== null);
+    
+    let f1 = project.factors.find(f => f.id === interactionF1Id);
+    let f2 = project.factors.find(f => f.id === interactionF2Id);
+    
+    if (!f1) f1 = project.factors[0];
+    if (!f2 || f2.id === f1.id) {
+       f2 = project.factors.find(f => f.id !== f1?.id) || project.factors[1];
+    }
+    if (!f1 || !f2) return null;
+
+    const f1Mid = (f1.min + f1.max) / 2;
+    const f2Mid = (f2.min + f2.max) / 2;
+
+    let llSum = 0, llCount = 0;
+    let lhSum = 0, lhCount = 0;
+    let hlSum = 0, hlCount = 0;
+    let hhSum = 0, hhCount = 0;
+
+    validRuns.forEach(run => {
+      const v1 = Number(run.factors[f1!.id]);
+      const v2 = Number(run.factors[f2!.id]);
+      const res = Number(run.responses[activeResponse.id]);
+
+      if (v1 < f1Mid - 1e-6 && v2 < f2Mid - 1e-6) { llSum += res; llCount++; }
+      if (v1 < f1Mid - 1e-6 && v2 > f2Mid + 1e-6) { lhSum += res; lhCount++; }
+      if (v1 > f1Mid + 1e-6 && v2 < f2Mid - 1e-6) { hlSum += res; hlCount++; }
+      if (v1 > f1Mid + 1e-6 && v2 > f2Mid + 1e-6) { hhSum += res; hhCount++; }
+    });
+
+    return {
+      f1, f2,
+      data: [
+        { name: 'Low', low: llCount > 0 ? llSum / llCount : null, high: lhCount > 0 ? lhSum / lhCount : null },
+        { name: 'High', low: hlCount > 0 ? hlSum / hlCount : null, high: hhCount > 0 ? hhSum / hhCount : null },
+      ]
+    };
+  }, [project, hasData, activeResponse, interactionF1Id, interactionF2Id]);
+
+  // DOE Mean plot data
+  const doeMeanData = useMemo(() => {
+    if (!hasData || !activeResponse) return null;
+    return project.runs
+      .filter(r => r.responses[activeResponse.id] !== null)
+      .map((r, i) => ({
+        run: `Run ${i + 1}`,
+        value: r.responses[activeResponse.id]
+      }));
+  }, [project, hasData, activeResponse]);
+
+  // 3D Plot data
+  const plotData = useMemo(() => {
+    if (!hasData || project.factors.length < 2 || !activeResponse) return null;
+    
+    const xFactor = project.factors.find(f => f.id === xAxisFactorId) || project.factors[0];
+    const yFactor = project.factors.find(f => f.id === yAxisFactorId && f.id !== xFactor.id) || project.factors[1] || project.factors[0];
+    
+    const validRuns = project.runs.filter(r => r.responses[activeResponse.id] !== null);
+    
+    const xValues = validRuns.map(r => r.factors[xFactor.id]);
+    const yValues = validRuns.map(r => r.factors[yFactor.id]);
+    const zValues = validRuns.map(r => r.responses[activeResponse.id]);
+
+    let trace: any = {
+      x: xValues,
+      y: yValues,
+      z: zValues,
+      type: plot3dType
+    };
+
+    if (plot3dType === 'scatter3d') {
+      trace.mode = 'markers';
+      trace.marker = { size: 8, color: zValues, colorscale: 'Viridis', opacity: 0.8 };
+    } else if (plot3dType === 'mesh3d') {
+      trace.opacity = 0.8;
+      trace.color = '#3ab9a0';
+    } else if (plot3dType === 'contour') {
+      // Contour plot configuration
+      trace.colorscale = 'Viridis';
+    }
+
+    return {
+      xFactor, yFactor, activeResponse,
+      data: [trace]
+    };
+  }, [project, hasData, activeResponse, xAxisFactorId, yAxisFactorId, plot3dType]);
+
+  if (!hasData) {
+    return <div className="p-8 text-center text-[11px] text-slate-500 dark:text-slate-300 bg-white dark:bg-slate-900 rounded-lg shadow-sm border border-slate-200 dark:border-slate-600">Insufficient data for analysis. Please add factors, responses, and run results.</div>;
+  }
+
+  return (
+    <div className="space-y-4">
+      {/* Response Selector */}
+      {project.responses.length > 1 && (
+        <div className="bg-white dark:bg-slate-900 p-3 rounded-lg shadow-sm border border-slate-200 dark:border-slate-600 flex items-center gap-3">
+          <span className="text-[10px] font-bold text-slate-500 dark:text-slate-300 uppercase tracking-widest">Analyze Response:</span>
+          <select 
+            value={activeResponseId} 
+            onChange={e => setSelectedResponseId(e.target.value)}
+            className="rounded border border-slate-300 dark:border-slate-600 px-2 py-1 text-[11px] focus:outline-none focus:ring-1 focus:ring-brand-500"
+          >
+            {project.responses.map(r => (
+              <option key={r.id} value={r.id}>{r.name} ({r.goal})</option>
+            ))}
+          </select>
+        </div>
+      )}
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        {/* Pareto Chart */}
+        <div className="bg-white dark:bg-slate-900 p-4 rounded-lg shadow-sm border border-slate-200 dark:border-slate-600 flex flex-col">
+          <div>
+            <h3 className="text-[10px] uppercase tracking-widest font-bold text-slate-400 mb-1">
+              Pareto: Standardized Effects <span className="normal-case font-normal">({activeResponse?.name})</span>
+            </h3>
+            <p className="text-[10px] text-slate-500 mb-4">Shows the absolute size of each effect. Bars extending further indicate a stronger impact on the response.</p>
+          </div>
+          <div className="h-64 w-full">
+            {analysisResults?.effects && analysisResults.effects.length > 0 ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={analysisResults.effects} layout="vertical" margin={{ top: 10, right: 30, left: 40, bottom: 10 }}>
+                  <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} stroke="#e2e8f0" />
+                  <XAxis type="number" dataKey="absEffect" name="Absolute Effect" tick={{fontSize: 10}} />
+                  <YAxis type="category" dataKey="factor.name" width={80} tick={{fontSize: 10}} />
+                  <Tooltip 
+                    cursor={{ fill: '#f8fafc' }} 
+                    contentStyle={{fontSize: '11px', borderRadius: '4px'}}
+                    formatter={(value: number, name: string, props: any) => [
+                      `${value.toFixed(3)} (${props.payload.direction})`, 
+                      'Effect Size'
+                    ]}
+                  />
+                  <Bar dataKey="absEffect" name="Absolute Effect" radius={[0, 4, 4, 0]}>
+                    {analysisResults.effects.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.direction === 'Positive' ? '#3ab9a0' : '#0d89d1'} />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="h-full flex items-center justify-center text-[11px] text-slate-400 italic">No valid run data available.</div>
+            )}
+          </div>
+          <div className="flex gap-4 mt-2 justify-center text-[9px] uppercase tracking-widest text-slate-500 dark:text-slate-300 font-bold">
+            <div className="flex items-center gap-1.5"><div className="w-3 h-3 bg-brand-500 rounded-sm"></div> Positive Effect</div>
+            <div className="flex items-center gap-1.5"><div className="w-3 h-3 bg-brand-600 rounded-sm"></div> Negative Effect</div>
+          </div>
+        </div>
+
+        {/* Half Normal Plot */}
+        <div className="bg-white dark:bg-slate-900 p-4 rounded-lg shadow-sm border border-slate-200 dark:border-slate-600 flex flex-col">
+          <div>
+            <h3 className="text-[10px] uppercase tracking-widest font-bold text-slate-400 mb-1">
+              Half-Normal Plot of Effects
+            </h3>
+            <p className="text-[10px] text-slate-500 mb-4">Helps identify significant effects. Points that deviate furthest from the line represent factors with a meaningful impact.</p>
+          </div>
+          <div className="h-64 w-full">
+            {analysisResults?.halfNormalData && analysisResults.halfNormalData.length > 0 ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <ScatterChart margin={{ top: 10, right: 30, left: 10, bottom: 10 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                  <XAxis type="number" dataKey="absEffect" name="Absolute Effect" tick={{fontSize: 10}} label={{ value: '|Effect|', position: 'insideBottomRight', offset: -5, fontSize: 10, fill: '#94a3b8' }} />
+                  <YAxis type="number" dataKey="expected" name="Half-Normal Quantile" tick={{fontSize: 10}} label={{ value: 'Half-Normal Quantile', angle: -90, position: 'insideLeft', fontSize: 10, fill: '#94a3b8' }} />
+                  <ZAxis type="category" dataKey="factor.name" name="Factor" />
+                  <Tooltip 
+                    cursor={{ strokeDasharray: '3 3' }} 
+                    contentStyle={{fontSize: '11px', borderRadius: '4px'}}
+                    formatter={(value: number, name: string) => name === 'Factor' ? value : value.toFixed(3)}
+                  />
+                  <Scatter data={analysisResults.halfNormalData} shape="square">
+                    {analysisResults.halfNormalData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.significant ? '#ef4444' : '#0d89d1'} />
+                    ))}
+                  </Scatter>
+                </ScatterChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="h-full flex items-center justify-center text-[11px] text-slate-400 italic">No valid run data available.</div>
+            )}
+          </div>
+          <div className="flex gap-4 mt-2 justify-center text-[9px] uppercase tracking-widest text-slate-500 dark:text-slate-300 font-bold">
+            <div className="flex items-center gap-1.5"><div className="w-3 h-3 bg-red-500 rounded-sm"></div> Significant Effect</div>
+            <div className="flex items-center gap-1.5"><div className="w-3 h-3 bg-brand-600 rounded-sm"></div> Not Significant</div>
+          </div>
+        </div>
+
+        {/* Predictive Model & Optimal Conditions */}
+        <div className="lg:col-span-2 bg-brand-900 border border-brand-800 p-4 rounded-lg shadow-sm flex flex-col text-white">
+          <h3 className="text-[10px] uppercase tracking-widest font-bold text-brand-300 mb-2">
+            Predictive Model: Optimal Conditions
+          </h3>
+          <p className="text-[11px] text-brand-100 mb-4 leading-relaxed">
+            A regression model utilizing main effects and 2-way interactions predicts these settings will <strong>{activeResponse?.goal}</strong> the response <strong>{activeResponse?.name}</strong> (Expected Value: ~{analysisResults?.bestPred.toFixed(2)}).
+          </p>
+          
+          <div className="flex-1">
+            <table className="w-full text-left text-[11px]">
+              <thead className="text-brand-300 border-b border-brand-800 font-mono text-[9px] uppercase tracking-widest">
+                <tr>
+                  <th className="pb-2 font-medium">Factor</th>
+                  <th className="pb-2 font-medium text-right">Optimal Setting</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-brand-800/50">
+                {analysisResults?.optimalSettings.map((opt, i) => (
+                  <tr key={i}>
+                    <td className="py-2 text-brand-50 font-bold">{opt.factor.name}</td>
+                    <td className="py-2 text-right">
+                      <span className="font-mono text-brand-100 bg-brand-800 px-1.5 py-0.5 rounded">
+                        {opt.optimalValue} {opt.factor.unit}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        {/* Main Effects Plot */}
+        <div className="lg:col-span-2 bg-white dark:bg-slate-900 p-4 rounded-lg shadow-sm border border-slate-200 dark:border-slate-600">
+          <div>
+            <h3 className="text-[10px] uppercase tracking-widest font-bold text-slate-400 mb-1">
+              Main Effects Plot (Data Means)
+            </h3>
+            <p className="text-[10px] text-slate-500 mb-4">Shows how changing a single factor changes the response on average. Steeper lines indicate stronger main effects.</p>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            {analysisResults?.effects.map(effect => (
+              <div key={effect.factor.id} className="h-48 border border-slate-100 rounded bg-slate-50 dark:bg-slate-800 p-2">
+                <p className="text-[10px] text-center font-bold text-slate-600 mb-2 truncate">{effect.factor.name}</p>
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={[
+                    { name: 'Low', value: effect.lowAvg },
+                    { name: 'High', value: effect.highAvg }
+                  ]} margin={{ top: 5, right: 5, left: -20, bottom: 20 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                    <XAxis dataKey="name" tick={{fontSize: 10}} />
+                    <YAxis domain={['auto', 'auto']} tick={{fontSize: 10}} />
+                    <Tooltip contentStyle={{fontSize: '10px'}} />
+                    <Line type="linear" dataKey="value" stroke="#3ab9a0" strokeWidth={2} dot={{ r: 4 }} activeDot={{ r: 6 }} />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Interaction Plot */}
+        {interactionData && (
+          <div className="lg:col-span-2 bg-white dark:bg-slate-900 p-4 rounded-lg shadow-sm border border-slate-200 dark:border-slate-600">
+            <div className="flex flex-col md:flex-row md:items-center justify-between mb-4 gap-4">
+              <div>
+                <h3 className="text-[10px] uppercase tracking-widest font-bold text-slate-400 mb-1">
+                  Interaction Plot
+                </h3>
+                <p className="text-[10px] text-slate-500">Shows how two factors work together. Non-parallel lines indicate an interaction.</p>
+              </div>
+              <div className="flex flex-wrap items-center gap-3">
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] font-bold text-slate-500 uppercase">Factor 1:</span>
+                  <select 
+                    value={interactionData.f1.id} 
+                    onChange={e => setInteractionF1Id(e.target.value)}
+                    className="rounded border border-slate-300 px-2 py-1 text-[11px] focus:outline-none"
+                  >
+                    {project.factors.map(f => <option key={f.id} value={f.id}>{f.name}</option>)}
+                  </select>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] font-bold text-slate-500 uppercase">Factor 2:</span>
+                  <select 
+                    value={interactionData.f2.id} 
+                    onChange={e => setInteractionF2Id(e.target.value)}
+                    className="rounded border border-slate-300 px-2 py-1 text-[11px] focus:outline-none"
+                  >
+                    {project.factors.filter(f => f.id !== interactionData.f1.id).map(f => <option key={f.id} value={f.id}>{f.name}</option>)}
+                  </select>
+                </div>
+              </div>
+            </div>
+            <div className="h-64 w-full flex justify-center">
+              <div className="w-full max-w-lg">
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={interactionData.data} margin={{ top: 10, right: 30, left: 10, bottom: 10 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                    <XAxis dataKey="name" tick={{fontSize: 10}} label={{ value: interactionData.f1.name, position: 'insideBottom', offset: -5, fontSize: 10 }} />
+                    <YAxis domain={['auto', 'auto']} tick={{fontSize: 10}} />
+                    <Tooltip contentStyle={{fontSize: '11px'}} />
+                    <Legend wrapperStyle={{fontSize: '11px'}} />
+                    <Line type="linear" name={`${interactionData.f2.name} Low`} dataKey="low" stroke="#0d89d1" strokeWidth={2} dot={{ r: 4 }} connectNulls={true} />
+                    <Line type="linear" name={`${interactionData.f2.name} High`} dataKey="high" stroke="#3ab9a0" strokeWidth={2} dot={{ r: 4 }} strokeDasharray="5 5" connectNulls={true} />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* DOE Mean Plot */}
+        <div className="lg:col-span-2 bg-white dark:bg-slate-900 p-4 rounded-lg shadow-sm border border-slate-200 dark:border-slate-600">
+          <div>
+            <h3 className="text-[10px] uppercase tracking-widest font-bold text-slate-400 mb-1">
+              DOE Mean Plot (Run Means)
+            </h3>
+            <p className="text-[10px] text-slate-500 mb-4">Displays the average response for each experimental run to spot trends or anomalies.</p>
+          </div>
+          <div className="h-64 w-full">
+            {doeMeanData && doeMeanData.length > 0 ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={doeMeanData} margin={{ top: 10, right: 30, left: 10, bottom: 20 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                  <XAxis dataKey="run" tick={{fontSize: 10}} angle={-45} textAnchor="end" />
+                  <YAxis domain={['auto', 'auto']} tick={{fontSize: 10}} label={{ value: 'Mean Response', angle: -90, position: 'insideLeft', fontSize: 10 }} />
+                  <Tooltip contentStyle={{fontSize: '11px'}} />
+                  <Line type="monotone" dataKey="value" name="Response Value" stroke="#3ab9a0" strokeWidth={2} dot={{ r: 4 }} />
+                </LineChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="h-full flex items-center justify-center text-[11px] text-slate-400 italic">No valid run data available.</div>
+            )}
+          </div>
+        </div>
+
+        {/* Contour & Response Surface Plots */}
+        {plotData && project.factors.length >= 2 && (
+          <div className="lg:col-span-2 bg-white dark:bg-slate-900 p-4 rounded-lg shadow-sm border border-slate-200 dark:border-slate-600">
+            <div className="flex flex-wrap items-center justify-between mb-4 gap-4">
+               <div>
+                 <h3 className="text-[10px] uppercase tracking-widest font-bold text-slate-400 mb-1">
+                   Contour & Response Surface Plots
+                 </h3>
+                 <p className="text-[10px] text-slate-500">Visualizes the predicted response surface across two factors, helping locate optimal operating regions.</p>
+               </div>
+               <div className="flex flex-wrap items-center gap-3">
+                 <div className="flex items-center gap-2">
+                   <span className="text-[10px] font-bold text-slate-500 uppercase">Type:</span>
+                   <select 
+                     value={plot3dType} 
+                     onChange={e => setPlot3dType(e.target.value as any)}
+                     className="rounded border border-slate-300 px-2 py-1 text-[11px] focus:outline-none"
+                   >
+                     <option value="scatter3d">Scatter 3D</option>
+                     <option value="mesh3d">Surface 3D (Mesh)</option>
+                     <option value="contour">Contour 2D</option>
+                   </select>
+                 </div>
+                 <div className="flex items-center gap-2">
+                   <span className="text-[10px] font-bold text-slate-500 dark:text-slate-300 uppercase tracking-widest">X-Axis:</span>
+                   <select 
+                     value={plotData.xFactor.id} 
+                     onChange={e => setXAxisFactorId(e.target.value)}
+                     className="rounded border border-slate-300 dark:border-slate-600 px-2 py-1 text-[11px] focus:outline-none focus:ring-1 focus:ring-brand-500"
+                   >
+                     {project.factors.map(f => (
+                       <option key={f.id} value={f.id}>{f.name}</option>
+                     ))}
+                   </select>
+                 </div>
+                 <div className="flex items-center gap-2">
+                   <span className="text-[10px] font-bold text-slate-500 dark:text-slate-300 uppercase tracking-widest">Y-Axis:</span>
+                   <select 
+                     value={plotData.yFactor.id} 
+                     onChange={e => setYAxisFactorId(e.target.value)}
+                     className="rounded border border-slate-300 dark:border-slate-600 px-2 py-1 text-[11px] focus:outline-none focus:ring-1 focus:ring-brand-500"
+                   >
+                     {project.factors.map(f => (
+                       <option key={f.id} value={f.id}>{f.name}</option>
+                     ))}
+                   </select>
+                 </div>
+               </div>
+            </div>
+            
+            <div className="h-[400px] w-full border border-slate-100 rounded bg-slate-50 dark:bg-slate-800 flex items-center justify-center overflow-hidden">
+               <Plot
+                 data={plotData.data}
+                 layout={{
+                   autosize: true,
+                   margin: plot3dType === 'contour' ? { l: 50, r: 50, b: 50, t: 50 } : { l: 0, r: 0, b: 0, t: 0 },
+                   ...(plot3dType === 'contour' ? {
+                     xaxis: { title: plotData.xFactor.name },
+                     yaxis: { title: plotData.yFactor.name }
+                   } : {
+                     scene: {
+                       xaxis: { title: plotData.xFactor.name },
+                       yaxis: { title: plotData.yFactor.name },
+                       zaxis: { title: plotData.activeResponse?.name }
+                     }
+                   }),
+                   paper_bgcolor: 'transparent',
+                   plot_bgcolor: 'transparent'
+                 }}
+                 useResizeHandler={true}
+                 style={{ width: '100%', height: '100%' }}
+                 config={{ responsive: true, displayModeBar: true }}
+               />
+            </div>
+          </div>
+        )}
+
+        {/* Basic Statistics Summary */}
+        <div className="lg:col-span-2 bg-white dark:bg-slate-900 p-4 rounded-lg shadow-sm border border-slate-200 dark:border-slate-600">
+          <h3 className="text-[10px] uppercase tracking-widest font-bold text-slate-400 mb-4">Descriptive Statistics</h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {project.responses.map(resp => {
+              const values = project.runs.map(r => r.responses[resp.id]).filter(v => v !== null) as number[];
+              if (values.length === 0) return null;
+              
+              const max = Math.max(...values);
+              const min = Math.min(...values);
+              const avg = values.reduce((a, b) => a + b, 0) / values.length;
+
+              return (
+                <div key={resp.id} className="bg-slate-50 dark:bg-slate-800 p-3 rounded border border-slate-200 dark:border-slate-600">
+                  <h4 className="font-bold text-slate-700 dark:text-slate-200 mb-2 text-[11px]">{resp.name} <span className="font-normal text-slate-500 dark:text-slate-300 capitalize font-mono">({resp.goal})</span></h4>
+                  <div className="grid grid-cols-3 gap-3">
+                    <div className="bg-white dark:bg-slate-900 p-2 border border-slate-100 rounded">
+                      <p className="text-[9px] text-slate-500 dark:text-slate-300 uppercase tracking-widest mb-0.5">Mean</p>
+                      <p className="font-bold font-mono text-slate-900 dark:text-slate-100">{avg.toFixed(2)}</p>
+                    </div>
+                    <div className="bg-white dark:bg-slate-900 p-2 border border-slate-100 rounded">
+                      <p className="text-[9px] text-slate-500 dark:text-slate-300 uppercase tracking-widest mb-0.5">Max</p>
+                      <p className="font-bold font-mono text-brand-600">{max.toFixed(2)}</p>
+                    </div>
+                    <div className="bg-white dark:bg-slate-900 p-2 border border-slate-100 rounded">
+                      <p className="text-[9px] text-slate-500 dark:text-slate-300 uppercase tracking-widest mb-0.5">Min</p>
+                      <p className="font-bold font-mono text-brand-500">{min.toFixed(2)}</p>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
