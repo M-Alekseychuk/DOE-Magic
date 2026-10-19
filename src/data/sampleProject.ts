@@ -1,21 +1,24 @@
 import { Project, Folder } from '../types';
 
-export const demoFolder: Folder = {
-  id: 'folder-coupling',
-  name: 'Catalytic Coupling Development',
-  createdAt: 1712000000000,
-};
+export function createDemoFolder(): Folder {
+  const now = Date.now();
+  return {
+    id: 'folder-coupling',
+    name: 'Catalytic Coupling Development',
+    createdAt: now,
+  };
+}
 
-// Comprehensive Mixed-Level General Factorial (Numerical & Categorical Factors)
-export const demoCatalyticProject: Project = {
+export const demoFolder: Folder = createDemoFolder();
+
+// Base definition for the Comprehensive Mixed-Level General Factorial
+const demoCatalyticBase = {
   id: 'proj-suzuki-cross-coupling',
   folderId: 'folder-coupling',
   name: 'Suzuki-Miyaura Cross-Coupling API Optimization',
   description: 'Industrial mixed-level Factorial DOE investigating Reaction Temperature (70–95 °C), Catalyst Loading (0.5–2.5 mol%), Reaction Time (2–6 h), and Solvent System (3-level Categorical: Ethanol, 2-MeTHF, Toluene) on Crude Yield (%) and HPLC Purity (%). Includes replicated center points for Pure Error and Lack of Fit evaluation.',
   centerPoints: 3,
   designType: 'factorial_2level',
-  createdAt: 1712000000000,
-  updatedAt: 1712000000000,
   factors: [
     {
       id: 'f1',
@@ -260,12 +263,23 @@ export const demoCatalyticProject: Project = {
   ]
 };
 
+export function createDemoCatalyticProject(): Project {
+  const now = Date.now();
+  return {
+    ...JSON.parse(JSON.stringify(demoCatalyticBase)),
+    createdAt: now,
+    updatedAt: now,
+  };
+}
+
+export const demoCatalyticProject: Project = createDemoCatalyticProject();
+
 export const sampleProjects: Project[] = [
-  demoCatalyticProject
+  createDemoCatalyticProject()
 ];
 
 export const sampleFolders: Folder[] = [
-  demoFolder
+  createDemoFolder()
 ];
 
 // Alias for backwards compatibility
