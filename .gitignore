@@ -11,4 +11,4 @@ coverage/
 data.json
 
 # AI Studio agent plans (removed by hand in 0d05f8c; keep them out of git)
-.aistudio/
+/.aistudio/
