@@ -6,3 +6,6 @@ coverage/
 *.log
 .env*
 !.env.example
+
+# Runtime data store written by server.ts / src/mcp/stdio.ts (re-seeded from sample data when missing)
+data.json
