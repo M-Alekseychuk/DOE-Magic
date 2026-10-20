@@ -1,21 +1,25 @@
 #!/usr/bin/env node
 // Layer boundary check for DOE-Magic. Run with `npm run check` (after tsc).
-// Rules R1-R9 are described in docs/spec/DOE-Magic/design-spec.md. No dependencies.
+// Rules R1-R9 are described in docs/spec/DOE-Magic/design-spec.md.
+// Uses the TypeScript compiler API (already a devDependency) to read imports, so
+// commented-out code and strings that merely look like imports are ignored.
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import ts from 'typescript';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const P = path.posix;
 const CORE_PACKAGES = new Set(['jstat', 'uuid']);
 const SRC_TOP_LEVEL = new Set(['main.tsx', 'vite-env.d.ts', 'core', 'server', 'web']);
 const REPO_TOP_LEVEL = new Set([
-  '.env.example', '.gitignore', 'AGENTS.md', 'CLAUDE.md', 'README.md', 'assets', 'bun.lock', 'docs', 'index.html',
-  'metadata.json', 'package-lock.json', 'package.json', 'public', 'scripts', 'server.ts', 'src', 'tsconfig.json', 'vite.config.ts',
+  '.env.example', '.github', '.gitignore', 'AGENTS.md', 'CLAUDE.md', 'LICENSE', 'README.md', 'assets', 'bun.lock', 'docs',
+  'index.html', 'metadata.json', 'package-lock.json', 'package.json', 'public', 'scripts', 'server.ts', 'src', 'tsconfig.json', 'vite.config.ts',
 ]);
-const DOM_GLOBALS = /\b(window|document|localStorage|sessionStorage|navigator)\s*[.[]/;
-const RESOLVE_SUFFIXES = ['', '.ts', '.tsx', '.js', '.css', '/index.ts', '/index.tsx'];
+const AI_STUDIO_LEFTOVERS = new Set(['.aistudio', 'data.json']);
+const DOM_GLOBALS = new Set(['window', 'document', 'localStorage', 'sessionStorage', 'navigator']);
+const RESOLVE_SUFFIXES = ['', '.ts', '.tsx', '.js', '.jsx', '.css', '/index.ts', '/index.tsx'];
 
 const errors = [];
 const fail = (rule, file, msg) => errors.push(`${rule} ${file}: ${msg}`);
@@ -27,41 +31,56 @@ function walk(dir) {
     e.isDirectory() ? walk(P.join(dir, e.name)) : [P.join(dir, e.name)]);
 }
 
-function specifiers(source) {
-  const found = [];
-  const patterns = [
-    /\b(?:import|export)\s[^'"`;]*?\bfrom\s*['"]([^'"]+)['"]/g, // import x from '...', export { x } from '...'
-    /\bimport\s*['"]([^'"]+)['"]/g, // import '...'
-    /\b(?:import|require)\s*\(\s*['"]([^'"]+)['"]\s*\)/g, // import('...'), require('...')
-  ];
-  for (const re of patterns) for (const m of source.matchAll(re)) found.push(m[1]);
-  return found;
+// Static imports, re-exports, side-effect imports, import() and require().
+const specifiers = (source) => ts.preProcessFile(source, true, true).importedFiles.map((f) => f.fileName);
+
+// First line (1-based) where code reads a browser global such as `window.x` or
+// `localStorage?.getItem`, or 0. Works on the syntax tree, so comments and strings never match.
+function domGlobalLine(file, source) {
+  const sf = ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true);
+  let line = 0;
+  const visit = (node) => {
+    if (line) return;
+    if ((ts.isPropertyAccessExpression(node) || ts.isElementAccessExpression(node)) &&
+      ts.isIdentifier(node.expression) && DOM_GLOBALS.has(node.expression.text)) {
+      line = sf.getLineAndCharacterOfPosition(node.expression.getStart(sf)).line + 1;
+      return;
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(sf);
+  return line;
 }
 
 function resolve(fromFile, spec) {
-  const base = P.normalize(P.join(P.dirname(fromFile), spec));
-  for (const suffix of RESOLVE_SUFFIXES) if (exists(base + suffix)) return base + suffix;
+  const base = P.normalize(P.join(P.dirname(fromFile), spec.replace(/[?#].*$/, '')));
+  const candidates = [base, base.replace(/\.(m?)js(x?)$/, '.$1ts$2')]; // './x.js' may name x.ts
+  for (const c of candidates) for (const suffix of RESOLVE_SUFFIXES) if (exists(c + suffix)) return c + suffix;
   return null;
 }
 
-const layerOf = (file) => file.split('/')[1]; // 'core' | 'server' | 'web' | top-level file
-const featureOf = (file) => (file.startsWith('src/web/features/') ? file.split('/')[3] : null);
-const isCode = (file) => /\.(ts|tsx)$/.test(file);
+const layerOf = (file) => (file === 'src/main.tsx' ? 'web' : file === 'server.ts' ? 'server' : file.split('/')[1]);
+const featureOf = (file) => {
+  const parts = file.split('/');
+  return parts[2] === 'features' && parts.length > 4 ? parts[3] : null;
+};
+const isCode = (file) => /\.(ts|tsx|js|jsx|mjs|cjs)$/.test(file);
+
+// R1: only the agreed entries at the top of src/ (dotfiles such as .DS_Store are ignored).
+for (const entry of fs.readdirSync(path.join(ROOT, 'src'))) {
+  if (!entry.startsWith('.') && !SRC_TOP_LEVEL.has(entry)) fail('R1', `src/${entry}`, 'unexpected top-level entry; src/ holds main.tsx, vite-env.d.ts, core/, server/, web/');
+}
 
 // R9: only the agreed files and folders are tracked at the repo root (no scratch scripts).
 let tracked = null;
 try {
   tracked = execFileSync('git', ['ls-files', '-z'], { cwd: ROOT, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).split('\0').filter(Boolean);
 } catch {
-  console.warn('R9 skipped: git is not available here.');
+  console.warn('R9 skipped: not a git checkout (or git is not installed).');
 }
 for (const entry of new Set((tracked ?? []).map((f) => f.split('/')[0]))) {
-  if (!REPO_TOP_LEVEL.has(entry)) fail('R9', entry, 'not an agreed repo-root entry; put code in src/, tools in scripts/, docs in docs/ (or update the list in this script and AGENTS.md)');
-}
-
-// R1: only the agreed entries at the top of src/.
-for (const entry of fs.readdirSync(path.join(ROOT, 'src'))) {
-  if (!SRC_TOP_LEVEL.has(entry)) fail('R1', `src/${entry}`, 'unexpected top-level entry; src/ holds main.tsx, vite-env.d.ts, core/, server/, web/');
+  if (AI_STUDIO_LEFTOVERS.has(entry)) fail('R9', entry, 're-added by an AI Studio sync; remove it from git with `git rm -r --cached` (it is in .gitignore)');
+  else if (!REPO_TOP_LEVEL.has(entry)) fail('R9', entry, 'not an agreed repo-root entry; put code in src/, tools in scripts/, docs in docs/ (or update the list in this script and AGENTS.md)');
 }
 
 const files = [...walk('src').filter(isCode), 'server.ts'];
@@ -73,16 +92,19 @@ for (const file of files) {
   const edges = [];
   graph.set(file, edges);
 
+  if (file.startsWith('src/web/features/') && file.split('/').length === 4) {
+    fail('R6', file, 'loose file in src/web/features/; put it in a feature folder, src/web/shared/ or src/core/');
+  }
   if (layer === 'core') {
-    if (file.endsWith('.tsx')) fail('R3', file, 'src/core holds plain .ts only (no React)');
-    const line = source.split('\n').findIndex((l) => DOM_GLOBALS.test(l));
-    if (line !== -1) fail('R3', `${file}:${line + 1}`, 'browser global used in src/core');
+    if (/\.(tsx|jsx)$/.test(file)) fail('R3', file, 'src/core holds plain TypeScript only (no React/JSX)');
+    const line = domGlobalLine(file, source);
+    if (line) fail('R3', `${file}:${line}`, 'browser global used in src/core');
   }
 
   for (const spec of specifiers(source)) {
     // R2: relative imports only, and they must resolve.
     if (spec.startsWith('@/') || spec.startsWith('src/')) {
-      fail('R2', file, `"${spec}": use a relative path (aliases are not wired into esbuild/tsx)`);
+      fail('R2', file, `"${spec}": use a relative path ("@/" maps to the repo root, not src/, and the check cannot place aliased imports in a layer)`);
       continue;
     }
     if (!spec.startsWith('.')) {
@@ -97,7 +119,7 @@ for (const file of files) {
 
     const to = layerOf(target);
     if (layer === 'core' && to !== 'core') fail('R3', file, `imports ${target}; src/core may only import src/core`);
-    if (layer === 'server' && to !== 'core' && to !== 'server') fail('R4', file, `imports ${target}; src/server may only import src/core and src/server`);
+    if (layer === 'server' && to !== 'core' && to !== 'server') fail('R4', file, `imports ${target}; server code may only import src/core and src/server`);
     if (layer === 'web' && to === 'server') fail('R5', file, `imports ${target}; the browser reaches the server over HTTP only`);
     const [fromFeature, toFeature] = [featureOf(file), featureOf(target)];
     if (fromFeature && toFeature && fromFeature !== toFeature) {
