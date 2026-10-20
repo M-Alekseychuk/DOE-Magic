@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 // Layer boundary check for DOE-Magic. Run with `npm run check` (after tsc).
-// Rules R1-R8 are described in docs/spec/DOE-Magic/design-spec.md. No dependencies.
+// Rules R1-R9 are described in docs/spec/DOE-Magic/design-spec.md. No dependencies.
+import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -9,6 +10,10 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const P = path.posix;
 const CORE_PACKAGES = new Set(['jstat', 'uuid']);
 const SRC_TOP_LEVEL = new Set(['main.tsx', 'vite-env.d.ts', 'core', 'server', 'web']);
+const REPO_TOP_LEVEL = new Set([
+  '.env.example', '.gitignore', 'AGENTS.md', 'CLAUDE.md', 'README.md', 'assets', 'bun.lock', 'docs', 'index.html',
+  'metadata.json', 'package-lock.json', 'package.json', 'public', 'scripts', 'server.ts', 'src', 'tsconfig.json', 'vite.config.ts',
+]);
 const DOM_GLOBALS = /\b(window|document|localStorage|sessionStorage|navigator)\s*[.[]/;
 const RESOLVE_SUFFIXES = ['', '.ts', '.tsx', '.js', '.css', '/index.ts', '/index.tsx'];
 
@@ -42,6 +47,17 @@ function resolve(fromFile, spec) {
 const layerOf = (file) => file.split('/')[1]; // 'core' | 'server' | 'web' | top-level file
 const featureOf = (file) => (file.startsWith('src/web/features/') ? file.split('/')[3] : null);
 const isCode = (file) => /\.(ts|tsx)$/.test(file);
+
+// R9: only the agreed files and folders are tracked at the repo root (no scratch scripts).
+let tracked = null;
+try {
+  tracked = execFileSync('git', ['ls-files', '-z'], { cwd: ROOT, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).split('\0').filter(Boolean);
+} catch {
+  console.warn('R9 skipped: git is not available here.');
+}
+for (const entry of new Set((tracked ?? []).map((f) => f.split('/')[0]))) {
+  if (!REPO_TOP_LEVEL.has(entry)) fail('R9', entry, 'not an agreed repo-root entry; put code in src/, tools in scripts/, docs in docs/ (or update the list in this script and AGENTS.md)');
+}
 
 // R1: only the agreed entries at the top of src/.
 for (const entry of fs.readdirSync(path.join(ROOT, 'src'))) {

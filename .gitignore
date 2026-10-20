@@ -9,3 +9,6 @@ coverage/
 
 # Runtime data store written by server.ts / src/server/mcp/stdio.ts (re-seeded from sample data when missing)
 data.json
+
+# AI Studio agent plans (removed by hand in 0d05f8c; keep them out of git)
+.aistudio/
