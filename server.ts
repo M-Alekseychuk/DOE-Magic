@@ -17,9 +17,9 @@ const io = new Server(httpServer, {
   cors: { origin: '*' }
 });
 
-import { sampleProjects, sampleFolders } from './src/data/sampleProject';
+import { sampleProjects, sampleFolders } from './src/core/sampleProject';
 import { SSEServerTransport } from '@modelcontextprotocol/sdk/server/sse.js';
-import { createDoeMcpServer, handleDirectJsonRpc, mcpActivityLogs } from './src/mcp/doeMcpServer';
+import { createDoeMcpServer, handleDirectJsonRpc, mcpActivityLogs } from './src/server/mcp/doeMcpServer';
 
 // Load data with realistic default experiments
 let db: any = { projects: [], folders: [] };
