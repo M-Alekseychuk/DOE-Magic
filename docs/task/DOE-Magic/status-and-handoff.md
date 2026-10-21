@@ -1,6 +1,6 @@
 # DOE-Magic — Status and Handoff (START HERE)
 
-> Created: 2026-10-20. Status: START HERE. Current as of 2026-10-21. First written for PR `chore/project-structure-and-core-docs` (PR #1), which was merged on 2026-10-21: do the after-merge steps below if not done yet. Updated for the test harness PR (backlog P2.1 step 1, PR #PRNUM).
+> Created: 2026-10-20. Status: START HERE. Current as of 2026-10-21. First written for PR `chore/project-structure-and-core-docs` (PR #1), which was merged on 2026-10-21: do the after-merge steps below if not done yet. Updated for the test harness PR (backlog P2.1 step 1, PR #3).
 > Related: [Goals](goals.md), [Roadmap and backlog](../../spec/DOE-Magic/roadmap-backlog.md), [Design spec](../../spec/DOE-Magic/design-spec.md), [AI Studio origin](../../context/DOE-Magic/ai-studio-origin.md), [README](../../../README.md), [AGENTS.md](../../../AGENTS.md)
 
 ## First screen: what you must know
@@ -15,9 +15,9 @@
 
 DOE Magic is a working Design-of-Experiments web app with an MCP server. M-Alekseychuk built it in Google AI Studio for Jiuzhou Pharmaceutical process scientists. It plans designs (factorial, DSD, CCD, BBD, Plackett-Burman, D-optimal), analyses results (OLS, ANOVA, effects, diagnostics, desirability), compares responses, runs Monte Carlo robustness and Bayesian next-run suggestions, and exports JSON, Excel and HTML. It works in English and Chinese.
 
-PR #1 reorganised the repository and documented it without changing any behaviour. PR #PRNUM added the test harness (below); it changes no calculation either. A review of the code (some of it confirmed by running the engine) registered 160 issue IDs: 14 Critical, listed below, 47 High, 63 Medium and 36 Low. Some IDs describe the same bug from two angles. All of them are recorded in the [backlog](../../spec/DOE-Magic/roadmap-backlog.md) and none are fixed yet. The next work is Phase 1 of the [goals](goals.md): tests plus statistical correctness.
+PR #1 reorganised the repository and documented it without changing any behaviour. PR #3 added the test harness (below); it changes no calculation either. A review of the code (some of it confirmed by running the engine) registered 160 issue IDs: 14 Critical, listed below, 47 High, 63 Medium and 36 Low. Some IDs describe the same bug from two angles. All of them are recorded in the [backlog](../../spec/DOE-Magic/roadmap-backlog.md) and none are fixed yet. The next work is Phase 1 of the [goals](goals.md): tests plus statistical correctness.
 
-## Test harness (backlog P2.1 step 1, PR #PRNUM)
+## Test harness (backlog P2.1 step 1, PR #3)
 
 Tests and tooling only; nothing under `src/` changed.
 

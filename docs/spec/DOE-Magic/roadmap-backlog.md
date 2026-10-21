@@ -1,6 +1,6 @@
 # DOE-Magic — Roadmap and Backlog
 
-> Created: 2026-10-20. Status: proposed. Started: P2.1 (step 1, the test harness, done in PR #PRNUM on 2026-10-21); the `.baseline-dist/` part of P3.10 is done. This file is the issue registry and the prioritised backlog. Update it in every PR that closes or changes an item.
+> Created: 2026-10-20. Status: proposed. Started: P2.1 (step 1, the test harness, done in PR #3 on 2026-10-21); the `.baseline-dist/` part of P3.10 is done. This file is the issue registry and the prioritised backlog. Update it in every PR that closes or changes an item.
 > Related: [Status and handoff](../../task/DOE-Magic/status-and-handoff.md), [Goals](../../task/DOE-Magic/goals.md), [Design spec](design-spec.md), [Statistics engine](../../context/DOE-Magic/statistics-engine.md), [Design generation](../../context/DOE-Magic/design-generation.md), [MCP server](../../context/DOE-Magic/mcp-server.md), [Server and persistence](../../context/DOE-Magic/server-and-persistence.md), [Web UI](../../context/DOE-Magic/web-ui.md), [AI Studio origin](../../context/DOE-Magic/ai-studio-origin.md), [AGENTS.md](../../../AGENTS.md)
 
 ## How to use this backlog
@@ -43,7 +43,7 @@ PR 0 is the current branch `chore/project-structure-and-core-docs`. It removes t
 
 | # | PR | Item | Type | Why here |
 |---|---|---|---|---|
-| 1 | Test harness and reference datasets for `src/core/analysis` (done, PR #PRNUM) | P2.1 step 1 | tests and tooling | Every P0 statistics fix needs pinned reference values |
+| 1 | Test harness and reference datasets for `src/core/analysis` (done, PR #3) | P2.1 step 1 | tests and tooling | Every P0 statistics fix needs pinned reference values |
 | 2 | Demo buttons stop wiping all data | P0.1 | logic, S | One click destroys every project. Needs no harness, so it can land before or alongside PR 1 |
 | 3 | Confirm before replacing measured runs (UI and MCP) | P0.2 | logic, M | Same: silent loss of lab results |
 | 4 | CI: `npm ci`, `npm run check`, `npm test`, `npm run build` | P2.1 step 2 | tooling, S | Guards every later PR |
@@ -914,7 +914,7 @@ Each calculation should exist once, in `src/core`, with typed results. Several i
 
 | Item | Title | Covers | Phase | Type | Size | Status |
 |---|---|---|---|---|---|---|
-| P2.1 | Test harness, reference datasets and CI | BLD-4 | 1 | tooling | M | in progress (step 1 done in PR #PRNUM; step 2 open) |
+| P2.1 | Test harness, reference datasets and CI | BLD-4 | 1 | tooling | M | in progress (step 1 done in PR #3; step 2 open) |
 | P2.2 | One package manager, one lockfile, a declared Node version | BLD-7, SRV-6, BLD-13 | 3 (after decision 1) | tooling | S | open |
 | P2.3 | One design generator | DES-8, MCP-19, UI-15 | 2 | logic | L | open |
 | P2.4 | Design algorithm gaps | DES-9, DES-11, DES-12 | 2 | logic | M | open |
@@ -939,7 +939,7 @@ Each calculation should exist once, in `src/core`, with typed results. Several i
 ### P2.1 Test harness, reference datasets and CI
 
 - **Covers:** BLD-4 (Medium, C). Tooling. Step 1 M, step 2 S.
-- **Status (2026-10-21):** step 1 is done in PR #PRNUM. `npm test` runs vitest 4.1 on `tests/`: 118 passing tests, 38 expected failures (`it.fails`, named after STAT-1, STAT-2, STAT-3, STAT-4, STAT-5, STAT-21, MCP-1/UI-31, MCP-6, MCP-7, MCP-8 and MCP-9) and 2 `it.todo`. The case table (fixture, source, issue IDs, which backlog item flips each test) is in the [statistics engine doc](../../context/DOE-Magic/statistics-engine.md#reference-tests). Differences from the plan below:
+- **Status (2026-10-21):** step 1 is done in PR #3. `npm test` runs vitest 4.1 on `tests/`: 118 passing tests, 38 expected failures (`it.fails`, named after STAT-1, STAT-2, STAT-3, STAT-4, STAT-5, STAT-21, MCP-1/UI-31, MCP-6, MCP-7, MCP-8 and MCP-9) and 2 `it.todo`. The case table (fixture, source, issue IDs, which backlog item flips each test) is in the [statistics engine doc](../../context/DOE-Magic/statistics-engine.md#reference-tests). Differences from the plan below:
   - Reference values are published examples (Montgomery, *Design and Analysis of Experiments*, 8th ed., Examples 6.1, 6.2, 8.1 and 11.2; Lenth 1989) plus statsmodels 0.14.4 OLS via `tests/fixtures/compute_reference.py`, because R was not installed (decision 5 is still open). The Lenth worked example is Montgomery's application of Lenth's method to Example 6.2 (PSE 2.625, ME 6.75, SME 13.70), not the example in Lenth's paper, which was not at hand; it is an `it.todo` until P0.4 adds a core Lenth function.
   - Added fixtures beyond the minimum set: an unreplicated 2^4 (Example 6.2, two models) and a real 6-factor DSD built from a conference matrix (rank-deficient, like PB12).
   - The design helpers (run counts, level balance, max |r|, resolution, D-efficiency) are not in this step; P0.11 adds them before it changes the generators. Seeded random rank-deficient 3-level designs are left to P0.3.
