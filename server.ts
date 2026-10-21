@@ -5,7 +5,7 @@ import path from 'path';
 import fs from 'fs';
 import cors from 'cors';
 
-const PORT = 3000;
+const PORT = Number(process.env.PORT) || 3000;
 const DATA_FILE = path.join(process.cwd(), 'data.json');
 
 const app = express();
@@ -355,7 +355,7 @@ async function startServer() {
     const vite = await createViteServer({
       server: {
         middlewareMode: true,
-        hmr: {
+        hmr: process.env.DISABLE_HMR === 'true' ? false : {
           server: httpServer,
           clientPort: clientPort,
         },
