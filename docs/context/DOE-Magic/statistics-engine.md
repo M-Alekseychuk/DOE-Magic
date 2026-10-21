@@ -350,15 +350,41 @@ These issues in other areas involve engine outputs: MCP-1, MCP-6, MCP-7, MCP-8 a
 - **`optimalConditions.pModel` is a DF count** (`analysisCore.ts:890`, part of UI-31). Nothing reads it today. Its name clashes with the `pModel` field name suggested in the MCP-1 fix, so rename it (for example to `dfModel`) when that fix lands.
 - **A categorical factor with one level** (STAT-27) gets the column name `name[undefined]` (line 225) and a constant −1 column. That column is collinear with the intercept, so the term is reported as aliased. Input validation should reject such factors (backlog P1.10).
 
+## Reference tests
+
+`npm test` runs the vitest suite in `tests/` (BLD-4, backlog P2.1 step 1). It compares the engine with fixed reference values in `tests/fixtures/*.json`. Each fixture records where its data and values come from. Its `reference` block is computed by `tests/fixtures/compute_reference.py`: statsmodels 0.14.4 OLS on the estimable columns of the model defined in design spec §4.2, which is what R `lm()` reports with `NA` for aliased terms. R was not installed when the suite was written, so the references are published examples plus statsmodels (open decision 5). Format and rules: [tests/fixtures/README.md](../../../tests/fixtures/README.md).
+
+A test that fails today because of a registered bug is an `it.fails` named after its issue ID and backlog item, so the suite is green and each fix flips exactly its own tests. On 2026-10-21 the suite had 118 passing tests, 38 expected failures and 2 `it.todo`.
+
+"Full comparison" below means every group in `itMatchesReference` (`tests/helpers/reference.ts`): β, SE, t, p, VIF, SSE, R², adjusted R², RMSE, model F, Type III SS/F/p, lack of fit and pure error, leverage (Σh = rank, 0 ≤ h ≤ 1), studentized residuals, Cook's D, adequate precision and the Box-Cox profile. Tolerances are relative 1e-8 (1e-6 for p-values).
+
+| Case (fixture · test file) | Source of data and values | Passes today | Pins known bugs (`it.fails`, flipped by) |
+|---|---|---|---|
+| Replicated 2^3, plasma etch (`montgomery-ex6-1-plasma-etch` · `replicatedFactorial.test.ts`) | Montgomery (2013) *Design and Analysis of Experiments*, 8th ed., Example 6.1 | Published effects, Type III SS and SST; pure error = published error (8 DF), lack of fit = ABC SS; full comparison | none (baseline) |
+| Unreplicated 2^4, filtration (`montgomery-ex6-2-filtration` · `unreplicatedFactorial.test.ts`) | Montgomery Example 6.2, and Lenth's method on it (§6.5) | Published effects; Montgomery's final model A, C, D, AC, AD; full comparison of the default and the final model (the final model's pure error comes from the projection onto A, C, D) | STAT-2 worked example PSE 2.625, ME 6.75, SME 13.70 as `it.todo` (P0.4 adds a core Lenth function) |
+| Saturated 2^(4−1), filtration (`montgomery-ex8-1-half-fraction` · `saturated.test.ts`) | Montgomery Example 8.1; Lenth (1989) *Technometrics* 31:469–473 for PSE = 24.75 | Published effects, BC/BD/CD aliased, rank 8, leverages 1 | STAT-2 ×3 (t = \|effect\|/PSE, F = t², pool ignores excluded terms), STAT-5 ×2 (SE 0, zero-width CI/PI), STAT-21 (Box-Cox on an exact fit): P0.4 |
+| Saturated 2 × 3 with a 3-level categorical (`factorial-2x3-saturated` · `saturated.test.ts`, `runAnalysis.test.ts`) | Synthetic | Coefficients | STAT-5 (undefined reference row): P0.4. MCP-9 (crash): P0.5 |
+| PB12, 6 factors + 3 centre runs (`pb12-6f-3cp` · `rankDeficient.test.ts`) | Plackett & Burman (1946) N = 12 design, the generator's construction; synthetic y with seed | Coefficients, aliased set, fitted values, ANOVA, lack of fit, adequate precision; the explicit reduced model passes the full comparison | STAT-1 ×8 (Σh = rank and h ≤ 1, leverage, SE/t/p, SE = reduced model, VIF, Type III, studentized residuals and Cook's D, Box-Cox): P0.3 |
+| DSD, 6 factors + 3 centre runs (`dsd-6f-conference` · `rankDeficient.test.ts`) | Jones & Nachtsheim (2011), from the order-6 conference matrix; synthetic y with seed | Same as PB12 | STAT-1 ×8: P0.3 |
+| Regular 2^(4−1) + 3 centre runs (`half-fraction-2x4-1-3cp` · `rankDeficient.test.ts`) | The standard D = ABC fraction (Montgomery §8.2); synthetic y with seed | Full comparison. Its 3 aliased 2FI columns equal other columns exactly, so the engine is right today; this is the control that P0.3 must leave unchanged | none |
+| CCD, 2 factors (`montgomery-ex11-2-ccd` · `responseSurface.test.ts`) | Montgomery Example 11.2 (published second-order model and stationary point) | Full comparison of the A, B, A*B fit; linear and interaction coefficients equal the published ones | STAT-3 ×3 (ŷ at the centre = 79.94, ŷ at the stationary point = 80.21, lack of fit not significant) and an `it.todo` for the x² coefficients: P0.9 |
+| Optimum, 2^5 and 2^7 (`optimum.test.ts`) | Synthetic with a known answer | 5 factors: F0 at its maximum | STAT-4 ×2 (7 factors): P0.8 |
+| Demo project (`demo-suzuki-cross-coupling` · `demoProject.test.ts`) | `src/core/sampleProject.ts` (the fixture copy must stay equal) | Full comparison for Yield and Purity; characterization snapshot of the whole output | none; the snapshot contains known-wrong values (for example `p` = 14) |
+| Model p-value (`modelPValue.test.ts`) | Reference fits of Ex. 6.1, Ex. 6.2 and the demo | — | MCP-1/UI-31 ×5 (`dfModel`, `modelPValue`, null when error DF = 0): P0.5 |
+| MCP `run_analysis` (`tests/server/mcp/runAnalysis.test.ts`, SDK `InMemoryTransport`) | Demo reference fit | R², adjusted R², RMSE, F | MCP-1, MCP-6, MCP-7, MCP-8, MCP-9: P0.5 |
+| Every fixture (`invariants.test.ts`) | — | Predictions at the design points equal the fitted values, also from a JSON-serialised result; coefficients do not depend on factor order (full-rank models) | none |
+
+Not covered yet: design invariants (run counts, level balance, max \|r\|, resolution, D-efficiency) come with P0.11; seeded random rank-deficient 3-level designs with P0.3; the HTML report (UI-31's display side) and the web UI have no tests.
+
 ## How to verify numerically
 
-Keep verification scripts **outside the repo** ([lesson](../../memory/DOE-Magic/patch-scripts-in-repo-root.md)) until the vitest suite exists (BLD-4).
+The `.mts` route below is for one-off exploration. Keep such scripts **outside the repo** ([lesson](../../memory/DOE-Magic/patch-scripts-in-repo-root.md)); a check worth keeping becomes a test in `tests/` with a fixture.
 
 1. Write a `.mts` file. It needs top-level `await`, and `tsx` compiles a `.ts` file outside the repo (no `"type": "module"` package.json) as CommonJS, which rejects it.
 2. Import the engine through `pathToFileURL('<repo>/src/core/analysis/analysisCore.ts')`.
 3. Run it with `<repo>/node_modules/.bin/tsx file.mts`.
 
-The checks below were run on 2026-10-20 and give the results shown. The STAT-5 and STAT-4 runs used different Y data from the registry's runs, so their CI and desirability values differ from the registry and backlog figures (CI [15.28, 15.28]; desirability 0.045); the failure pattern is the same.
+The checks below were run on 2026-10-20 and give the results shown. They are now `it.fails` tests ([Reference tests](#reference-tests)). The fixtures use their own Y data, so values that depend on Y differ; leverage depends only on the design, and the PB12 fixture reproduces Σh = 11.000 and max h = 1.067. The STAT-5 and STAT-4 runs used different Y data from the registry's runs, so their CI and desirability values differ from the registry and backlog figures (CI [15.28, 15.28]; desirability 0.045); the failure pattern is the same.
 
 | Check | Setup | Invariant | Current result |
 |---|---|---|---|
@@ -370,8 +396,8 @@ The checks below were run on 2026-10-20 and give the results shown. The STAT-5 a
 
 Reference values for fixes:
 
-- compare against a reduced full-rank model fitted on the estimable columns (STAT-1);
-- Lenth (1989), *Technometrics* 31:469-473 (STAT-2);
-- JMP or R `lm` and `anova` for every table, starting with the demo project.
+- compare against a reduced full-rank model fitted on the estimable columns (STAT-1; `rankDeficient.test.ts` does);
+- Lenth (1989), *Technometrics* 31:469-473 (STAT-2; the Ex. 6.2 and Ex. 8.1 fixtures carry the values);
+- JMP or R `lm` and `anova` for every table, starting with the demo project (statsmodels stands in until decision 5 is made).
 
-AGENTS.md requires a reference test before any statistics change.
+AGENTS.md requires a reference test before any statistics change. Add it to `tests/` with a fixture.

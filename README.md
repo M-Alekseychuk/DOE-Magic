@@ -58,6 +58,7 @@ Open http://localhost:3000. The same process serves the web app, the data API an
 | `npm run build` | Build the production bundle into `dist/` |
 | `npm start` | Run the production bundle. It needs `NODE_ENV=production`. In PowerShell, run `$env:NODE_ENV="production"; npm start` and close that window afterwards, otherwise a later `npm run dev` in it serves the old build. In bash, run `NODE_ENV=production npm start` |
 | `npm run mcp` | Start the MCP server over stdio, for desktop AI clients |
+| `npm test` | Run the automatic tests. They compare the statistics with textbook examples; results that are known to be wrong show as "expected fail" until they are fixed |
 | `npm run check` | Type-check everything and verify the folder rules. Developers run it before every commit. AI Studio cannot run it, so until automatic checks exist, someone with a local copy runs it after each AI Studio push |
 
 ### Where your data is
@@ -99,6 +100,7 @@ src/
   web/             the web app: screens, tabs, translations, shared widgets
 public/            files served as-is (logo, Plotly charting library)
 scripts/           project tools (the folder-rule check)
+tests/             automatic tests and the reference data they compare against
 docs/              project documentation (see below)
 ```
 
