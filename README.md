@@ -4,11 +4,10 @@ DOE Magic is a Design of Experiments (DOE) workbench for pharmaceutical process 
 
 > [!WARNING]
 > **If you edit this project in Google AI Studio.** AI Studio pushes its *whole* workspace to GitHub and overwrites what is there.
-> 1. **Until the pull request `chore/project-structure-and-core-docs` is merged, do not push from AI Studio at all.** If you need changes in the meantime, tell the person who opened the pull request.
-> 2. **Before you switch:** in your current AI Studio app, open every real project and click **Export JSON** on its page. Keep the files. A new AI Studio project starts with only the demo project. The copy in your browser is not a backup (see [where your data is](#where-your-data-is)).
-> 3. **After the merge:** re-import the project from the `main` branch, or start a fresh AI Studio project from it. Then bring each project back with **Import Project** on the Dashboard. Never push from an AI Studio workspace that is older than `main`.
+> 1. **Never push from an AI Studio workspace that is older than `main`.** The restructuring pull request (#1) was merged on 2026-10-21. After that and after every later merge, re-import the project from the `main` branch, or start a fresh AI Studio project from it, before you edit there again.
+> 2. **Before you switch workspaces:** in your current AI Studio app, open every real project and click **Export JSON** on its page. Keep the files. A new AI Studio project starts with only the demo project. The copy in your browser is not a backup (see [where your data is](#where-your-data-is)). In the new workspace, bring each project back with **Import Project** on the Dashboard.
 >
-> Nobody has confirmed the exact AI Studio steps yet ([details](docs/context/DOE-Magic/ai-studio-origin.md)). If you are unsure, do not push; ask the pull-request author to do it with you. After any AI Studio push, open the commit on GitHub. If it deletes `README.md` or `docs/`, or adds many files at the top level, say so right away; it can be undone.
+> Nobody has confirmed the exact AI Studio steps yet ([details](docs/context/DOE-Magic/ai-studio-origin.md)). If you are unsure, do not push; ask a developer to do it with you. After any AI Studio push, open the commit on GitHub. If it deletes files you did not mean to delete (`README.md`, `docs/`, anything else), or adds many files at the top level, say so right away; it can be undone. The first push after the merge (commit cc41f15) deleted the two lockfiles and `assets/.aistudio/.gitignore` without saying so. The lockfiles are no longer kept, so that part needs nothing from you.
 
 > [!CAUTION]
 > **Some results are known to be wrong.** Do not use these for process decisions, batch records or reports until they are fixed:
@@ -54,7 +53,7 @@ Open http://localhost:3000. The same process serves the web app, the data API an
 
 | Command | What it does |
 |---|---|
-| `npm run dev` | Start the app for development on port 3000 |
+| `npm run dev` | Start the app for development on port 3000. To use another port, set the `PORT` environment variable; the page then no longer reloads by itself after code edits |
 | `npm run build` | Build the production bundle into `dist/` |
 | `npm start` | Run the production bundle. It needs `NODE_ENV=production`. In PowerShell, run `$env:NODE_ENV="production"; npm start` and close that window afterwards, otherwise a later `npm run dev` in it serves the old build. In bash, run `NODE_ENV=production npm start` |
 | `npm run mcp` | Start the MCP server over stdio, for desktop AI clients |

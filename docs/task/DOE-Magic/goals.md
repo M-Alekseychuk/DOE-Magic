@@ -94,7 +94,7 @@ There are no behaviour changes.
 The one-click data-loss issues (DATA-1/UI-1, DES-1/UI-2, MCP-10) are small guard fixes. Do them at the start of this phase rather than waiting for Phase 3.
 
 **Success criteria:**
-- CI runs `npm ci`, `npm run check`, the tests and `npm run build` on every PR.
+- CI runs `npm install` (no lockfile, decision 1), `npm run check`, the tests and `npm run build` on every PR.
 - Each core statistic has at least one reference test, for example:
   - the sum of leverages equals the rank on a Plackett-Burman design with centre points
   - the Lenth (1989) example is reproduced
@@ -142,7 +142,7 @@ Then:
 - Access control: restricted CORS, localhost binding by default, and a token (SRV-1).
 - No source maps served (SRV-2/BLD-2).
 - A correct production start (SRV-3/BLD-1).
-- One lockfile and a declared Node version (BLD-7, SRV-6/BLD-13), once open decision 1 is made.
+- A declared package manager and Node version (BLD-7, SRV-6/BLD-13). Decision 1 keeps no lockfile for now.
 - Exact-id lookups for destructive MCP tools (MCP-4).
 - Escaping in the HTML export (UI-11).
 - A dependency audit (BLD-3).

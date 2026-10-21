@@ -1,6 +1,6 @@
 # DOE-Magic — Roadmap and Backlog
 
-> Created: 2026-10-20. Status: in progress. Done: P0.1 (PR #2, 2026-10-21), P2.1 step 1 (the test harness, PR #3, 2026-10-21) and the `.baseline-dist/` part of P3.10; no other item is started. This file is the issue registry and the prioritised backlog. Update it in every PR that closes or changes an item.
+> Created: 2026-10-20. Status: in progress. Done: P0.1 (PR #2, 2026-10-21), P2.1 step 1 (the test harness, PR #3, 2026-10-21), the `.baseline-dist/` part of P3.10, and two parts of P3.9 that the owner's commit cc41f15 made (2026-10-21); no other item is started. Decision 1 is settled (no lockfile). This file is the issue registry and the prioritised backlog. Update it in every PR that closes or changes an item.
 > Related: [Status and handoff](../../task/DOE-Magic/status-and-handoff.md), [Goals](../../task/DOE-Magic/goals.md), [Design spec](design-spec.md), [Statistics engine](../../context/DOE-Magic/statistics-engine.md), [Design generation](../../context/DOE-Magic/design-generation.md), [MCP server](../../context/DOE-Magic/mcp-server.md), [Server and persistence](../../context/DOE-Magic/server-and-persistence.md), [Web UI](../../context/DOE-Magic/web-ui.md), [AI Studio origin](../../context/DOE-Magic/ai-studio-origin.md), [AGENTS.md](../../../AGENTS.md)
 
 ## How to use this backlog
@@ -32,7 +32,7 @@ The full change process is §9 of the [design spec](design-spec.md). The rules t
 5. **Persisted format.** Before P2.16 (schema version) lands, only additive optional fields may be added to `src/core/types.ts`. Any change to an existing field waits for the migration pipeline.
 6. **Checks.** Run `npm run check`, `npm test` and `npm run build`. For server or MCP changes, also rerun the smoke check used for the restructuring PR: REST, MCP over HTTP including `run_analysis` on the demo project, stdio MCP, and dev-mode Vite.
 7. **AI Studio-sensitive changes** are flagged below. They touch `package.json` scripts, `server.ts` host or port, `index.html`, `metadata.json`, `.env.example`, `vite.config.ts` or the `dist/` layout. Check them in a fresh AI Studio import before merging, and re-import AI Studio from `main` after every merge, exporting every real project with Export JSON first (a new workspace starts with only the demo project). See [AI Studio sync overwrites the repo](../../memory/DOE-Magic/ai-studio-sync-overwrites-repo.md).
-8. **Dependencies.** While both lockfiles are tracked (decision 1), every dependency change updates `package-lock.json` and `bun.lock`; if bun is not available, the PR says that `bun.lock` was not updated (design spec §9.8). See [lockfile drift](../../memory/DOE-Magic/lockfile-drift.md).
+8. **Dependencies.** No lockfile is tracked (decision 1, settled 2026-10-21). A dependency change commits `package.json` only, made with `npm install <pkg>` or `npm uninstall <pkg>` (design spec §9.8). See [lockfile drift](../../memory/DOE-Magic/lockfile-drift.md).
 9. **No scratch scripts in the repo.** See [patch scripts in the repo root](../../memory/DOE-Magic/patch-scripts-in-repo-root.md).
 
 ## Suggested PR sequence
@@ -46,7 +46,7 @@ PR 0 is the current branch `chore/project-structure-and-core-docs`. It removes t
 | 1 | Test harness and reference datasets for `src/core/analysis` | P2.1 step 1 | tests and tooling | **Done 2026-10-21 (PR #3).** Every P0 statistics fix needs pinned reference values |
 | 2 | Demo buttons stop wiping all data | P0.1 | logic, S | **Done 2026-10-21 (PR #2).** One click destroyed every project. Needs no harness, so it can land before or alongside PR 1 |
 | 3 | Confirm before replacing measured runs (UI and MCP) | P0.2 | logic, M | Same: silent loss of lab results |
-| 4 | CI: `npm ci`, `npm run check`, `npm test`, `npm run build` | P2.1 step 2 | tooling, S | Guards every later PR |
+| 4 | CI: `npm install`, `npm run check`, `npm test`, `npm run build` | P2.1 step 2 | tooling, S | Guards every later PR |
 | 5 | QR least-squares solver | P0.3 | logic, M | Standard errors, p-values, leverage and intervals depend on it. Needed by P0.9 and P2.6 |
 | 6 | Saturated-model inference (Lenth, SE, Box-Cox) | P0.4 | logic, M | |
 | 7 | Model p-value and the MCP `run_analysis` contract | P0.5 | logic, M | Needs the null semantics from PR 6 |
@@ -73,7 +73,7 @@ PR 0 is the current branch `chore/project-structure-and-core-docs`. It removes t
 **Phase 3: integrity and security.** Skip any item already pulled forward.
 1. P2.16 (schema version) first.
 2. P1.5, P1.6, P2.15, P1.10, P1.12, P2.14, P1.7, P1.8, P1.13, P1.14.
-3. P1.2, then P2.2 once decision 1 is made (both change the `package.json` scripts and the production start, and both are AI Studio-sensitive), P1.3, P1.4, then P1.1 once decisions 3 and 8 are made.
+3. P1.2, then P2.2 (decision 1 is settled; both change the `package.json` scripts and the production start, and both are AI Studio-sensitive), P1.3, P1.4, then P1.1 once decisions 3 and 8 are made.
 4. P1.9 and P2.18 once decision 6 is made.
 5. P2.17.
 
@@ -85,8 +85,8 @@ Numbers 1–8 match the table in [Status and handoff](../../task/DOE-Magic/statu
 
 | # | Decision | Options | Blocks | Until decided |
 |---|---|---|---|---|
-| 1 | Package manager and lockfile | npm (`package-lock.json`) or bun (`bun.lock`). It depends on which installer AI Studio runs, which is unknown. Check AI Studio's build log | P2.2. Every dependency PR (P1.3, P3.6) | Update both lockfiles. CI uses `npm ci` |
-| 2 | Remove the Gemini leftovers (`@google/genai`, `MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API` in `metadata.json:5-7`, `GEMINI_API_KEY` in `.env.example:1-4`) | Remove all of them, or keep them for AI Studio. The effect on AI Studio is unverified; try it in a scratch import first | P3.6 | Keep them. Nothing in `src/` or `server.ts` uses Gemini |
+| 1 | Package manager and lockfile | **Settled 2026-10-21 by the developer (PR #4): npm, with no lockfile for now.** Neither `package-lock.json` nor `bun.lock` is tracked; both are in `.gitignore`. The owner's AI Studio push cc41f15 deleted both, and a restored one would be deleted by the next push; early development accepts floating versions. Revisit when AI Studio no longer pushes to `main`, when a dependency update changes a test result, or when decision 6 makes the tool GMP-relevant ([lesson](../../memory/DOE-Magic/lockfile-drift.md)) | P2.2 keeps `packageManager` and `engines` | Settled. Dependency PRs commit `package.json` only; CI uses `npm install` |
+| 2 | Remove the Gemini leftovers (`@google/genai`, `MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API` in `metadata.json:5-7`, `GEMINI_API_KEY` in `.env.example:1-2`) | Remove all of them, or keep them for AI Studio. The effect on AI Studio is unverified; try it in a scratch import first | P3.6 | Keep them. Nothing in `src/` or `server.ts` uses Gemini |
 | 3 | Where the app runs: one PC, a LAN server, or AI Studio's Cloud Run deployment | One or more of these. Unverified today | P1.1 (bind address, CORS, HTTPS), P1.9, P1.6, P2.21 | Assume local use, plus Cloud Run when `K_SERVICE` or `APP_URL` is set (`server.ts:368`) |
 | 4 | Keep editing in AI Studio, or move to git-only with PRs | (a) AI Studio stays an editor: re-import from `main` before each session and push only through a reviewed PR. (b) Git-only: AI Studio is retired or used read-only | All AI Studio-sensitive items (P1.1, P1.2, P2.2, P2.13, P3.6, P3.7, P3.9, P3.10) | Treat AI Studio as an editor that must be re-imported after each merge; export every real project with Export JSON before switching and bring it back with Import Project |
 | 5 | Reference software that defines "correct" | JMP (which version, and is a licence available?), R, or published examples only | P2.1 fixture provenance. Every P0 statistics item | Use R `lm()`/`anova()` and published examples. Record the tool and version in each fixture |
@@ -495,12 +495,12 @@ The app has no authentication, accepts any payload, and lets stale tabs and agen
   - Move to the SheetJS 0.20.x distribution or another parser (for example exceljs), and use one library for import and export.
   - Run `npm audit fix` for the transitive `qs` and `source-map-js` advisories.
   - Removing the unused `jspdf` belongs to P3.6.
-- **Where:** `package.json` (both lockfiles), `src/web/features/design/`, `src/web/features/export/`.
+- **Where:** `package.json`, `src/web/features/design/`, `src/web/features/export/`.
 - **Accept when:**
   - `npm audit --omit=dev` shows no spreadsheet-library advisory.
   - A workbook exported by the app re-imports to identical runs.
   - The bundle does not grow.
-- **Order:** decision 1 for lockfiles. The importer itself changes in P1.12.
+- **Order:** any time (decision 1 is settled: no lockfile to update). The importer itself changes in P1.12.
 
 #### P1.4 Escape the HTML export
 
@@ -934,7 +934,7 @@ Each calculation should exist once, in `src/core`, with typed results. Several i
 | Item | Title | Covers | Phase | Type | Size | Status |
 |---|---|---|---|---|---|---|
 | P2.1 | Test harness, reference datasets and CI | BLD-4 | 1 | tooling | M | in progress (step 1 done in PR #3; step 2 open) |
-| P2.2 | One package manager, one lockfile, a declared Node version | BLD-7, SRV-6, BLD-13 | 3 (after decision 1) | tooling | S | open |
+| P2.2 | A declared package manager and Node version | BLD-7, SRV-6, BLD-13 | 3 | tooling | S | open (decision 1 settled: no lockfile) |
 | P2.3 | One design generator | DES-8, MCP-19, UI-15 | 2 | logic | L | open |
 | P2.4 | Design algorithm gaps | DES-9, DES-11, DES-12 | 2 | logic | M | open |
 | P2.5 | One desirability and one optimum search | STAT-6, MCP-3, UI-5, MCP-11 | 2 | logic | M | open |
@@ -963,7 +963,7 @@ Each calculation should exist once, in `src/core`, with typed results. Several i
   - Added fixtures beyond the minimum set: an unreplicated 2^4 (Example 6.2, two models) and a real 6-factor DSD built from a conference matrix (rank-deficient, like PB12).
   - The design helpers (run counts, level balance, max |r|, resolution, D-efficiency) are not in this step; P0.11 adds them before it changes the generators. Seeded random rank-deficient 3-level designs are left to P0.3.
   - MCP tool tests cover `run_analysis` only (MCP-1, MCP-6 to MCP-9), through the SDK's `InMemoryTransport`.
-  - No lockfile was updated: commit cc41f15 on `main` (2026-10-21, just after PR #1 merged) deleted both `package-lock.json` and `bun.lock`, so this PR changes `package.json` only and `npm ci` cannot run until a lockfile is restored (see [Unregistered findings](#unregistered-findings-awaiting-ids)). Before that deletion, `npm install` added only vitest and its dependencies to `package-lock.json`, with Vite deduplicated at 6.4.3. bun is not installed here.
+  - No lockfile was updated: commit cc41f15 on `main` (2026-10-21, just after PR #1 merged) deleted both `package-lock.json` and `bun.lock`, so this PR changes `package.json` only. Decision 1 then settled on no lockfile (PR #4), so installs use `npm install`, never `npm ci` (see [decision 1](#open-decisions-for-the-owner)). Before that deletion, `npm install` added only vitest and its dependencies to `package-lock.json`, with Vite deduplicated at 6.4.3. bun is not installed here.
   - The `dist/` output is byte-identical to a build of `main` with the same `node_modules` (also checked against PR #1's build while its lockfile still existed).
 - **Problem:** There are no automated tests and no CI. Every P0 statistics and design fix needs a pinned reference value, and today nothing catches a regression.
 - **Evidence:** `package.json:6-13` has no `test` script. There are no `*.test.*` or `*.spec.*` files and no `.github/` directory.
@@ -991,8 +991,8 @@ Each calculation should exist once, in `src/core`, with typed results. Several i
   - Characterization tests snapshot today's output. Values known to be wrong are marked `test.fails('STAT-n …')`, so each fix flips exactly its own tests.
   - Design helpers: run counts, level balance, the maximum |r| between model columns, resolution from the alias structure, and D-efficiency units.
   - MCP tool tests use the SDK's `InMemoryTransport`.
-- **Change, step 2:** `.github/workflows/ci.yml` runs `npm ci`, `npm run check`, `npm test` and `npm run build` on every push and PR. Use `npm ci` until decision 1 is made; `package-lock.json` was synced in 50c088c.
-- **Where:** `package.json`, both lockfiles, `tsconfig.json`, `vitest.config.ts`, `tests/`, `.github/workflows/ci.yml`.
+- **Change, step 2:** `.github/workflows/ci.yml` runs `npm install`, `npm run check`, `npm test` and `npm run build` on every push and PR. No lockfile is tracked (decision 1), so CI cannot use `npm ci`. Print the installed versions of the packages the tests depend on (for example `npm ls jstat vitest vite`), so a red run caused by a dependency update can be told apart from a code change.
+- **Where:** `package.json`, `tsconfig.json`, `vitest.config.ts`, `tests/`, `.github/workflows/ci.yml`.
 - **Accept when:**
   - `npm test` runs the invariant and characterization suites, which are green except for the listed expected failures.
   - `npm run check` type-checks the tests.
@@ -1000,23 +1000,22 @@ Each calculation should exist once, in `src/core`, with typed results. Several i
   - The `dist/` output does not change.
 - **Order:** first. Decision 5 sets the reference tool.
 
-### P2.2 One package manager, one lockfile, a declared Node version
+### P2.2 A declared package manager and Node version
 
 - **Covers:** BLD-7 (Medium, C), SRV-6 (Medium, R), BLD-13 (Medium, R). Tooling, S. SRV-6 and BLD-13 describe the same defect.
-- **Problem:** Two lockfiles drift apart: `npm ci` already broke once. No package manager or Node version is declared. The CommonJS server bundle `require()`s ESM-only `uuid` 14, so the production bundle needs a Node version with `require(esm)` on by default: 22.12 or newer, or 20.19 or newer on the 20.x line.
-- **Evidence:** both `bun.lock` and `package-lock.json` are tracked. `package.json` has no `engines` or `packageManager` field. `package.json:8` (`--format=cjs --packages=external`), `:41` (`uuid ^14.0.1`). The installed `uuid` 14.0.2 is `"type": "module"` and its `exports` have no `require` condition; `dist/server.cjs` contains two `require("uuid")` calls. The README already states Node 22.12+.
+- **Problem:** No lockfile is tracked, by decision 1, so every install resolves the newest versions within the `package.json` ranges. Before that, two lockfiles drifted apart and `npm ci` broke once. No package manager or Node version is declared. The CommonJS server bundle `require()`s ESM-only `uuid` 14, so the production bundle needs a Node version with `require(esm)` on by default: 22.12 or newer, or 20.19 or newer on the 20.x line.
+- **Evidence:** cc41f15 (2026-10-21) deleted `bun.lock` and `package-lock.json`, and `.gitignore` lists both since decision 1. `package.json` has no `engines` or `packageManager` field. `package.json:8` (`--format=cjs --packages=external`), `:41` (`uuid ^14.0.1`). The installed `uuid` 14.0.2 is `"type": "module"` and its `exports` have no `require` condition; `dist/server.cjs` contains two `require("uuid")` calls. The README already states Node 22.12+.
 - **Measured:** `node --no-experimental-require-module dist/server.cjs` (Node 24.13.0 with `require(esm)` turned off, which simulates an older Node) fails at start-up with `ERR_REQUIRE_ESM` on `node_modules/uuid/dist-node/index.js`.
 - **Change:**
-  - Keep one lockfile (decision 1).
+  - Decision 1 is settled: npm, no lockfile. If it is reopened, commit one lockfile and switch CI to `npm ci` in the same PR.
   - Add `packageManager` and `engines.node`, matching the README.
   - Either bundle the server as ESM or keep CJS with the declared engine.
-  - CI uses the matching install command.
-- **Where:** `package.json`, lockfiles, CI.
+  - CI installs with `npm install` while no lockfile is tracked.
+- **Where:** `package.json`, CI.
 - **Accept when:**
-  - One lockfile is tracked, and the frozen install succeeds in CI.
   - `engines` matches the README.
   - `npm start` works on the minimum declared Node (CI matrix).
-- **Order:** after decision 1. AI Studio-sensitive. In the [suggested PR sequence](#suggested-pr-sequence) it sits in Phase 3 next to P1.2, which also changes the `package.json` scripts and the production start.
+- **Order:** decision 1 is settled. AI Studio-sensitive. In the [suggested PR sequence](#suggested-pr-sequence) it sits in Phase 3 next to P1.2, which also changes the `package.json` scripts and the production start.
 
 ### P2.3 One design generator
 
@@ -1440,7 +1439,7 @@ Each calculation should exist once, in `src/core`, with typed results. Several i
 | P3.6 | Unused dependencies and template leftovers | BLD-5, BLD-10, BLD-11, SRV-11 | 4 | logic | S | open |
 | P3.7 | One version source | BLD-8 | 4 | logic | S | open |
 | P3.8 | Smaller payload, one Plotly | BLD-6, UI-21 | 4 | logic | M | open |
-| P3.9 | Server and config polish | SRV-7, SRV-8, SRV-10, BLD-12 | 4 | logic | S | open |
+| P3.9 | Server and config polish | SRV-7, SRV-8, SRV-10, SRV-14, BLD-12 | 4 | logic | S | open (`PORT` and `hmr: false` done in the owner's commit cc41f15) |
 | P3.10 | Repo hygiene | BLD-14 | 0 (now) | chore | S | open (`.baseline-dist/` part done) |
 | P3.11 | Design generator polish | DES-14, DES-15, DES-16, DES-18 | 2 | logic | M | open |
 | P3.12 | MCP server hygiene | MCP-23 | 2 | logic | S | open |
@@ -1542,10 +1541,10 @@ Each calculation should exist once, in `src/core`, with typed results. Several i
 - **Evidence:**
   - Never imported (grep of `src/`, `server.ts`, `vite.config.ts`): `@google/genai`, `dotenv`, `plotly.js-dist-min`, `jspdf`, `jspdf-autotable`, `motion`, `clsx`, `tailwind-merge`, `autoprefixer`, `sharp`.
   - `vite` is listed twice (`package.json:42`, `:58`). `@types/uuid` ^10 is listed, but `uuid` 14 ships its own types.
-  - Gemini: `metadata.json:5-7`, `.env.example:1-4`, `server.ts:122`.
+  - Gemini: `metadata.json:5-7`, `.env.example:1-2`, `server.ts:122`.
   - Template names: `package.json:2` (`react-example`), `index.html:6`, `:10` ("Remix DOE Magic …"), `src/web/pages/GuideView.tsx:21` (`axiom_doe_sop_steps_v1`), `src/web/features/export/htmlExport.ts:84` ("Axiom DOE Export"), `src/web/App.tsx:1-4` (template licence header).
 - **Change:**
-  - Remove the unused packages in one PR and update both lockfiles.
+  - Remove the unused packages in one PR (`package.json` only; no lockfile is tracked, decision 1).
   - Remove Gemini only after decision 2, tested in a scratch AI Studio import.
   - Rename the package to `doe-magic`, and fix the title and fallback text.
   - Migrate the SOP storage key; renaming it without a migration orphans saved steps.
@@ -1554,7 +1553,7 @@ Each calculation should exist once, in `src/core`, with typed results. Several i
   - The build succeeds and the bundle does not grow.
   - The AI Studio import runs.
   - Existing SOP steps survive the key change.
-- **Order:** after decision 1 (lockfiles) and decision 2.
+- **Order:** after decision 2 (decision 1 is settled).
 
 ### P3.7 One version source
 
@@ -1593,26 +1592,28 @@ Each calculation should exist once, in `src/core`, with typed results. Several i
 
 ### P3.9 Server and config polish
 
-- **Covers:** SRV-7 (Low, C), SRV-8 (Low, C), SRV-10 (Low, P), BLD-12 (Low, C). Logic, S. AI Studio-sensitive.
+- **Covers:** SRV-7 (Low, C), SRV-8 (Low, C), SRV-10 (Low, R), SRV-14 (Low, R), BLD-12 (Low, C). Logic, S. AI Studio-sensitive.
 - **Problem:**
   - Unknown `/api` and `/mcp` GETs return `index.html` with 200, and 500 responses echo internal error messages.
-  - The port is hard-coded, `.env` is never loaded, and every path depends on `process.cwd()`.
-  - The inline `hmr` object probably overrides `DISABLE_HMR`; inferred from Vite's merge rules, not run.
+  - `.env` is never loaded, and every path depends on `process.cwd()`. The port was hard-coded until cc41f15.
+  - With `PORT` set to anything but 3000 (outside Cloud Run), the HMR `clientPort` stays 3000, so the browser dials the wrong port for hot reload (SRV-14).
+  - `DISABLE_HMR=true` still leaves an HMR socket. Before cc41f15 the inline `hmr` object probably overrode it (inferred from Vite's merge rules, not run). Since cc41f15 it passes `hmr: false`, and in middleware mode Vite then opens its own WebSocket server on port 24678 and points the client at it (run on 2026-10-21).
   - An unused `@` alias contradicts rule R2.
-- **Evidence:** `server.ts:384-386` (the SPA fallback), `:266`, `:291`, `:308` (`err.message`), `:8` (`PORT = 3000`), `:9`, `:382`; `src/server/mcp/stdio.ts:8`; `package.json:22` (`dotenv`); `vite.config.ts:15-21` versus `server.ts:370-379`; `vite.config.ts:10-14` and the `tsconfig.json` `paths`.
+- **Evidence:** `server.ts:384-386` (the SPA fallback), `:266`, `:291`, `:308` (`err.message`), `:8` (`PORT`), `:369` (`clientPort` 443 or 3000), `:9`, `:382`; `src/server/mcp/stdio.ts:8`; `package.json:22` (`dotenv`); `vite.config.ts:15-21` versus `server.ts:370-379`; `vite.config.ts:10-14` and the `tsconfig.json` `paths`. Run on 2026-10-21 (Vite 6.4.5): with `PORT=3100`, `/@vite/client` holds `hmrPort = 3000`; with `PORT=3101 DISABLE_HMR=true`, the server port refuses a `vite-hmr` WebSocket, `/@vite/client` holds `hmrPort = 24678`, and a `vite-hmr` WebSocket opens on 24678.
 - **Change:**
   - A JSON 404 for `/api` and `/mcp` ahead of the SPA fallback. Generic 500 bodies, with details logged.
-  - `PORT` from the environment, defaulting to 3000 (AI Studio needs 3000).
+  - Done in cc41f15: `PORT` from the environment, defaulting to 3000 (`Number(process.env.PORT) || 3000`).
+  - Outside Cloud Run, `clientPort` is the listening port, not 3000 (SRV-14).
   - The data path from `DOE_DATA_FILE`, or the repo root, not the cwd.
   - Import `dotenv/config`, or drop it (P3.6).
-  - `hmr: process.env.DISABLE_HMR === 'true' ? false : {…}` in `server.ts`. Leave the `vite.config.ts` block alone.
+  - Done in cc41f15: `hmr: process.env.DISABLE_HMR === 'true' ? false : {…}` in `server.ts`. Still to do: with `DISABLE_HMR=true`, also pass `ws: false` (a Vite 6 server option that the installed 6.4.5 has; not tried yet) so that no socket opens. Leave the `vite.config.ts` block alone.
   - Remove the alias and `paths`, after one AI Studio check.
 - **Accept when:**
   - In production, `GET /api/nope` returns a JSON 404.
   - 500 bodies carry no internal text.
-  - `PORT=3100 npm run dev` listens on 3100.
+  - `PORT=3100 npm run dev` listens on 3100 (met since cc41f15), and its `/@vite/client` dials HMR on 3100.
   - A start from another directory uses the configured data file.
-  - With `DISABLE_HMR=true`, no HMR socket is served.
+  - With `DISABLE_HMR=true`, no HMR socket is served, on the server port or on 24678.
 - **Order:** after P2.12 step 1.
 
 ### P3.10 Repo hygiene
@@ -1688,9 +1689,9 @@ These were found while writing the doc set and checked against the current code.
 
 Registered on 2026-10-20 with the docs commit: UI-31 (HTML report "Model p-value", including `optimalConditions.pModel`), STAT-27, DES-19, DES-20, DES-21, UI-32, UI-33, DATA-21, DATA-22, DATA-23 and SRV-13.
 
-Open:
+Registered on 2026-10-21: SRV-14 (the HMR `clientPort` ignores `PORT`), found while checking cc41f15, in P3.9.
 
-- **Both lockfiles deleted on `main`** (found 2026-10-21 while writing P2.1 step 1). Commit cc41f15 ("build: configure server port and HMR settings", M-Alekseychuk, 2026-10-21, 13 minutes after PR #1 merged) deletes `package-lock.json` and `bun.lock` and also `assets/.aistudio/.gitignore`, which matches the AI Studio whole-workspace push described in [AI Studio sync overwrites the repo](../../memory/DOE-Magic/ai-studio-sync-overwrites-repo.md); its message mentions none of the deletions. `npm ci` (process rule 8, design spec §9.8, P2.1 step 2) fails without a lockfile, and installs float within the `package.json` ranges. Belongs with BLD-7 in P2.2; restoring a lockfile is decision 1. The same commit makes the port configurable (`PORT`, `server.ts:8`) and adds a `DISABLE_HMR` switch to the inline HMR options, so the docs that say the port is hard-coded (design spec §7.2 and §7.4, SRV-8) are out of date. Confirmed by reading the commit.
+None are open.
 
 Resolved without an ID:
 
@@ -1698,24 +1699,25 @@ Resolved without an ID:
 |---|---|
 | `addEmptyRun` uses `runOrder = runs.length + 1` (`src/web/features/design/ProjectDesign.tsx:1079`) | Same defect as DATA-20; added to DATA-20's evidence in P2.11 |
 | `npm run check` did not look at the repo root (R1 covers only `src/`) | Done in ea8091e: rule R9 in `scripts/check-boundaries.mjs` (now `:16-20`, `:74-84`) fails when git tracks a root entry outside the agreed list ([design spec §3.2](design-spec.md#32-layer-rules-enforced-by-npm-run-check), [patch scripts lesson](../../memory/DOE-Magic/patch-scripts-in-repo-root.md)) |
+| Both lockfiles deleted on `main`: cc41f15 ("build: configure server port and HMR settings", M-Alekseychuk, 2026-10-21, an AI Studio push 13 minutes after PR #1 merged) deletes `package-lock.json`, `bun.lock` and `assets/.aistudio/.gitignore`, and its message mentions none of them. `npm ci` fails without a lockfile | Decision 1 settled on 2026-10-21 (PR #4): no lockfile for now. `.gitignore` lists both files, CI will use `npm install` (P2.1 step 2), and BLD-7 in P2.2 keeps the rest (`packageManager`, `engines`). Restoring `assets/.aistudio/.gitignore` is the owner's call. The same commit's `PORT` and `DISABLE_HMR` changes are recorded under SRV-8, SRV-10 and the new SRV-14 (P3.9) |
 
 ## ID index
 
 Severity: C = Critical, H = High, M = Medium, L = Low. Basis: R = confirmed by running, C = confirmed by reading, P = plausible, unverified.
 
-160 IDs. Some pairs describe one defect from two angles (for example SRV-3 = BLD-1), so there are fewer distinct defects than IDs.
+161 IDs. Some pairs describe one defect from two angles (for example SRV-3 = BLD-1), so there are fewer distinct defects than IDs.
 
 | Prefix | Critical | High | Medium | Low | Total |
 |---|---|---|---|---|---|
 | STAT | 4 | 8 | 7 | 8 | 27 |
 | DES | 3 | 5 | 7 | 6 | 21 |
 | MCP | 2 | 9 | 10 | 2 | 23 |
-| SRV | 0 | 3 | 4 | 6 | 13 |
+| SRV | 0 | 3 | 4 | 7 | 14 |
 | DATA | 1 | 8 | 10 | 4 | 23 |
 | UI | 4 | 11 | 14 | 4 | 33 |
 | I18N | 0 | 0 | 4 | 2 | 6 |
 | BLD | 0 | 3 | 7 | 4 | 14 |
-| **All** | **14** | **47** | **63** | **36** | **160** |
+| **All** | **14** | **47** | **63** | **37** | **161** |
 
 | ID | Sev | Basis | Issue | Item |
 |---|---|---|---|---|
@@ -1797,12 +1799,13 @@ Severity: C = Critical, H = High, M = Medium, L = Low. Basis: R = confirmed by r
 | SRV-5 | M | C | `server.ts` untyped monolith | P2.12 |
 | SRV-6 | M | R | CJS bundle requires ESM-only `uuid`; no engines (same defect as BLD-13) | P2.2 |
 | SRV-7 | L | C | SPA fallback for unknown API GETs; error echo | P3.9 |
-| SRV-8 | L | C | Hard-coded port; cwd-relative paths; `.env` not loaded | P3.9 |
+| SRV-8 | L | C | cwd-relative paths; `.env` not loaded (the hard-coded port was fixed in cc41f15) | P3.9 |
 | SRV-9 | L | C | Whole-DB write and broadcast per edit | P1.7 |
-| SRV-10 | L | P | `DISABLE_HMR` overridden by the inline `hmr` | P3.9 |
+| SRV-10 | L | R | `DISABLE_HMR` still leaves a Vite socket on port 24678 (the inline `hmr` override was fixed in cc41f15) | P3.9 |
 | SRV-11 | L | C | Unused deps, Gemini leftovers, template identity, versions | P3.6 |
 | SRV-12 | L | C | Root-absolute paths versus `base: './'` | P2.14 |
 | SRV-13 | M | R | A `data.json` holding `null` crashes startup | P1.5 |
+| SRV-14 | L | R | HMR `clientPort` stays 3000 when `PORT` is set | P3.9 |
 | DATA-1 | C | C | Demo buttons wipe all data (fixed 2026-10-21) | P0.1 |
 | DATA-2 | H | C | Non-atomic writes; corrupt file reseeded | P1.5 |
 | DATA-3 | H | C | Server and stdio both own `data.json` | P1.6 |
@@ -1871,7 +1874,7 @@ Severity: C = Critical, H = High, M = Medium, L = Low. Basis: R = confirmed by r
 | BLD-4 | M | C | No tests, no CI | P2.1 |
 | BLD-5 | M | C | Unused and redundant dependencies | P3.6 |
 | BLD-6 | M | R | 2 MB main chunk plus 4.9 MB blocking Plotly | P3.8 |
-| BLD-7 | M | C | Two lockfiles; no package manager or engine | P2.2 |
+| BLD-7 | M | C | No package manager or engine declared; lockfiles drifted, then cc41f15 deleted both (decision 1: none for now) | P2.2 |
 | BLD-8 | M | R | Version hard-coded in 10 places (7 files) | P3.7 |
 | BLD-9 | M | R | Not strict; no linter | P2.13 |
 | BLD-10 | L | C | Gemini leftovers in metadata and env | P3.6 |
