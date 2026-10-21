@@ -1,3 +1,4 @@
+import { v4 as uuidv4 } from 'uuid';
 import { Project, Folder } from './types';
 
 export function createDemoFolder(): Folder {
@@ -274,13 +275,28 @@ export function createDemoCatalyticProject(): Project {
 
 export const demoCatalyticProject: Project = createDemoCatalyticProject();
 
-export const sampleProjects: Project[] = [
-  createDemoCatalyticProject()
-];
+// A fresh demo project to add next to the existing ones. It keeps the demo id unless a project in `existing`
+// already has it, so loading the demo again never overwrites an edited copy (DATA-1).
+export function createDemoProjectCopy(existing: { id: string }[]): Project {
+  const project = createDemoCatalyticProject();
+  if (existing.some(p => p.id === project.id)) {
+    project.id = uuidv4();
+  }
+  return project;
+}
 
-export const sampleFolders: Folder[] = [
-  createDemoFolder()
-];
+// New objects on every call, so a reset never restores a sample that was edited in place (DATA-14)
+export function createSampleProjects(): Project[] {
+  return [createDemoCatalyticProject()];
+}
+
+export function createSampleFolders(): Folder[] {
+  return [createDemoFolder()];
+}
+
+export const sampleProjects: Project[] = createSampleProjects();
+
+export const sampleFolders: Folder[] = createSampleFolders();
 
 // Alias for backwards compatibility
 export const sampleProject = demoCatalyticProject;

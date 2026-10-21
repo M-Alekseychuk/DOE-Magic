@@ -1,6 +1,6 @@
 # DOE-Magic — Roadmap and Backlog
 
-> Created: 2026-10-20. Status: proposed; no item started, apart from the `.baseline-dist/` part of P3.10, which is done. This file is the issue registry and the prioritised backlog. Update it in every PR that closes or changes an item.
+> Created: 2026-10-20. Status: in progress. P0.1 is done (2026-10-21), and so is the `.baseline-dist/` part of P3.10; no other item is started. This file is the issue registry and the prioritised backlog. Update it in every PR that closes or changes an item.
 > Related: [Status and handoff](../../task/DOE-Magic/status-and-handoff.md), [Goals](../../task/DOE-Magic/goals.md), [Design spec](design-spec.md), [Statistics engine](../../context/DOE-Magic/statistics-engine.md), [Design generation](../../context/DOE-Magic/design-generation.md), [MCP server](../../context/DOE-Magic/mcp-server.md), [Server and persistence](../../context/DOE-Magic/server-and-persistence.md), [Web UI](../../context/DOE-Magic/web-ui.md), [AI Studio origin](../../context/DOE-Magic/ai-studio-origin.md), [AGENTS.md](../../../AGENTS.md)
 
 ## How to use this backlog
@@ -44,7 +44,7 @@ PR 0 is the current branch `chore/project-structure-and-core-docs`. It removes t
 | # | PR | Item | Type | Why here |
 |---|---|---|---|---|
 | 1 | Test harness and reference datasets for `src/core/analysis` | P2.1 step 1 | tests and tooling | Every P0 statistics fix needs pinned reference values |
-| 2 | Demo buttons stop wiping all data | P0.1 | logic, S | One click destroys every project. Needs no harness, so it can land before or alongside PR 1 |
+| 2 | Demo buttons stop wiping all data | P0.1 | logic, S | **Done 2026-10-21.** One click destroyed every project. Needs no harness, so it can land before or alongside PR 1 |
 | 3 | Confirm before replacing measured runs (UI and MCP) | P0.2 | logic, M | Same: silent loss of lab results |
 | 4 | CI: `npm ci`, `npm run check`, `npm test`, `npm run build` | P2.1 step 2 | tooling, S | Guards every later PR |
 | 5 | QR least-squares solver | P0.3 | logic, M | Standard errors, p-values, leverage and intervals depend on it. Needed by P0.9 and P2.6 |
@@ -87,7 +87,7 @@ Numbers 1–8 match the table in [Status and handoff](../../task/DOE-Magic/statu
 |---|---|---|---|---|
 | 1 | Package manager and lockfile | npm (`package-lock.json`) or bun (`bun.lock`). It depends on which installer AI Studio runs, which is unknown. Check AI Studio's build log | P2.2. Every dependency PR (P1.3, P3.6) | Update both lockfiles. CI uses `npm ci` |
 | 2 | Remove the Gemini leftovers (`@google/genai`, `MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API` in `metadata.json:5-7`, `GEMINI_API_KEY` in `.env.example:1-4`) | Remove all of them, or keep them for AI Studio. The effect on AI Studio is unverified; try it in a scratch import first | P3.6 | Keep them. Nothing in `src/` or `server.ts` uses Gemini |
-| 3 | Where the app runs: one PC, a LAN server, or AI Studio's Cloud Run deployment | One or more of these. Unverified today | P1.1 (bind address, CORS, HTTPS), P1.9, P1.6, P2.21 | Assume local use, plus Cloud Run when `K_SERVICE` or `APP_URL` is set (`server.ts:353`) |
+| 3 | Where the app runs: one PC, a LAN server, or AI Studio's Cloud Run deployment | One or more of these. Unverified today | P1.1 (bind address, CORS, HTTPS), P1.9, P1.6, P2.21 | Assume local use, plus Cloud Run when `K_SERVICE` or `APP_URL` is set (`server.ts:368`) |
 | 4 | Keep editing in AI Studio, or move to git-only with PRs | (a) AI Studio stays an editor: re-import from `main` before each session and push only through a reviewed PR. (b) Git-only: AI Studio is retired or used read-only | All AI Studio-sensitive items (P1.1, P1.2, P2.2, P2.13, P3.6, P3.7, P3.9, P3.10) | Treat AI Studio as an editor that must be re-imported after each merge; export every real project with Export JSON before switching and bring it back with Import Project |
 | 5 | Reference software that defines "correct" | JMP (which version, and is a licence available?), R, or published examples only | P2.1 fixture provenance. Every P0 statistics item | Use R `lm()`/`anova()` and published examples. Record the tool and version in each fixture |
 | 6 | Is the tool used for GMP-relevant decisions or records? If so, `data.json` falls short of 21 CFR Part 11 / EU GMP Annex 11 expectations: no audit trail, no identity, no electronic signatures, no backups | (a) Declare it a non-GMP research tool and document the intended use. (b) SQLite on a durable volume plus an append-only change log. (c) A managed database. Whether Part 11 applies is the owner's QA decision; it is unverified here | P1.5 scope, P1.6, P1.9, P2.18 | Do P1.5 (atomic writes and backups) regardless. It is cheap and needed in every option |
@@ -100,7 +100,7 @@ Until these land, the README warns not to trust the affected outputs.
 
 | Item | Title | Covers | Phase | Type | Size | Status |
 |---|---|---|---|---|---|---|
-| P0.1 | Demo buttons stop wiping all data | DATA-1, UI-1 | 1 | logic | S | open |
+| P0.1 | Demo buttons stop wiping all data | DATA-1, UI-1 | 1 | logic | S | done |
 | P0.2 | Confirm before replacing measured runs | DES-1, UI-2, MCP-10 | 1 | logic | M | open |
 | P0.3 | Correct least squares for rank-deficient models | STAT-1 | 1 | logic | M | open |
 | P0.4 | Honest inference for saturated models | STAT-2, STAT-5, STAT-21 | 1 | logic | M | open |
@@ -115,6 +115,7 @@ Until these land, the README warns not to trust the affected outputs.
 
 ### P0.1 Demo buttons stop wiping all data
 
+- **Status:** done (2026-10-21); see [Outcome](#p01-outcome). Problem, evidence and change below are as written before the fix; their line numbers refer to `b2a9f85`.
 - **Covers:** DATA-1 (Critical, C), UI-1 (Critical, C). Logic, S.
 - **Problem:** "Demo Studies" and "Load Demo Experiments" both call `resetSampleData`. It replaces every project and folder on the server, in localStorage and in every connected browser, with no confirmation and no backup.
 - **Evidence:**
@@ -135,6 +136,23 @@ Until these land, the README warns not to trust the affected outputs.
   - Loading the demo again, or after editing the demo, never overwrites the edited copy.
   - `POST /api/reset-sample` without the confirm body returns 400 and changes nothing. With the body, a backup file exists before `data.json` is rewritten.
 - **Order:** first, with no dependencies. The server part may be a second small PR.
+
+#### P0.1 outcome
+
+Done in one PR, client and server together.
+
+- **Demo buttons.** "Demo Studies" and "Load Demo Experiments" call `loadDemoProject` (`src/web/state/ProjectContext.tsx:293-301`). It adds `createDemoProjectCopy(projects)` (`src/core/sampleProject.ts:280-286`), a fresh deep copy that keeps the demo id unless a project already has it, in which case it gets a new uuid. A missing demo folder is saved again. The Dashboard then opens the new project (`src/web/pages/Dashboard.tsx:127-130`), so the result is visible from any folder view. Labels and tooltips go through `t()` (`demo_studies`, `demo_studies_tooltip`, `load_demo_experiments`).
+- **Shared dialog.** `src/web/shared/ConfirmDialog.tsx`. It renders into `document.body`, focuses Cancel, and cancels on Escape or a click outside, so a stray Enter or click never confirms.
+- **Full reset.** Kept, but only as **Reset Sample Data** in the Archive view (`Dashboard.tsx:225-234`), behind `ConfirmDialog`. The text is `reset_sample_confirm`, reworded to name the project and folder counts, the backup and Export JSON, with the button `reset_sample_confirm_button`. `resetSampleData` (`ProjectContext.tsx:271-291`) posts `{"confirm": true}` and changes local state only after a 200; otherwise the Dashboard shows `reset_sample_failed`. If the owner wants no full reset in the UI at all, delete that button; the endpoint stays protected.
+- **Server.** `POST /api/reset-sample` (`server.ts:194-217`) returns 400 and changes nothing unless the body is the JSON `{"confirm": true}`. With it, the server copies `data.json` to `data.json.before-reset-<timestamp>` (an ISO time with `:` and `.` replaced by `-`), or returns 500 and changes nothing if the copy fails. It then resets to `createSampleProjects()` and `createSampleFolders()` (`sampleProject.ts:289-295`), which build new objects, so an MCP edit of the seeded demo is no longer restored (the reset half of DATA-14; seeding stays with P2.15). The response adds `backup`: the file name, or `null` when no `data.json` existed. `.gitignore` ignores `data.json.*`.
+- **Verified 2026-10-21** with `npm run dev` and with `NODE_ENV=production node dist/server.cjs`:
+  - Before the fix, a `POST /api/reset-sample` with no body deleted three user projects.
+  - After it, with three user projects, both buttons left all three on the server and in a second browser tab, and each click added exactly one demo.
+  - A renamed demo was never overwritten. With the demo and its folder deleted, the copy took the demo id and the folder came back on the server.
+  - No body, a `text/plain` body and `{"confirm": "yes"}` each returned 400 and changed nothing. `{"confirm": true}` returned 200, and the backup file held all four projects.
+  - In the dialog, Cancel, Escape, and Enter on the focused Cancel button changed nothing. Confirm reset both tabs. A failed reset (stubbed 500) left local data alone and showed the error.
+  - Reset after an MCP `update_project` rename of the demo restored the original name.
+- **Not covered:** a preflighted cross-site request can still reset, until P1.1 restricts CORS. There is no automated test yet; once P2.1 provides a runner, cover `createDemoProjectCopy` and the endpoint's 400 path.
 
 ### P0.2 Confirm before replacing measured runs
 
@@ -439,7 +457,7 @@ The app has no authentication, accepts any payload, and lets stale tabs and agen
   - `:237`: SSE transport without DNS-rebinding options.
 - **Change:**
   - CORS is same-origin by default, with an allowlist from an environment variable. socket.io follows the same rule.
-  - Bind to `127.0.0.1` unless `HOST` is set, or when running on Cloud Run. `server.ts:353` already detects Cloud Run (`K_SERVICE` or `APP_URL`), but today only inside the development branch, to pick the HMR port; move that check up so the production branch can use it. Cloud Run must reach the container, so keep `0.0.0.0` there; check this in AI Studio.
+  - Bind to `127.0.0.1` unless `HOST` is set, or when running on Cloud Run. `server.ts:368` already detects Cloud Run (`K_SERVICE` or `APP_URL`), but today only inside the development branch, to pick the HMR port; move that check up so the production branch can use it. Cloud Run must reach the container, so keep `0.0.0.0` there; check this in AI Studio.
   - Authentication per decision 8: for example a shared token header for REST, socket and MCP, or reverse-proxy SSO.
   - DNS-rebinding protection and `allowedHosts` on the MCP transports.
   - `/api/mcp/logs` behind auth.
@@ -455,7 +473,7 @@ The app has no authentication, accepts any payload, and lets stale tabs and agen
 
 - **Covers:** SRV-2 (High, C), BLD-2 (High, C), SRV-3 (High, C), BLD-1 (High, C). Logic, S. AI Studio-sensitive (decision 7). Each pair is one defect registered twice: SRV-2 = BLD-2 (the server bundle and its source map are served from `dist/`) and SRV-3 = BLD-1 (`npm start` runs the development path). Both IDs of each pair are kept and closed together.
 - **Problem:** The build writes `server.cjs` and its source map into `dist/`, which production serves, so `/server.cjs.map` hands out the server, MCP and statistics source. `npm start` does not set `NODE_ENV=production`, so the "production" server runs Vite dev middleware on the source tree.
-- **Evidence:** `package.json:8`: esbuild with `--sourcemap --outfile=dist/server.cjs`. `server.ts:366-368`: `express.static(dist)`. `package.json:9`: `node dist/server.cjs`. `server.ts:351-365`: when not in production, it imports `vite` and serves through the dev middleware.
+- **Evidence:** `package.json:8`: esbuild with `--sourcemap --outfile=dist/server.cjs`. `server.ts:381-383`: `express.static(dist)`. `package.json:9`: `node dist/server.cjs`. `server.ts:366-380`: when not in production, it imports `vite` and serves through the dev middleware.
 - **Change:**
   - Write the server bundle outside `dist/` (decision 7). Dropping only `--sourcemap` is not enough: the build does not minify, so `/server.cjs` is itself readable.
   - Make `start` run in production without shell-specific syntax: for example `--define` in the esbuild step, or a default in `server.ts` when it runs from the bundle.
@@ -508,6 +526,7 @@ The app has no authentication, accepts any payload, and lets stale tabs and agen
 - **Change:**
   - Write to a temporary file and rename it into place.
   - Keep N rotating backups.
+  - Take over the copy that P0.1 makes before a reset (`data.json.before-reset-<timestamp>`, `server.ts:200-209`), so there is one backup implementation.
   - On a parse failure, or a file that parses but is not an object, move the file aside as `data.json.corrupt-<timestamp>` and stop. Never re-seed over it.
   - The same store module serves `server.ts` and `stdio.ts`.
 - **Where:** `src/server/store/jsonFileStore.ts` (created by P2.12 step 1).
@@ -537,7 +556,7 @@ The app has no authentication, accepts any payload, and lets stale tabs and agen
   - Each edit is sent twice, over HTTP and socket, and the REST broadcast echoes back to the sender, which can revert quick successive keystrokes. This part was not reproduced.
   - Each write also pretty-prints the whole database to disk and broadcasts the whole database.
 - **Evidence:**
-  - Whole-object replace: `server.ts:78-87`, `:137-151`, `:210-220`.
+  - Whole-object replace: `server.ts:78-87`, `:137-151`, `:225-235`.
   - Double send: `src/web/state/ProjectContext.tsx:172-195`.
   - `server.ts:150`: `io.emit` reaches the sender too. `:86`: the socket path broadcasts to others.
   - Incoming sync replaces local state: `ProjectContext.tsx:134-143`.
@@ -581,7 +600,7 @@ The app has no authentication, accepts any payload, and lets stale tabs and agen
 
 - **Covers:** DATA-9 (High, P). Logic, M–L.
 - **Problem:** On Cloud Run, which AI Studio uses to deploy, `data.json` lives on the container's temporary filesystem. It is lost on each new revision, restart or scale-to-zero, and multiple instances keep diverging copies. How the owner actually deploys the app is unverified.
-- **Evidence:** `server.ts:9` (path from `process.cwd()`), `:353` (Cloud Run detection), `:62-68`.
+- **Evidence:** `server.ts:9` (path from `process.cwd()`), `:368` (Cloud Run detection), `:62-68`.
 - **Change:**
   - State in the README and the [server and persistence](../../context/DOE-Magic/server-and-persistence.md) doc that a deployed instance is not durable storage.
   - Add a store adapter interface. Implement the backend chosen in decisions 3 and 6, plus export and backup.
@@ -605,8 +624,8 @@ The app has no authentication, accepts any payload, and lets stale tabs and agen
 - **Evidence:**
   - `server.ts:137-148` (REST), `:78-84` and `:95-101` (socket).
   - `src/server/mcp/doeMcpServer.ts:113`: `p.runs.filter` throws for a record without runs.
-  - `src/web/pages/Dashboard.tsx:50`: `p.description.toLowerCase()` throws without a description.
-  - `Dashboard.tsx:73-105`: import checks only that `factors`, `responses` and `runs` are arrays, and keeps `folderId` and `isArchived`.
+  - `src/web/pages/Dashboard.tsx:53`: `p.description.toLowerCase()` throws without a description.
+  - `Dashboard.tsx:76-108`: import checks only that `factors`, `responses` and `runs` are arrays, and keeps `folderId` and `isArchived`.
   - `src/web/pages/ProjectView.tsx:44-52`: the export carries no format or version marker.
   - `src/web/App.tsx:15-30`: no error boundary.
   - DATA-22: the UI writes `0` and `levels.length − 1` (`src/web/features/setup/ProjectSetup.tsx:76-77`, `:115-116`); MCP `create_project` writes the zod defaults `0`/`100` (`src/server/mcp/doeMcpServer.ts:229-230`); `simulate_robustness` falls back to the numeric midpoint `(min + max)/2`, also for categoricals (`:1015`). Details: [design spec §4.3](design-spec.md#43-factor-range-and-name-conventions-data-22-data-23).
@@ -684,7 +703,7 @@ The app has no authentication, accepts any payload, and lets stale tabs and agen
 - **Covers:** DATA-17 (Medium, C), UI-20 (Medium, C). Logic, S.
 - **Problem:** Permanently deleting an archived project, deleting a folder, a factor or a response, all happen on one click. The MCP playground is pre-filled with calls that change the demo project.
 - **Evidence:**
-  - `src/web/pages/Dashboard.tsx:269-271` → `ProjectContext.tsx:201-215`: the hard delete. `:198` reads `projects` from a closure.
+  - `src/web/pages/Dashboard.tsx:311-313` → `ProjectContext.tsx:201-215`: the hard delete. `:198` reads `projects` from a closure.
   - `src/web/Layout.tsx:49-51`, `:106-107`: folder delete.
   - `src/web/features/setup/ProjectSetup.tsx:141-143`, `:161-163`: factor and response delete.
   - `src/web/i18n/translations.ts:83`: `delete_confirm_msg` is unused.
@@ -729,7 +748,7 @@ The app has no authentication, accepts any payload, and lets stale tabs and agen
 - **Evidence:**
   - Direct handler call: `src/server/mcp/doeMcpServer.ts:1369-1391` (`tool.handler(toolArgs)`).
   - `:1351-1360`: `tools/list` returns serialized zod internals. `:1394-1418`: resources and prompts are read from private maps; resource templates and prompt arguments are missing. `:1337`: the protocol version is hard-coded.
-  - `server.ts:302-343`: `/api/mcp/info` reads private fields. `server.ts:21` and `:231-257`: `SSEServerTransport`, which SDK 1.32.1 marks deprecated. `:260-282`: the session map.
+  - `server.ts:317-358`: `/api/mcp/info` reads private fields. `server.ts:21` and `:246-272`: `SSEServerTransport`, which SDK 1.32.1 marks deprecated. `:275-297`: the session map.
   - `src/web/features/mcp-panel/McpModal.tsx:81-92`: the playground's `create_project` example has a categorical factor without `min`/`max`.
 - **Measured:** `create_project` over `/api/mcp` gave 0 runs, with `designType` and `centerPoints` undefined.
 - **Change:**
@@ -1212,9 +1231,9 @@ Each calculation should exist once, in `src/core`, with typed results. Several i
   - Upsert logic is written six times.
   - `stdio.ts` copies the store bootstrap, and the copies have drifted: stdio seeds only an empty store, does not set `updatedAt`, and has a no-op broadcast.
 - **Evidence:**
-  - `server.ts:25` (`let db: any`), `:24-68` (store), `:70-120` (socket), `:128-202` (REST), `:207-348` (MCP), `:350-377` (bootstrap).
-  - Upserts: `server.ts:78-87`, `:95-104`, `:137-151`, `:166-180`, `:210-220`; `src/server/mcp/stdio.ts:43-51`.
-  - The stdio copy: `stdio.ts:8-58` versus `server.ts:9-68` and `:207-228`.
+  - `server.ts:25` (`let db: any`), `:24-68` (store), `:70-120` (socket), `:128-217` (REST), `:222-363` (MCP), `:365-392` (bootstrap).
+  - Upserts: `server.ts:78-87`, `:95-104`, `:137-151`, `:166-180`, `:225-235`; `src/server/mcp/stdio.ts:43-51`.
+  - The stdio copy: `stdio.ts:8-58` versus `server.ts:9-68` and `:222-243`.
 - **Change:**
   1. Move-only: split into `src/server/store/jsonFileStore.ts`, `src/server/routes/`, `src/server/realtime/socket.ts` and `src/server/mcp/http.ts`. Root `server.ts` stays as a thin entry, for AI Studio.
   2. Logic: a typed store that implements `McpDatabaseContext`, shared by `server.ts` and `stdio.ts`, with one seeding, migration and save path.
@@ -1270,19 +1289,19 @@ Each calculation should exist once, in `src/core`, with typed results. Several i
 - **Evidence:**
   - Re-seeding: `server.ts:40-56`; `src/web/state/ProjectContext.tsx:34-35`, `:56-57`.
   - Empty server: `ProjectContext.tsx:89`, `:96-115`, `:136`.
-  - Shared samples: `src/core/sampleProject.ts:275-283`; `server.ts:38`, `:43`, `:196`.
-  - In-place mutation: `src/server/mcp/doeMcpServer.ts:350-355`, `:469-472`; `ProjectContext.tsx:173`, `:311`.
-- **Measured:** after `update_project` renamed the demo, a reset built like `server.ts:196` still showed "EDITED BY MCP".
+  - Shared samples: `src/core/sampleProject.ts:297-299` (built once at module load); `server.ts:38`, `:43`. The reset no longer uses them since P0.1.
+  - In-place mutation: `src/server/mcp/doeMcpServer.ts:350-355`, `:469-472`; `ProjectContext.tsx:173`. (`loadDemoProject` saved the shared module object until P0.1.)
+- **Measured:** after `update_project` renamed the demo, a reset built from `[...sampleProjects]` (the pre-P0.1 `server.ts:196`) still showed "EDITED BY MCP". Since P0.1 the reset builds new objects and restores the original name (re-run 2026-10-21).
 - **Change:**
   - Seed only on first run, with a `seeded` flag in the store.
   - An empty list is valid state, and the client never pushes its cache to the server implicitly.
-  - `createSampleProjects()` returns deep clones; `createDemoCatalyticProject` already exists at `sampleProject.ts:266`.
+  - Seed from `createSampleProjects()` / `createSampleFolders()` (`sampleProject.ts:289-295`, added in P0.1), which return new deep copies on every call.
   - Tools and `saveProject` work on copies and never mutate their inputs.
 - **Where:** `src/core/sampleProject.ts`, `src/server/store/`, `ProjectContext.tsx`, `doeMcpServer.ts`.
 - **Accept when:**
   - A deleted demo stays deleted after a restart.
   - Deleting the last project reaches every client.
-  - Reset after an MCP rename restores the pristine sample.
+  - Reset after an MCP rename restores the pristine sample (met since P0.1).
   - A unit test shows that inputs are unchanged after `saveProject` and tool calls.
 - **Order:** after P2.12 step 1.
 
@@ -1343,7 +1362,7 @@ Each calculation should exist once, in `src/core`, with typed results. Several i
 - **Evidence:**
   - `src/core/types.ts:37-53`; `server.ts:62-68`.
   - The log: `src/server/mcp/doeMcpServer.ts:17-41`. Resources log a fixed `durationMs: 5` (`:1153-1159`, `:1183-1189`, `:1215-1221`). Prompts are not logged (`:1239-1311`).
-  - `server.ts:346-348`: `/api/mcp/logs`.
+  - `server.ts:361-363`: `/api/mcp/logs`.
 - **Change:**
   - Now: call it an "activity log" in the UI and the docs.
   - Then, per decision 6: an append-only change log in the store (entity, patch or before/after, actor, timestamp, channel: ui, mcp or import), a per-project history view, and scheduled backups.
@@ -1395,7 +1414,7 @@ Each calculation should exist once, in `src/core`, with typed results. Several i
 
 - **Covers:** SRV-4 (Medium, C), UI-22 (Medium, C). Logic, S.
 - **Problem:** `crypto.randomUUID` and `navigator.clipboard` exist only in secure contexts. Opened as `http://<LAN-IP>:3000`, "Append suggestions" and the MCP copy buttons throw. Inferred, not reproduced in a browser.
-- **Evidence:** `src/web/features/optimization/ProjectOptimization.tsx:651` (`crypto.randomUUID`), `src/web/features/mcp-panel/McpModal.tsx:46` (`navigator.clipboard.writeText`, unguarded), `server.ts:374` (`0.0.0.0`).
+- **Evidence:** `src/web/features/optimization/ProjectOptimization.tsx:651` (`crypto.randomUUID`), `src/web/features/mcp-panel/McpModal.tsx:46` (`navigator.clipboard.writeText`, unguarded), `server.ts:389` (`0.0.0.0`).
 - **Change:** use `uuid` v4 everywhere, and guard the clipboard with a fallback.
 - **Where:** the two files above.
 - **Accept when:** `src/web` has no `crypto.randomUUID`; the copy buttons work without the clipboard API; a manual check on a LAN IP passes.
@@ -1430,8 +1449,8 @@ Each calculation should exist once, in `src/core`, with typed results. Several i
   - 533 `locale === 'zh'` occurrences in `src/web` (grep, 2026-10-20) and 54 `currentLang === 'zh'` in `src/web/features/export/htmlExport.ts`.
   - Only 6 files call `t()`: `Layout`, `Dashboard`, `ProjectView`, `ProjectSetup`, `LanguageSelector`, `GuideView`.
   - English-only strings: `src/web/shared/PlotlyErrorBoundary.tsx:45-49`, `src/web/features/robustness/RobustnessSimulation.tsx:107`, `src/web/features/compare/CompareResponses.tsx:365`, `src/web/features/analysis/ProjectAnalysis.tsx:1851-1854`.
-  - Unused keys, for example `src/web/i18n/translations.ts:83`, `:87`, `:116`, `:147`, `:151`.
-  - Locale plumbing: `translations.ts:1`, `:436-439`; `src/web/i18n/LanguageContext.tsx:17`, `:44`, `:46-50`; `translations.ts:20`, `:229`.
+  - Unused keys, for example `src/web/i18n/translations.ts:83`, `:122`, `:153`, `:157`.
+  - Locale plumbing: `translations.ts:1`, `:448-451`; `src/web/i18n/LanguageContext.tsx:17`, `:44`, `:46-50`; `translations.ts:20`, `:235`.
 - **Change:**
   - Migrate one feature per PR to `t(key, fallback, params)` under design spec §8, reusing existing keys.
   - Add `scripts/check-i18n.mjs` to `npm run check`. It reports unused and missing keys, and new locale ternaries.
@@ -1467,7 +1486,7 @@ Each calculation should exist once, in `src/core`, with typed results. Several i
 - **Evidence:**
   - `tsc --noEmit --noUnusedLocals` reported 37 errors, for example `src/web/features/analysis/ProjectAnalysis.tsx:5` and `:12-13`.
   - `:24-27`: an empty comment block.
-  - `src/web/state/ProjectContext.tsx:73`, `:318` (`socket` has no consumers) and `:74` (`loading` is never set true). `loadDemoProject` gains a caller in P0.1.
+  - `src/web/state/ProjectContext.tsx:73`, `:307` (`socket` has no consumers) and `:74` (`loading` is never set true). `loadDemoProject` has callers since P0.1.
   - `src/web/pages/GuideView.tsx:23`, `:86-97`.
   - `ProjectAnalysis.tsx:283-383` (`interactionData` reads `analysisResults` at `:291`; it is missing from the dependencies at `:383`) and `:257-281` (two fits).
   - UI-32: `ProjectAnalysis.tsx:180` (`activeResponse?.excludedTerms || []`), a dependency of the memos at `:271` and `:281`. Any Analysis state change (plot type, table tab, axis select) reruns `computeAnalysis` for every response. The demo project has no saved `excludedTerms`.
@@ -1533,7 +1552,7 @@ Each calculation should exist once, in `src/core`, with typed results. Several i
 
 - **Covers:** BLD-8 (Medium, R). Logic, S. AI Studio-sensitive.
 - **Problem:** "1.5.2" is hard-coded in 10 places in 7 files, while `package.json` says 0.0.0.
-- **Evidence:** the 10 places: `index.html:6`, `:10`; `metadata.json:2`; `server.ts:325`; `src/server/mcp/doeMcpServer.ts:50`, `:1345`; `src/web/features/mcp-panel/McpModal.tsx:213`; `src/web/i18n/translations.ts:20`, `:229`; `src/web/Layout.tsx:64` (grep of tracked files, excluding lockfiles and `docs/`, 2026-10-20). `package.json:4` holds `0.0.0`.
+- **Evidence:** the 10 places: `index.html:6`, `:10`; `metadata.json:2`; `server.ts:340`; `src/server/mcp/doeMcpServer.ts:50`, `:1345`; `src/web/features/mcp-panel/McpModal.tsx:213`; `src/web/i18n/translations.ts:20`, `:235`; `src/web/Layout.tsx:64` (grep of tracked files, excluding lockfiles and `docs/`, 2026-10-20). `package.json:4` holds `0.0.0`.
 - **Change:**
   - Make the `package.json` version the source: the server and MCP read it, and the client gets it through a Vite `define`.
   - Update `metadata.json` and `index.html` in a documented release step.
@@ -1572,7 +1591,7 @@ Each calculation should exist once, in `src/core`, with typed results. Several i
   - The port is hard-coded, `.env` is never loaded, and every path depends on `process.cwd()`.
   - The inline `hmr` object probably overrides `DISABLE_HMR`; inferred from Vite's merge rules, not run.
   - An unused `@` alias contradicts rule R2.
-- **Evidence:** `server.ts:369-371` (the SPA fallback), `:251`, `:276`, `:293` (`err.message`), `:8` (`PORT = 3000`), `:9`, `:367`; `src/server/mcp/stdio.ts:8`; `package.json:22` (`dotenv`); `vite.config.ts:15-21` versus `server.ts:355-364`; `vite.config.ts:10-14` and the `tsconfig.json` `paths`.
+- **Evidence:** `server.ts:384-386` (the SPA fallback), `:266`, `:291`, `:308` (`err.message`), `:8` (`PORT = 3000`), `:9`, `:382`; `src/server/mcp/stdio.ts:8`; `package.json:22` (`dotenv`); `vite.config.ts:15-21` versus `server.ts:370-379`; `vite.config.ts:10-14` and the `tsconfig.json` `paths`.
 - **Change:**
   - A JSON 404 for `/api` and `/mcp` ahead of the SPA fallback. Generic 500 bodies, with details logged.
   - `PORT` from the environment, defaulting to 3000 (AI Studio needs 3000).
@@ -1633,7 +1652,7 @@ Each calculation should exist once, in `src/core`, with typed results. Several i
   - The context has unused members.
   - Tools use deprecated SDK overloads, without output schemas.
   - The server name and version are hard-coded in four places.
-- **Evidence:** `server.ts:210-227` (`saveProject` already emits); `src/server/mcp/doeMcpServer.ts:292-293`, `:357-358`, `:406-407` (a second emit through `broadcastSync`), `:8-15` (`getFolders` and `saveData` are unused by tools), `:47-51`, `:1344-1345`; `server.ts:323-326`.
+- **Evidence:** `server.ts:225-242` (`saveProject` already emits); `src/server/mcp/doeMcpServer.ts:292-293`, `:357-358`, `:406-407` (a second emit through `broadcastSync`), `:8-15` (`getFolders` and `saveData` are unused by tools), `:47-51`, `:1344-1345`; `server.ts:338-341`.
 - **Change:**
   - `saveProject` and `deleteProject` become the only notifiers.
   - Migrate to `registerTool`, `registerResource` and `registerPrompt`, with `outputSchema` and `structuredContent`.
@@ -1774,7 +1793,7 @@ Severity: C = Critical, H = High, M = Medium, L = Low. Basis: R = confirmed by r
 | SRV-11 | L | C | Unused deps, Gemini leftovers, template identity, versions | P3.6 |
 | SRV-12 | L | C | Root-absolute paths versus `base: './'` | P2.14 |
 | SRV-13 | M | R | A `data.json` holding `null` crashes startup | P1.5 |
-| DATA-1 | C | C | Demo buttons wipe all data | P0.1 |
+| DATA-1 | C | C | Demo buttons wipe all data (fixed 2026-10-21) | P0.1 |
 | DATA-2 | H | C | Non-atomic writes; corrupt file reseeded | P1.5 |
 | DATA-3 | H | C | Server and stdio both own `data.json` | P1.6 |
 | DATA-4 | H | C | Whole-project last-writer-wins | P1.7 |
@@ -1797,7 +1816,7 @@ Severity: C = Critical, H = High, M = Medium, L = Low. Basis: R = confirmed by r
 | DATA-21 | M | C | Live sync gives up after 3 reconnects; the stale tab keeps overwriting | P1.8 |
 | DATA-22 | L | C | Categorical `min`/`max` has no single convention | P1.10 |
 | DATA-23 | M | C | Names not unique, but some paths key by name | P1.10 |
-| UI-1 | C | C | Demo buttons wipe all data | P0.1 |
+| UI-1 | C | C | Demo buttons wipe all data (fixed 2026-10-21) | P0.1 |
 | UI-2 | C | C | Generate, import and Simulate overwrite measurements | P0.2 |
 | UI-3 | C | C | Profiler uses full models for non-active responses | P0.6 |
 | UI-4 | C | C | HTML export surfaces drop interactions and categoricals | P0.10 |

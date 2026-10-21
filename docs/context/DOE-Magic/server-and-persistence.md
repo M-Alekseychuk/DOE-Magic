@@ -1,9 +1,9 @@
 # DOE-Magic — Server and Persistence
 
-> Created: 2026-10-20. Status: describes `server.ts`, the JSON-file store and the browser cache as they are on branch `chore/project-structure-and-core-docs` (behaviour unchanged by the `src/` restructure); verified against the code, partly by running the server in an isolated directory.
+> Created: 2026-10-20. Status: describes `server.ts`, the JSON-file store and the browser cache as they are on branch `chore/project-structure-and-core-docs` (behaviour unchanged by the `src/` restructure); verified against the code, partly by running the server in an isolated directory. The reset endpoint, the demo buttons and the line numbers were updated for P0.1 on 2026-10-21 and checked by running.
 > Related: [MCP server](mcp-server.md), [Web UI](web-ui.md), [AI Studio origin](ai-studio-origin.md), [Roadmap and backlog](../../spec/DOE-Magic/roadmap-backlog.md), [Design spec](../../spec/DOE-Magic/design-spec.md), [Status and handoff](../../task/DOE-Magic/status-and-handoff.md), [Runtime data in git](../../memory/DOE-Magic/runtime-data-in-git.md), [AI Studio sync overwrites repo](../../memory/DOE-Magic/ai-studio-sync-overwrites-repo.md)
 
-One Node process, [`server.ts`](../../../server.ts) (379 lines), serves everything on port 3000:
+One Node process, [`server.ts`](../../../server.ts) (394 lines), serves everything on port 3000:
 
 - the SPA
 - the REST API
@@ -25,10 +25,10 @@ All data lives in one untyped in-memory object, `db = {projects, folders}`. It i
 | `62-68` | `saveData()`: synchronous, non-atomic, pretty-printed whole-file `writeFileSync`. |
 | `70-120` | socket.io handlers. |
 | `122` | Comment: the Gemini integration was removed. |
-| `124-202` | REST routes. |
-| `204-228` | `mcpContext`: the store adapter handed to the MCP server. |
-| `230-348` | MCP endpoints: SSE, messages, direct JSON-RPC, info, logs (see [MCP server](mcp-server.md#http-endpoints-serverts)). |
-| `350-377` | `startServer()`: Vite dev middleware or static `dist/`, then `listen(3000, '0.0.0.0')`. |
+| `124-217` | REST routes. |
+| `219-243` | `mcpContext`: the store adapter handed to the MCP server. |
+| `245-363` | MCP endpoints: SSE, messages, direct JSON-RPC, info, logs (see [MCP server](mcp-server.md#http-endpoints-serverts)). |
+| `365-392` | `startServer()`: Vite dev middleware or static `dist/`, then `listen(3000, '0.0.0.0')`. |
 
 All API and MCP routes are registered at module top level, before `startServer()` adds Vite or the static fallback, so they take precedence.
 
@@ -44,9 +44,9 @@ All API and MCP routes are registered at module top level, before `startServer()
 | GET | `/api/folders` | none | `Folder[]` | none | `162-164` |
 | POST | `/api/folders` | a `Folder` (only `id` is checked) | `{success, folder}`; 400 without `id` | Upsert, write, emit to all | `166-180` |
 | DELETE | `/api/folders/:id` | none | `{success: true}` | Removes the folder, clears `folderId` on its projects, write, emit to all | `182-192` |
-| POST | `/api/reset-sample` | none (no body needed) | `{success, data: db}` | **Replaces the whole db with the samples**, write, emit to all (DATA-1) | `194-202` |
-| various | `/mcp/*`, `/api/mcp/*` | see [MCP server](mcp-server.md) | | | `233-348` |
-| GET | `*` (production only) | none | `dist/index.html` | none | `369-371` |
+| POST | `/api/reset-sample` | JSON `{"confirm": true}`; anything else gets 400 and changes nothing | `{success, data: db, backup}`; `backup` is the backup file name, or `null` when no `data.json` existed; 500 `{error}` if the backup fails | Copies `data.json` to `data.json.before-reset-<timestamp>`, then **replaces the whole db with new sample objects**, write, emit to all (P0.1) | `194-217` |
+| various | `/mcp/*`, `/api/mcp/*` | see [MCP server](mcp-server.md) | | | `248-363` |
+| GET | `*` (production only) | none | `dist/index.html` | none | `384-386` |
 
 Callers in `src/web`: only `src/web/state/ProjectContext.tsx` (`/api/data`, POST/DELETE projects and folders, reset) and `src/web/features/mcp-panel/McpModal.tsx` (`/api/mcp/info`, `/api/mcp/logs`, `POST /api/mcp`). `GET /api/health`, `GET /api/projects` and `GET /api/folders` have no caller in the app.
 
@@ -68,17 +68,17 @@ The client listens to `sync_data` (`ProjectContext.tsx:134-145`) and `connect_er
 
 ## MCP mounting
 
-`mcpContext` (`server.ts:207-228`) implements `McpDatabaseContext` over the same `db`. Its `saveProject` sets `updatedAt`, upserts, writes the file and emits `sync_data`; `broadcastSync` emits again.
+`mcpContext` (`server.ts:222-243`) implements `McpDatabaseContext` over the same `db`. Its `saveProject` sets `updatedAt`, upserts, writes the file and emits `sync_data`; `broadcastSync` emits again.
 
-- One shared `McpServer` (`:230`) answers the direct JSON-RPC and info endpoints.
-- Each SSE connection gets its own `McpServer`, all over the same context (`:236`).
-- Sessions are held in an in-memory `Map` (`:231`).
+- One shared `McpServer` (`:245`) answers the direct JSON-RPC and info endpoints.
+- Each SSE connection gets its own `McpServer`, all over the same context (`:251`).
+- Sessions are held in an in-memory `Map` (`:246`).
 
 Details: [MCP server](mcp-server.md).
 
 ## Dev mode and production mode
 
-| | Development: `NODE_ENV !== 'production'` (`server.ts:351-365`) | Production: `NODE_ENV === 'production'` (`server.ts:366-371`) |
+| | Development: `NODE_ENV !== 'production'` (`server.ts:366-380`) | Production: `NODE_ENV === 'production'` (`server.ts:381-386`) |
 |---|---|---|
 | Front end | `await import('vite')`, then `createViteServer({server: {middlewareMode: true, hmr: {server: httpServer, clientPort}}, appType: 'spa'})` and `app.use(vite.middlewares)`. No `root` or `configFile` is passed, so Vite finds `vite.config.ts` and `index.html` through `process.cwd()`. | `express.static(<cwd>/dist)` plus a catch-all `GET *` that returns `dist/index.html`. |
 | HMR | WebSocket on the shared HTTP server. `clientPort` is 443 when `K_SERVICE` or `APP_URL` is set (AI Studio / Cloud Run proxy), otherwise 3000. | none |
@@ -86,21 +86,21 @@ Details: [MCP server](mcp-server.md).
 | Files exposed | Vite serves the source tree and `public/` | Everything in `dist/`, including `server.cjs.map` once built (SRV-2; ran with a stub file) |
 
 - `npm run dev` is `tsx server.ts` with no watch mode. Browser code hot-reloads, but `server.ts`, `src/server/**` and the server's copy of `src/core/**` (used by MCP) only change after a restart.
-- `vite.config.ts:15-21` sets `hmr: false` and `watch: null` when `DISABLE_HMR=true`. The inline `hmr` object in `server.ts:358-361` probably overrides `hmr: false`, so only `watch: null` would take effect (SRV-10; inferred, not run).
+- `vite.config.ts:15-21` sets `hmr: false` and `watch: null` when `DISABLE_HMR=true`. The inline `hmr` object in `server.ts:373-376` probably overrides `hmr: false`, so only `watch: null` would take effect (SRV-10; inferred, not run).
 - `index.html:12-32` suppresses WebSocket and `@vite/client` errors so that HMR failures in the AI Studio proxy stay silent.
 
 ## Environment variables actually read
 
 | Variable | Where | Effect |
 |---|---|---|
-| `NODE_ENV` | `server.ts:351` | Anything except `production` selects Vite dev middleware. |
-| `K_SERVICE` | `server.ts:353` | Presence only: HMR `clientPort` 443. |
-| `APP_URL` | `server.ts:353` | Presence only: HMR `clientPort` 443. |
+| `NODE_ENV` | `server.ts:366` | Anything except `production` selects Vite dev middleware. |
+| `K_SERVICE` | `server.ts:368` | Presence only: HMR `clientPort` 443. |
+| `APP_URL` | `server.ts:368` | Presence only: HMR `clientPort` 443. |
 | `DISABLE_HMR` | `vite.config.ts:18`, `:20` | `'true'` turns off HMR and file watching (dev only; see SRV-10). |
 
 Not read:
 
-- **`PORT` and `HOST`.** The port is fixed at 3000 on `0.0.0.0` (`server.ts:8`, `:374`).
+- **`PORT` and `HOST`.** The port is fixed at 3000 on `0.0.0.0` (`server.ts:8`, `:389`).
 - **`GEMINI_API_KEY`.** It is listed in `.env.example:1-4` but unused.
 - **`.env`.** `dotenv` is a dependency but is never imported, so the server does not load a `.env` file.
 - **`import.meta.env`.** No client code uses it.
@@ -165,16 +165,17 @@ Two other client behaviours:
 
 ## Seeding and legacy purge
 
-The demo study is the Suzuki-Miyaura project `proj-suzuki-cross-coupling` in folder `folder-coupling`, defined in `src/core/sampleProject.ts`. `sampleProjects` and `sampleFolders` are built once per process at module load (`sampleProject.ts:277-283`).
+The demo study is the Suzuki-Miyaura project `proj-suzuki-cross-coupling` in folder `folder-coupling`, defined in `src/core/sampleProject.ts`. `sampleProjects` and `sampleFolders` are built once per process at module load (`sampleProject.ts:297-299`). `createSampleProjects()` and `createSampleFolders()` (`:289-295`) build new objects on every call; the reset uses them. `createDemoProjectCopy(existing)` (`:280-286`) is the demo copy that the demo buttons add.
 
 | Where | Store empty | Store not empty | Legacy purge |
 |---|---|---|---|
 | `server.ts:36-60` | `db.projects = [...sampleProjects]` (shallow copy: `db` holds the module's own objects, DATA-14) | Pushes back any sample project or folder whose id is missing, so a deleted demo returns on every restart (DATA-13) | Removes `proj-api-synthesis-01` and `folder-synthesis` |
 | `src/server/mcp/stdio.ts:21-30` | Same shallow copy | Nothing (differs from `server.ts`, MCP-20) | Same purge |
 | Browser cache (`ProjectContext.tsx:24-68`) | `[...sampleProjects]`, `[...sampleFolders]` | Prepends `demoCatalyticProject` / `demoFolder` if missing | Same purge |
-| `POST /api/reset-sample` (`server.ts:194-202`) and client `resetSampleData` (`ProjectContext.tsx:269-281`) | Replaces **everything**, on the server and in the cache. Wired to both "Demo" buttons (`src/web/pages/Dashboard.tsx:181`, `:343`) with no confirmation (DATA-1). | | |
+| `POST /api/reset-sample` (`server.ts:194-217`) and client `resetSampleData` (`ProjectContext.tsx:269-291`) | Replaces **everything** with `createSampleProjects()` / `createSampleFolders()`, on the server and then in the cache, after a backup of `data.json`. Needs the body `{"confirm": true}`. The only UI caller is "Reset Sample Data" in the Archive view (`src/web/pages/Dashboard.tsx:225-234`), behind `ConfirmDialog` (P0.1) | | |
+| Client `loadDemoProject` (`ProjectContext.tsx:293-301`) | Adds `createDemoProjectCopy(projects)` with `saveProject`, and the demo folder with `saveFolder` if it is missing. Keeps the demo id unless a project already has it, else a new uuid; never replaces a project. Called by "Demo Studies" and "Load Demo Experiments" (`Dashboard.tsx:202`, `:385`) | | |
 
-Startup seeding (server and stdio) does not write `data.json` by itself. A missing file is created on the first write (any save, delete or reset); verified by running: `POST /api/reset-sample` in an empty directory created `data.json` there.
+Startup seeding (server and stdio) does not write `data.json` by itself. A missing file is created on the first write (any save, delete or reset); verified by running: `POST /api/reset-sample` in an empty directory created `data.json` there (before P0.1; a reset now also needs the confirm body, and writes no backup when there is no file yet).
 
 There is no schema version in `data.json`, in `Project` or in the cache keys. The purge above is the only "migration", and it is copied in three places (DATA-12).
 
@@ -194,12 +195,12 @@ Keep these unless AI Studio compatibility is deliberately dropped. See [AI Studi
 
 | Assumption | Where | Note |
 |---|---|---|
-| Port 3000 on `0.0.0.0` | `server.ts:8`, `:374` | `PORT` is ignored (SRV-8). |
+| Port 3000 on `0.0.0.0` | `server.ts:8`, `:389` | `PORT` is ignored (SRV-8). |
 | One process serves the SPA, REST, socket.io and MCP from one origin | `server.ts` | API routes are registered before the Vite/static middleware. |
-| HMR behind an HTTPS proxy | `server.ts:353-361` | `clientPort` 443 when `K_SERVICE` or `APP_URL` is set. `.env.example:6-8` says AI Studio injects `APP_URL` with the Cloud Run service URL. |
+| HMR behind an HTTPS proxy | `server.ts:368-376` | `clientPort` 443 when `K_SERVICE` or `APP_URL` is set. `.env.example:6-8` says AI Studio injects `APP_URL` with the Cloud Run service URL. |
 | `DISABLE_HMR` switch | `vite.config.ts:15-21` | The file says "Do not modify". Partly ineffective (SRV-10). |
 | Silenced HMR socket errors | `index.html:12-32` | Hides WebSocket failures in the AI Studio preview. |
-| Working directory = repo root | `server.ts:9`, `:367`; `stdio.ts:8`; Vite config discovery | Starting from another directory silently creates a fresh, sample-seeded `data.json` there (SRV-8). |
+| Working directory = repo root | `server.ts:9`, `:382`; `stdio.ts:8`; Vite config discovery | Starting from another directory silently creates a fresh, sample-seeded `data.json` there (SRV-8). |
 | `base: './'` | `vite.config.ts:8` | Contradicted by root-absolute `/plotly.min.js`, `/logo.png`, `/api/...` and `/socket.io` (SRV-12). |
 | Container filesystem | `data.json` | On Cloud Run it is temporary and per instance (DATA-9). |
 
@@ -231,7 +232,7 @@ From the [issue registry](../../spec/DOE-Magic/roadmap-backlog.md). Basis: R = c
 
 | ID | Sev | Issue | Basis |
 |---|---|---|---|
-| DATA-1 | Critical | The "Demo Studies" / "Load Demo Experiments" buttons wipe every project and folder for all users, with no confirmation. | C |
+| DATA-1 | Critical | **Fixed in P0.1 (2026-10-21).** The "Demo Studies" / "Load Demo Experiments" buttons wiped every project and folder for all users, with no confirmation. They now add a copy of the demo, and the reset needs confirmation in the UI and on the server. | C |
 | DATA-2 | High | Non-atomic `data.json` write; a corrupt file is replaced by samples and then overwritten. | C |
 | DATA-3 | High | The Express server and the stdio MCP both own `data.json` with separate in-memory copies, so updates are lost. | C |
 | DATA-4 | High | Whole-project last-writer-wins with no version check (stale tabs, other users, MCP). | C |
@@ -244,7 +245,7 @@ From the [issue registry](../../spec/DOE-Magic/roadmap-backlog.md). Basis: R = c
 | DATA-11 | Medium | Edits to factors, responses and metadata do not cascade, leaving orphaned data. | C |
 | DATA-12 | Medium | No schema version anywhere; the only migration is a legacy-id purge copied into three places. | C |
 | DATA-13 | Medium | Deleted demo data comes back; an empty server is refilled from the browser cache. | C |
-| DATA-14 | Medium | Sample constants are shared by reference and mutated in place, so "reset" restores an edited sample. | R |
+| DATA-14 | Medium | Sample constants are shared by reference and mutated in place, so seeding hands out objects that MCP edits change. (Until P0.1, "reset" restored such an edited sample; it now builds new objects.) | R |
 | DATA-15 | Medium | Opening the Robustness tab writes the project; simulation results are persisted inside it. | C |
 | DATA-16 | Medium | No change history, audit trail, user identity or backups. | C |
 | DATA-17 | Medium | Permanent deletes (Archive view) and folder deletes happen on a single click. | C |

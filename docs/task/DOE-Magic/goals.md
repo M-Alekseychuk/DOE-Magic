@@ -20,7 +20,7 @@ A DOE workbench for pharmaceutical process development that scientists can trust
 
 What the app already offers, and what stays in scope:
 
-- **Workflow tabs** ([`src/web/pages/ProjectView.tsx:368-373`](../../../src/web/pages/ProjectView.tsx); English labels from [`src/web/i18n/translations.ts:96-101`](../../../src/web/i18n/translations.ts), which take precedence over the fallbacks in ProjectView): Setup, Experiment Matrix, Model Analysis, Compare Responses, Robustness & Simulation, Bayesian Optimization. There is also a Guide/SOP page, a dashboard with folders, and an MCP panel.
+- **Workflow tabs** ([`src/web/pages/ProjectView.tsx:368-373`](../../../src/web/pages/ProjectView.tsx); English labels from [`src/web/i18n/translations.ts:102-107`](../../../src/web/i18n/translations.ts), which take precedence over the fallbacks in ProjectView): Setup, Experiment Matrix, Model Analysis, Compare Responses, Robustness & Simulation, Bayesian Optimization. There is also a Guide/SOP page, a dashboard with folders, and an MCP panel.
 - **Design types** ([`src/core/types.ts:2`](../../../src/core/types.ts)): 2-level factorial (full or fractional), definitive screening (DSD), central composite (CCD), Box-Behnken (BBD), Plackett-Burman, and custom D-optimal.
 - **Analysis**: OLS with ANOVA, lack of fit, effects (Pareto, half-normal), parameter estimates, residual diagnostics, Box-Cox, desirability, prediction profiler, and response surfaces.
 - **Exports**: JSON (the Dashboard can import it again), Excel, and an HTML report.

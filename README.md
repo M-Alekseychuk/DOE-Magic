@@ -22,11 +22,11 @@ DOE Magic is a Design of Experiments (DOE) workbench for pharmaceutical process 
 > The full list is in [Status and handoff](docs/task/DOE-Magic/status-and-handoff.md#top-risks-right-now).
 
 > [!CAUTION]
-> **Buttons that delete data without asking:**
-> - **Demo Studies** and **Load Demo Experiments** on the Dashboard replace *all* projects for everyone. Demo Studies sits right next to **Import Project**, so take care.
-> - **Generate Design Matrix**, Excel import and **Simulate Sample Data** overwrite measured results.
+> **Buttons that delete data without asking:** **Generate Design Matrix**, Excel import and **Simulate Sample Data** overwrite measured results.
 >
 > Before using any of them, click **Export JSON** on each project's page. **Import Project** on the Dashboard brings the file back as a copy.
+>
+> **Demo Studies** and **Load Demo Experiments** on the Dashboard no longer delete anything: they add a copy of the demo study and keep your projects. **Reset Sample Data**, in the Archive view, still deletes *all* projects for everyone. It asks first, and the server saves a copy of `data.json` before it resets ([where your data is](#where-your-data-is)).
 >
 > The app has no login. Anyone who can open its address can read and delete everything, including anyone with the link if it was shared or deployed from AI Studio.
 
@@ -65,6 +65,8 @@ Open http://localhost:3000. The same process serves the web app, the data API an
 Your projects are stored on the server in `data.json`, in the folder the server was started from. With the commands above, that is the project folder. The browser keeps only a temporary copy, and the server overwrites it every time the page loads, so it is not a backup. `data.json` is not part of git. When it is missing, the server recreates it with only the demo project.
 
 To back up, click **Export JSON** on each project, or copy `data.json` while the server is stopped.
+
+A confirmed **Reset Sample Data** first copies `data.json` to `data.json.before-reset-<date and time>` in the same folder. To undo a reset, stop the server, copy that file over `data.json`, and start the server again.
 
 ## Where things are
 
