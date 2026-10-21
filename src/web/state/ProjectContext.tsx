@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useEffect, useState, useRef } from 'react';
 import { io, Socket } from 'socket.io-client';
 import { Project, Folder } from '../../core/types';
-import { sampleProjects, sampleFolders, demoCatalyticProject, demoFolder } from '../../core/sampleProject';
+import { sampleProjects, sampleFolders, demoCatalyticProject, demoFolder, createDemoProjectCopy, createDemoFolder } from '../../core/sampleProject';
 
 interface ProjectContextType {
   projects: Project[];
@@ -11,8 +11,8 @@ interface ProjectContextType {
   deleteProject: (id: string) => void;
   saveFolder: (folder: Folder) => void;
   deleteFolder: (id: string) => void;
-  resetSampleData: () => void;
-  loadDemoProject: (id?: string) => void;
+  resetSampleData: () => Promise<boolean>;
+  loadDemoProject: () => string;
   loading: boolean;
 }
 
@@ -266,49 +266,38 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
     }
   };
 
-  const resetSampleData = () => {
-    const sampleP = [...sampleProjects];
-    const sampleF = [...sampleFolders];
-    setProjects(sampleP);
-    setFolders(sampleF);
+  // Deletes every project and folder for every user, so only call it after the user confirmed (DATA-1).
+  // Local state changes only once the server has reset; resolves to false if it did not.
+  const resetSampleData = async (): Promise<boolean> => {
     try {
-      localStorage.setItem(LOCAL_PROJECTS_KEY, JSON.stringify(sampleP));
-      localStorage.setItem(LOCAL_FOLDERS_KEY, JSON.stringify(sampleF));
-    } catch (e) {}
-
-    fetch('/api/reset-sample', { method: 'POST' })
-      .catch(e => console.warn('Failed to reset sample data on server:', e));
+      const res = await fetch('/api/reset-sample', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ confirm: true })
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const { data } = await res.json();
+      setProjects(data.projects);
+      setFolders(data.folders);
+      try {
+        localStorage.setItem(LOCAL_PROJECTS_KEY, JSON.stringify(data.projects));
+        localStorage.setItem(LOCAL_FOLDERS_KEY, JSON.stringify(data.folders));
+      } catch (e) {}
+      return true;
+    } catch (e) {
+      console.warn('Failed to reset sample data on server:', e);
+      return false;
+    }
   };
 
-  const loadDemoProject = (id?: string) => {
-    const targetProject = id 
-      ? sampleProjects.find(p => p.id === id) || demoCatalyticProject 
-      : demoCatalyticProject;
-
-    setProjects(prev => {
-      const filtered = prev.filter(p => p.id !== targetProject.id);
-      const next = [targetProject, ...filtered];
-      try {
-        localStorage.setItem(LOCAL_PROJECTS_KEY, JSON.stringify(next));
-      } catch (e) {}
-      return next;
-    });
-
-    setFolders(prev => {
-      if (targetProject.folderId && !prev.some(f => f.id === targetProject.folderId)) {
-        const folderToAdd = sampleFolders.find(f => f.id === targetProject.folderId);
-        if (folderToAdd) {
-          const next = [...prev, folderToAdd];
-          try {
-            localStorage.setItem(LOCAL_FOLDERS_KEY, JSON.stringify(next));
-          } catch (e) {}
-          return next;
-        }
-      }
-      return prev;
-    });
-
-    saveProject(targetProject);
+  // Adds a fresh copy of the demo study and keeps every existing project. Returns the new project's id.
+  const loadDemoProject = (): string => {
+    const demo = createDemoProjectCopy(projects);
+    if (demo.folderId && !folders.some(f => f.id === demo.folderId)) {
+      saveFolder(createDemoFolder());
+    }
+    saveProject(demo);
+    return demo.id;
   };
 
   return (
