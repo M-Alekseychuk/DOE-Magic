@@ -59,6 +59,22 @@ if (!db.folders || db.folders.length === 0) {
 db.projects = (db.projects || []).filter((p: any) => p.id !== 'proj-api-synthesis-01');
 db.folders = (db.folders || []).filter((f: any) => f.id !== 'folder-synthesis');
 
+if (!db.defaultSopSteps || !Array.isArray(db.defaultSopSteps) || db.defaultSopSteps.length === 0) {
+  db.defaultSopSteps = [
+    {
+      id: 'step-1',
+      badge: 'STEP 1',
+      badgeColor: 'blue',
+      title: 'Plan your factors and responces',
+      description: 'Plan which variables/factors (equivalents of reagents, temperature, reaction time, catalyst loading etc.) you want to investigate, and what you expect to change (responses) in your product (purity, yield, pH, impurity formation etc.)\nMore factors to investigate means more reactions are generated to cover the various points of data, which means more work. Carefully consider which factors make sense and which might be too much.',
+      guidelines: [
+        'Check potential factors to investigate',
+        'Determine all responses you are interested in'
+      ]
+    }
+  ];
+}
+
 function saveData() {
   try {
     fs.writeFileSync(DATA_FILE, JSON.stringify(db, null, 2));
@@ -189,6 +205,22 @@ app.delete('/api/folders/:id', (req, res) => {
   saveData();
   io.emit('sync_data', db);
   res.json({ success: true });
+});
+
+// Step-by-Step SOP Guide default template endpoints
+app.get('/api/guide/default', (req, res) => {
+  res.json({ steps: db.defaultSopSteps || [] });
+});
+
+app.post('/api/guide/default', (req, res) => {
+  const { steps } = req.body;
+  if (Array.isArray(steps)) {
+    db.defaultSopSteps = steps;
+    saveData();
+    res.json({ success: true, steps: db.defaultSopSteps });
+  } else {
+    res.status(400).json({ error: 'Expected steps array in body' });
+  }
 });
 
 // Deletes every project and folder for every user (DATA-1). A request without the JSON body {"confirm": true}
@@ -370,7 +402,7 @@ async function startServer() {
     const vite = await createViteServer({
       server: {
         middlewareMode: true,
-        hmr: process.env.DISABLE_HMR === 'true' ? false : {
+        hmr: (process.env.DISABLE_HMR === 'true' || isCloudRun) ? false : {
           server: httpServer,
           clientPort: clientPort,
         },

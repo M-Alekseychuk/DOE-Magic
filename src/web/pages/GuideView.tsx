@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { 
   BookOpen, Plus, Pencil, X, Check, Trash2, Download, Upload, 
-  ChevronUp, ChevronDown, AlertTriangle 
+  ChevronUp, ChevronDown, AlertTriangle, RotateCcw, BookmarkCheck 
 } from 'lucide-react';
 import { useTranslation } from '../i18n/LanguageContext';
 
@@ -18,7 +18,20 @@ export interface SopStep {
 
 const STORAGE_KEY = 'axiom_doe_sop_steps_v1';
 
-const DEFAULT_STEPS: SopStep[] = [];
+export const DEFAULT_STEPS: SopStep[] = [
+  {
+    id: 'step-1',
+    badge: 'STEP 1',
+    badgeColor: 'blue',
+    title: 'Plan your factors and responces',
+    description: `Plan which variables/factors (equivalents of reagents, temperature, reaction time, catalyst loading etc.) you want to investigate, and what you expect to change (responses) in your product (purity, yield, pH, impurity formation etc.)
+More factors to investigate means more reactions are generated to cover the various points of data, which means more work. Carefully consider which factors make sense and which might be too much.`,
+    guidelines: [
+      'Check potential factors to investigate',
+      'Determine all responses you are interested in'
+    ]
+  }
+];
 
 const BADGE_COLOR_MAP: Record<string, { badgeBg: string; badgeText: string; dotBg: string; lineBorder: string }> = {
   blue: {
@@ -72,32 +85,90 @@ export default function GuideView() {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
+    let initialSteps: SopStep[] = DEFAULT_STEPS;
+    let hasStored = false;
     try {
       const stored = localStorage.getItem(STORAGE_KEY);
       if (stored) {
         const parsed = JSON.parse(stored);
-        if (Array.isArray(parsed)) {
-          // If the stored data was the previous 3-step default, reset to empty default
+        if (Array.isArray(parsed) && parsed.length > 0) {
           const isOldDefault =
             parsed.length === 3 &&
             parsed[0]?.id === 'step-1' &&
             parsed[0]?.title === 'Reaction Scheme & Factor Setup';
           if (!isOldDefault) {
-            setSteps(parsed);
-            return;
+            initialSteps = parsed;
+            hasStored = true;
           }
         }
       }
     } catch (e) {
       console.error('Failed to load steps from storage:', e);
     }
-    // Default initial steps is the empty version
-    setSteps(DEFAULT_STEPS);
+    setSteps(initialSteps);
+
+    // Sync with server:
+    // If the client has existing steps in localStorage, sync them as the server's default.
+    // If client has no stored steps, load whatever software default is on the server.
+    fetch('/api/guide/default')
+      .then(res => res.json())
+      .then(data => {
+        if (hasStored && initialSteps.length > 0) {
+          fetch('/api/guide/default', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ steps: initialSteps })
+          }).catch(() => {});
+        } else if (Array.isArray(data.steps) && data.steps.length > 0) {
+          setSteps(data.steps);
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(data.steps));
+        }
+      })
+      .catch(() => {});
   }, []);
 
   const saveSteps = (updated: SopStep[]) => {
     setSteps(updated);
     localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+    // Persist to server as software default
+    fetch('/api/guide/default', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ steps: updated })
+    }).catch(() => {});
+  };
+
+  const handleSaveAsDefault = async () => {
+    try {
+      const res = await fetch('/api/guide/default', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ steps })
+      });
+      if (res.ok) {
+        showToast(locale === 'zh' ? '当前指南已成功保存为系统软件默认！' : 'Current guide saved as software default!');
+      } else {
+        showToast(locale === 'zh' ? '保存失败，请稍后重试。' : 'Failed to save software default.');
+      }
+    } catch {
+      showToast(locale === 'zh' ? '保存失败，请稍后重试。' : 'Failed to save software default.');
+    }
+  };
+
+  const handleResetToDefault = () => {
+    fetch('/api/guide/default')
+      .then(res => res.json())
+      .then(data => {
+        const defaultSteps = (Array.isArray(data.steps) && data.steps.length > 0) ? data.steps : DEFAULT_STEPS;
+        saveSteps(defaultSteps);
+        setEditingStepId(null);
+        setIsAddingNew(false);
+        showToast(locale === 'zh' ? '已恢复为系统软件默认指南' : 'Reset to software default guide');
+      })
+      .catch(() => {
+        saveSteps(DEFAULT_STEPS);
+        showToast(locale === 'zh' ? '已恢复为系统软件默认指南' : 'Reset to software default guide');
+      });
   };
 
   const showToast = (msg: string) => {
@@ -421,6 +492,17 @@ export default function GuideView() {
             <span>{locale === 'zh' ? '下载 JSON' : 'Download'}</span>
           </button>
 
+          {/* Save as Software Default */}
+          <button
+            type="button"
+            onClick={handleSaveAsDefault}
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 dark:bg-emerald-950/40 hover:bg-emerald-100 dark:hover:bg-emerald-900/50 text-emerald-700 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-700 rounded-md font-medium text-xs transition-colors shadow-xs cursor-pointer"
+            title={locale === 'zh' ? '将当前指南保存为系统软件默认模板' : 'Save current Step-by-Step guide as software default'}
+          >
+            <BookmarkCheck size={13} />
+            <span>{locale === 'zh' ? '设为软件默认' : 'Save as Default'}</span>
+          </button>
+
           {/* Clear Button */}
           <button
             type="button"
@@ -484,6 +566,13 @@ export default function GuideView() {
               className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-md font-semibold text-xs transition-colors shadow-xs cursor-pointer"
             >
               {locale === 'zh' ? '创建第一项步骤' : 'Insert First Step'}
+            </button>
+            <button
+              onClick={handleResetToDefault}
+              className="px-4 py-2 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-md font-medium text-xs transition-colors shadow-xs cursor-pointer flex items-center gap-1.5"
+            >
+              <RotateCcw size={13} />
+              <span>{locale === 'zh' ? '加载软件默认指南' : 'Load Software Default'}</span>
             </button>
           </div>
         </div>
@@ -645,21 +734,35 @@ export default function GuideView() {
               </div>
             </div>
 
-            <div className="flex items-center justify-end gap-2.5 mt-6 pt-4 border-t border-slate-100 dark:border-slate-800">
+            <div className="flex items-center justify-between gap-2.5 mt-6 pt-4 border-t border-slate-100 dark:border-slate-800 flex-wrap">
               <button
                 type="button"
-                onClick={() => setShowClearConfirm(false)}
-                className="px-3.5 py-1.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-lg text-xs font-medium cursor-pointer transition-colors"
+                onClick={() => {
+                  handleResetToDefault();
+                  setShowClearConfirm(false);
+                }}
+                className="px-3 py-1.5 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/40 rounded-lg text-xs font-medium cursor-pointer transition-colors"
+                title={locale === 'zh' ? '重置为软件默认执行指南' : 'Reset to software default guide'}
               >
-                {locale === 'zh' ? '取消' : 'Cancel'}
+                {locale === 'zh' ? '重置为软件默认' : 'Reset to Software Default'}
               </button>
-              <button
-                type="button"
-                onClick={handleConfirmClear}
-                className="px-4 py-1.5 bg-rose-600 hover:bg-rose-500 text-white rounded-lg text-xs font-semibold shadow-xs cursor-pointer transition-colors"
-              >
-                {locale === 'zh' ? '确认清空' : 'Yes, Clear All'}
-              </button>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowClearConfirm(false)}
+                  className="px-3.5 py-1.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-lg text-xs font-medium cursor-pointer transition-colors"
+                >
+                  {locale === 'zh' ? '取消' : 'Cancel'}
+                </button>
+                <button
+                  type="button"
+                  onClick={handleConfirmClear}
+                  className="px-4 py-1.5 bg-rose-600 hover:bg-rose-500 text-white rounded-lg text-xs font-semibold shadow-xs cursor-pointer transition-colors"
+                >
+                  {locale === 'zh' ? '清空为空白' : 'Clear to Blank'}
+                </button>
+              </div>
             </div>
           </div>
         </div>

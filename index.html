@@ -5,31 +5,97 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Remix DOE Magic V.1.5.2 (current Version)</title>
     <link rel="icon" type="image/png" href="/logo.png" />
-    <script src="/plotly.min.js"></script>
     <meta name="description" content="Design of Experiments, Statistical Optimization, and Model Context Protocol (MCP) Server Endpoint for Jiuzhou Pharmaceutical" />
     <meta property="og:title" content="Remix DOE Magic V.1.5.2 (current Version)" />
     <meta property="og:description" content="Design of Experiments, Statistical Optimization, and Model Context Protocol (MCP) Server Endpoint for Jiuzhou Pharmaceutical" />
     <script>
+      // In AI Studio proxy / preview environments, Vite HMR WebSocket transport cannot connect.
+      // Mock the "vite-hmr" WebSocket connection so @vite/client connects without throwing errors.
+      if (typeof window !== 'undefined' && window.WebSocket) {
+        const _NativeWebSocket = window.WebSocket;
+        function MockHmrWebSocket(url, protocols) {
+          const isViteHmr = 
+            (typeof protocols === 'string' && protocols === 'vite-hmr') ||
+            (Array.isArray(protocols) && protocols.includes('vite-hmr')) ||
+            (typeof url === 'string' && (url.includes('vite-hmr') || url.includes('token=')));
+
+          if (isViteHmr) {
+            const target = new EventTarget();
+            target.url = url;
+            target.protocol = 'vite-hmr';
+            target.readyState = 1; // WebSocket.OPEN
+            target.OPEN = 1;
+            target.CONNECTING = 0;
+            target.CLOSING = 2;
+            target.CLOSED = 3;
+            target.binaryType = 'blob';
+            target.bufferedAmount = 0;
+            target.extensions = '';
+            target.onopen = null;
+            target.onclose = null;
+            target.onerror = null;
+            target.onmessage = null;
+            target.send = function() {};
+            target.close = function() {
+              target.readyState = 3;
+              if (typeof target.onclose === 'function') target.onclose(new Event('close'));
+            };
+            setTimeout(() => {
+              target.dispatchEvent(new Event('open'));
+              if (typeof target.onopen === 'function') target.onopen(new Event('open'));
+            }, 0);
+            return target;
+          }
+          return new _NativeWebSocket(url, protocols);
+        }
+        MockHmrWebSocket.prototype = _NativeWebSocket.prototype;
+        MockHmrWebSocket.CONNECTING = _NativeWebSocket.CONNECTING;
+        MockHmrWebSocket.OPEN = _NativeWebSocket.OPEN;
+        MockHmrWebSocket.CLOSING = _NativeWebSocket.CLOSING;
+        MockHmrWebSocket.CLOSED = _NativeWebSocket.CLOSED;
+        window.WebSocket = MockHmrWebSocket;
+      }
+
       // In AI Studio proxy / preview environments, suppress Vite HMR WebSocket transport rejections per environment constraints
+      function isIgnoredHmrError(str) {
+        if (!str) return false;
+        return (
+          str.includes('WebSocket') ||
+          str.includes('createWebSocketModuleRunnerTransport') ||
+          str.includes('@vite/client') ||
+          str.includes('ws://') ||
+          str.includes('wss://')
+        );
+      }
       window.addEventListener('unhandledrejection', (event) => {
         const msg = event?.reason?.message || (typeof event?.reason === 'string' ? event.reason : '');
         const stack = event?.reason?.stack || '';
-        if (
-          msg.includes('WebSocket') ||
-          stack.includes('createWebSocketModuleRunnerTransport') ||
-          stack.includes('@vite/client')
-        ) {
+        if (isIgnoredHmrError(msg) || isIgnoredHmrError(stack)) {
           event.preventDefault();
         }
       });
       window.addEventListener('error', (event) => {
         const msg = event?.message || '';
         const filename = event?.filename || '';
-        if (msg.includes('WebSocket') || filename.includes('@vite/client')) {
+        const stack = event?.error?.stack || '';
+        const errDesc = event?.error?.message || '';
+        if (isIgnoredHmrError(msg) || isIgnoredHmrError(filename) || isIgnoredHmrError(stack) || isIgnoredHmrError(errDesc)) {
           event.preventDefault();
+          if (typeof event.stopImmediatePropagation === 'function') {
+            event.stopImmediatePropagation();
+          }
         }
-      });
+      }, true);
+      const _origOnError = window.onerror;
+      window.onerror = function(msg, url, lineNo, columnNo, error) {
+        const full = [msg, url, error?.message, error?.stack].filter(Boolean).join(' ');
+        if (isIgnoredHmrError(full)) {
+          return true;
+        }
+        if (_origOnError) return _origOnError.apply(this, arguments);
+      };
     </script>
+    <script src="/plotly.min.js"></script>
   </head>
   <body>
     <div id="root"></div>

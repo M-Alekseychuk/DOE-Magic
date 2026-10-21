@@ -3,6 +3,7 @@ import React, { useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useProjects } from '../state/ProjectContext';
 import { useTranslation } from '../i18n/LanguageContext';
+import { useBranding } from '../state/BrandingContext';
 import { ArrowLeft, Settings2, Table2, LineChart, Cpu, Download, FileSpreadsheet, Edit2, Check, X, Activity, Layers } from 'lucide-react';
 import ProjectSetup from '../features/setup/ProjectSetup';
 import ProjectDesign from '../features/design/ProjectDesign';
@@ -17,6 +18,7 @@ export default function ProjectView() {
   const { id } = useParams<{ id: string }>();
   const { projects, saveProject } = useProjects();
   const { t, locale } = useTranslation();
+  const { activeLogo } = useBranding();
   const project = projects.find(p => p.id === id);
   const [activeTab, setActiveTab] = useState<'setup' | 'design' | 'analysis' | 'compare' | 'optimization' | 'robustness'>('setup');
   const [selectedAnalysisResponseId, setSelectedAnalysisResponseId] = useState<string>('');
@@ -353,7 +355,7 @@ export default function ProjectView() {
   };
 
   const handleExportHTML = () => {
-    const htmlContent = generateExportHTML(project);
+    const htmlContent = generateExportHTML(project, locale, activeLogo);
     const blob = new Blob([htmlContent], { type: 'text/html' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');

@@ -32,6 +32,15 @@ export const translations: Record<SupportedLocale, Record<string, string>> = {
     'dark_mode': 'Dark Mode',
     'language': 'Language',
     'coming_soon': 'Coming Soon',
+    'branding_logo': 'Branding Logo',
+    'branding_settings': 'Organization & Branding Logo',
+    'branding_desc': 'Displayed in app sidebar and embedded into all exported reports.',
+    'custom_logo': 'Custom Logo',
+    'default_logo': 'Default Built-in Logo',
+    'reset_default_logo': 'Reset to Default Logo',
+    'logo_width': 'Logo Display Width',
+    'full_sidebar_width': 'Full Sidebar Width',
+    'reset_width': 'Reset Width',
 
     // Common Actions
     'save': 'Save',
@@ -247,6 +256,15 @@ export const translations: Record<SupportedLocale, Record<string, string>> = {
     'dark_mode': '深色模式',
     'language': '语言',
     'coming_soon': '敬请期待',
+    'branding_logo': '品牌 Logo 设置',
+    'branding_settings': '机构品牌与 Logo 定制',
+    'branding_desc': '在界面与导出的全部报告中展示自定义 Logo。',
+    'custom_logo': '自定义 Logo',
+    'default_logo': '默认品牌 Logo',
+    'reset_default_logo': '恢复默认 Logo',
+    'logo_width': 'Logo 显示宽度',
+    'full_sidebar_width': '全侧边栏宽度',
+    'reset_width': '重置宽度',
 
     // Common Actions
     'save': '保存',

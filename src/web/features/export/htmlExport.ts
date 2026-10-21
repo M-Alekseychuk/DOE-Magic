@@ -3,7 +3,12 @@ import { logoBase64 } from './logoBase64';
 import { Project } from '../../../core/types';
 import { computeAnalysis } from '../../../core/analysis/analysisCore';
 
-export function generateExportHTML(project: Project, initialLocale: 'en' | 'zh' = 'en'): string {
+export function generateExportHTML(
+  project: Project, 
+  initialLocale: string = 'en',
+  customLogo?: string
+): string {
+  const reportLogo = customLogo || (typeof window !== 'undefined' ? (localStorage.getItem('app_custom_logo') || localStorage.getItem('app_default_logo')) : null) || logoBase64;
   const analysisData: Record<string, any> = {};
   for (const resp of project.responses) {
     const res = computeAnalysis(project, resp, resp.excludedTerms || [], resp.goal, resp.targetValue);
@@ -72,6 +77,12 @@ export function generateExportHTML(project: Project, initialLocale: 'en' | 'zh' 
         select { border: 1px solid #cbd5e1; border-radius: 4px; padding: 4px 8px; font-size: 0.875rem; background: white; }
         .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
         @media (max-width: 900px) { .grid-2 { grid-template-columns: 1fr; } }
+        @media print {
+            body { background: white; color: black; padding: 0; }
+            .card { box-shadow: none; border: 1px solid #cbd5e1; break-inside: avoid; }
+            #report-lang-select { display: none; }
+            img { max-width: 100% !important; print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+        }
     </style>
 </head>
 <body>
@@ -97,7 +108,7 @@ export function generateExportHTML(project: Project, initialLocale: 'en' | 'zh' 
                     </div>
                 </div>
             </div>
-            ${logoBase64 ? `<img src="${logoBase64}" alt="Logo" style="height: auto; max-height: 90px; width: auto; max-width: 280px; object-fit: contain; align-self: center;">` : ''}
+            ${reportLogo ? `<div style="display: flex; align-items: center; justify-content: center; padding: 4px;"><img src="${reportLogo}" alt="Logo" style="height: auto; max-height: 90px; width: auto; max-width: 280px; object-fit: contain; align-self: center;"></div>` : ''}
         </div>
 
         <div class="grid-2">

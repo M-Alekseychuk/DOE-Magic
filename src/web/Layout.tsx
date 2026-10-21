@@ -2,15 +2,17 @@ import React, { useState, useEffect } from 'react';
 import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
 import { useProjects } from './state/ProjectContext';
 import { useTranslation } from './i18n/LanguageContext';
+import { useBranding } from './state/BrandingContext';
 import LanguageSelector from './i18n/LanguageSelector';
 import McpModal from './features/mcp-panel/McpModal';
-import { Folder as FolderIcon, Plus, Trash2, Home, Moon, Sun, BookOpen, Bot } from 'lucide-react';
+import BrandingModal from './shared/BrandingModal';
+import { Folder as FolderIcon, Plus, Minus, Trash2, Home, Moon, Sun, BookOpen, Bot, Pencil } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
-import logoUrl from './assets/logo.png';
 
 export default function Layout() {
   const { projects, folders, saveFolder, deleteFolder } = useProjects();
-  const { t } = useTranslation();
+  const { t, locale } = useTranslation();
+  const { activeLogo, openBrandingModal, logoWidth, setLogoWidth } = useBranding();
   const location = useLocation();
   const navigate = useNavigate();
   const currentProjectId = location.pathname.startsWith('/project/') 
@@ -26,6 +28,20 @@ export default function Layout() {
   const [isDarkMode, setIsDarkMode] = useState(() => {
     return localStorage.getItem('darkMode') === 'true';
   });
+
+  const [logoAspect, setLogoAspect] = useState<number>(2.32);
+
+  useEffect(() => {
+    if (activeLogo) {
+      const img = new Image();
+      img.onload = () => {
+        if (img.naturalWidth && img.naturalHeight) {
+          setLogoAspect(img.naturalWidth / img.naturalHeight);
+        }
+      };
+      img.src = activeLogo;
+    }
+  }, [activeLogo]);
 
   useEffect(() => {
     if (isDarkMode) {
@@ -50,20 +66,116 @@ export default function Layout() {
     deleteFolder(id);
   };
 
+  // Adapt white box size to match the logo proportions and user width preference
+  // Sidebar is w-56 (224px), with p-4 available width is 192px
+  const maxAvailableWidth = 192;
+  const paddingBorder = 12; // 6px padding on each side (p-1.5)
+  const targetBoxWidth = Math.max(60, (maxAvailableWidth * logoWidth) / 100);
+  const maxAllowedImgHeight = 125;
+
+  const aspect = logoAspect > 0 ? logoAspect : 2.32;
+  let targetImgWidth = targetBoxWidth - paddingBorder;
+  let targetImgHeight = targetImgWidth / aspect;
+
+  if (targetImgHeight > maxAllowedImgHeight) {
+    targetImgHeight = maxAllowedImgHeight;
+    targetImgWidth = targetImgHeight * aspect;
+  }
+
+  const fittedBoxWidth = Math.round(targetImgWidth + paddingBorder);
+  const fittedBoxHeight = Math.round(targetImgHeight + paddingBorder);
+
   return (
     <div className="h-screen w-full bg-slate-100 dark:bg-slate-950 flex flex-row overflow-hidden text-[11px] font-sans text-slate-800 dark:text-slate-200 transition-colors duration-200">
       {/* Sidebar Navigation */}
       <div className="w-56 bg-gradient-to-b from-blue-950 to-emerald-950 flex flex-col border-r border-slate-700 shrink-0">
         <div className="p-4 border-b border-slate-800/50">
-          <Link to="/" className="flex flex-col items-center gap-2 mb-4 hover:opacity-90 transition-opacity">
-            <div className="w-40 bg-white rounded-md shadow-sm flex items-center justify-center overflow-hidden border border-white/20 p-1">
-              <img src={logoUrl} alt="Jiuzhou Pharmaceutical" className="w-full h-auto object-contain" />
+          <div className="flex flex-col items-center gap-2 mb-4 w-full">
+            <div className="relative group flex items-center justify-center">
+              <div 
+                onClick={openBrandingModal}
+                className="bg-white dark:bg-slate-900 rounded-md shadow-xs p-1.5 flex items-center justify-center overflow-hidden border border-white/20 dark:border-slate-800 cursor-pointer hover:ring-2 hover:ring-blue-400 transition-all duration-150"
+                style={{
+                  width: `${fittedBoxWidth}px`,
+                  height: `${fittedBoxHeight}px`,
+                }}
+                title={locale === 'zh' ? '点击修改品牌与报告 Logo / 调整宽度' : 'Click to customize branding and report logo / adjust width'}
+              >
+                <img 
+                  src={activeLogo} 
+                  alt="Organization Logo" 
+                  onLoad={(e) => {
+                    const img = e.currentTarget;
+                    if (img.naturalWidth && img.naturalHeight) {
+                      setLogoAspect(img.naturalWidth / img.naturalHeight);
+                    }
+                  }}
+                  className="object-contain block transition-all"
+                  style={{
+                    width: `${Math.round(targetImgWidth)}px`,
+                    height: `${Math.round(targetImgHeight)}px`,
+                  }} 
+                />
+              </div>
+
+              {/* Quick resize and edit controls on hover */}
+              <div className="absolute -top-2 -right-2 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity z-10">
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    setLogoWidth(Math.max(40, logoWidth - 10));
+                  }}
+                  disabled={logoWidth <= 40}
+                  className="w-5 h-5 bg-slate-800/90 hover:bg-slate-700 text-white rounded-full shadow-md flex items-center justify-center cursor-pointer disabled:opacity-40 transition-colors"
+                  title={locale === 'zh' ? '减小 Logo 宽度 (-10%)' : 'Decrease logo width (-10%)'}
+                  aria-label="Decrease logo width"
+                >
+                  <Minus size={10} />
+                </button>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    setLogoWidth(Math.min(100, logoWidth + 10));
+                  }}
+                  disabled={logoWidth >= 100}
+                  className="w-5 h-5 bg-slate-800/90 hover:bg-slate-700 text-white rounded-full shadow-md flex items-center justify-center cursor-pointer disabled:opacity-40 transition-colors"
+                  title={locale === 'zh' ? '增加 Logo 宽度 (+10%)' : 'Increase logo width (+10%)'}
+                  aria-label="Increase logo width"
+                >
+                  <Plus size={10} />
+                </button>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    openBrandingModal();
+                  }}
+                  className="w-5 h-5 bg-blue-600 hover:bg-blue-500 text-white rounded-full shadow-md flex items-center justify-center cursor-pointer transition-colors"
+                  title={locale === 'zh' ? '自定义品牌 Logo 与设置' : 'Customize branding logo & settings'}
+                  aria-label="Customize logo"
+                >
+                  <Pencil size={10} />
+                </button>
+              </div>
+
+              {/* Subtle width badge when customized */}
+              {logoWidth < 100 && (
+                <span className="absolute -bottom-2 right-0 text-[9px] font-mono px-1 py-0.2 rounded bg-slate-900/90 text-slate-300 border border-slate-700 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
+                  {logoWidth}%
+                </span>
+              )}
             </div>
-            <div className="flex items-center gap-2">
+
+            <Link to="/" className="flex items-center gap-2 hover:opacity-90 transition-opacity">
               <span className="text-white font-bold text-lg tracking-tight text-center">{t('app_name', 'DOE Magic')}</span>
               <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-mono">{t('app_version', 'v.1.5.2')}</span>
-            </div>
-          </Link>
+            </Link>
+          </div>
           <div className="text-[11px] uppercase tracking-widest font-bold text-brand-700 dark:text-blue-400 mb-1">{t('current_experiment', 'Current Experiment')}</div>
           <div className="text-white font-medium truncate">
             {currentProject ? currentProject.name : t('none_selected', 'None Selected')}
@@ -184,6 +296,9 @@ export default function Layout() {
 
       {/* Interactive MCP Server Endpoint Modal */}
       <McpModal isOpen={isMcpModalOpen} onClose={() => setIsMcpModalOpen(false)} />
+
+      {/* Custom Organization Branding Logo Modal */}
+      <BrandingModal />
     </div>
   );
 }
