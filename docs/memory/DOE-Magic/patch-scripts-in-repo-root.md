@@ -55,9 +55,9 @@ A script worth keeping goes into `scripts/`, with a `package.json` entry and a l
 - Before every commit, and after every AI Studio push, run `git status --short` and look at every new file outside `src/`, `docs/` and `scripts/`.
 - The tracked root may contain only these (the R9 list):
   - `server.ts`, `index.html`, `vite.config.ts`, `tsconfig.json`, `package.json` and `metadata.json`;
-  - `.env.example`, `.gitignore`, `bun.lock` and `package-lock.json`;
+  - `.env.example` and `.gitignore`, plus `bun.lock` and `package-lock.json`, which are allowed but not tracked (decision 1);
   - `README.md`, `AGENTS.md`, `CLAUDE.md` and `LICENSE`;
-  - `.github/`, `public/`, `assets/` (today only `assets/.aistudio/`), `scripts/`, `docs/` and `src/`.
+  - `.github/`, `public/`, `assets/` (nothing tracked since cc41f15 deleted `assets/.aistudio/.gitignore`), `scripts/`, `docs/` and `src/`.
 
   Adding an entry means updating the list in `scripts/check-boundaries.mjs` and AGENTS.md.
 - Keep throwaway scripts in a folder outside the repo.

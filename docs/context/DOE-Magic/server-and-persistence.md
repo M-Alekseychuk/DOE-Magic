@@ -1,9 +1,9 @@
 # DOE-Magic — Server and Persistence
 
-> Created: 2026-10-20. Status: describes `server.ts`, the JSON-file store and the browser cache as they are on branch `chore/project-structure-and-core-docs` (behaviour unchanged by the `src/` restructure); verified against the code, partly by running the server in an isolated directory.
+> Created: 2026-10-20. Status: describes `server.ts`, the JSON-file store and the browser cache as they are on branch `chore/project-structure-and-core-docs` (behaviour unchanged by the `src/` restructure); verified against the code, partly by running the server in an isolated directory. Port and HMR passages updated on 2026-10-21 for the owner's commit cc41f15, checked by running the dev server.
 > Related: [MCP server](mcp-server.md), [Web UI](web-ui.md), [AI Studio origin](ai-studio-origin.md), [Roadmap and backlog](../../spec/DOE-Magic/roadmap-backlog.md), [Design spec](../../spec/DOE-Magic/design-spec.md), [Status and handoff](../../task/DOE-Magic/status-and-handoff.md), [Runtime data in git](../../memory/DOE-Magic/runtime-data-in-git.md), [AI Studio sync overwrites repo](../../memory/DOE-Magic/ai-studio-sync-overwrites-repo.md)
 
-One Node process, [`server.ts`](../../../server.ts) (379 lines), serves everything on port 3000:
+One Node process, [`server.ts`](../../../server.ts) (379 lines), serves everything on one port, `PORT` or 3000:
 
 - the SPA
 - the REST API
@@ -17,7 +17,7 @@ All data lives in one untyped in-memory object, `db = {projects, folders}`. It i
 | Lines | Content |
 |---|---|
 | `1-6` | Imports: express, http, socket.io, path, fs, cors. |
-| `8-9` | `PORT = 3000` (hard-coded); `DATA_FILE = path.join(process.cwd(), 'data.json')`. |
+| `8-9` | `PORT = Number(process.env.PORT) \|\| 3000` (since cc41f15; an unset, empty, non-numeric or 0 value gives 3000); `DATA_FILE = path.join(process.cwd(), 'data.json')`. |
 | `11-18` | Express app with `cors()` (any origin) and `express.json({limit: '50mb'})`. One `http.createServer(app)` is shared by Express, socket.io (`cors: {origin: '*'}`) and Vite HMR. |
 | `20-22` | Project imports: `src/core/sampleProject`, the SDK `SSEServerTransport`, `src/server/mcp/doeMcpServer`. |
 | `24-34` | Load `data.json` synchronously if it exists. A parse error is only logged. A file that parses to `null` crashes startup at `:37` (SRV-13). |
@@ -80,29 +80,31 @@ Details: [MCP server](mcp-server.md).
 
 | | Development: `NODE_ENV !== 'production'` (`server.ts:351-365`) | Production: `NODE_ENV === 'production'` (`server.ts:366-371`) |
 |---|---|---|
-| Front end | `await import('vite')`, then `createViteServer({server: {middlewareMode: true, hmr: {server: httpServer, clientPort}}, appType: 'spa'})` and `app.use(vite.middlewares)`. No `root` or `configFile` is passed, so Vite finds `vite.config.ts` and `index.html` through `process.cwd()`. | `express.static(<cwd>/dist)` plus a catch-all `GET *` that returns `dist/index.html`. |
-| HMR | WebSocket on the shared HTTP server. `clientPort` is 443 when `K_SERVICE` or `APP_URL` is set (AI Studio / Cloud Run proxy), otherwise 3000. | none |
+| Front end | `await import('vite')`, then `createViteServer({server: {middlewareMode: true, hmr: DISABLE_HMR === 'true' ? false : {server: httpServer, clientPort}}, appType: 'spa'})` (the `DISABLE_HMR` test since cc41f15) and `app.use(vite.middlewares)`. No `root` or `configFile` is passed, so Vite finds `vite.config.ts` and `index.html` through `process.cwd()`. | `express.static(<cwd>/dist)` plus a catch-all `GET *` that returns `dist/index.html`. |
+| HMR | WebSocket on the shared HTTP server. `clientPort` is 443 when `K_SERVICE` or `APP_URL` is set (AI Studio / Cloud Run proxy), otherwise 3000, even when `PORT` is different (SRV-14). With `DISABLE_HMR=true` there is no socket on the shared server, but Vite opens its own WebSocket server on port 24678 (SRV-10). | none |
 | Unknown GET such as `/api/nope` or `/mcp/x` | Handled by Vite's SPA fallback; not run | 200 with `index.html` (SRV-7; ran with a stub `dist/`) |
 | Files exposed | Vite serves the source tree and `public/` | Everything in `dist/`, including `server.cjs.map` once built (SRV-2; ran with a stub file) |
 
 - `npm run dev` is `tsx server.ts` with no watch mode. Browser code hot-reloads, but `server.ts`, `src/server/**` and the server's copy of `src/core/**` (used by MCP) only change after a restart.
-- `vite.config.ts:15-21` sets `hmr: false` and `watch: null` when `DISABLE_HMR=true`. The inline `hmr` object in `server.ts:358-361` probably overrides `hmr: false`, so only `watch: null` would take effect (SRV-10; inferred, not run).
+- `vite.config.ts:15-21` sets `hmr: false` and `watch: null` when `DISABLE_HMR=true`. Before cc41f15, the inline `hmr` object in `server.ts` probably overrode `hmr: false` (inferred, not run). Since cc41f15, `server.ts:358` passes `hmr: false` as well. Run on 2026-10-21 (Vite 6.4.5) with `PORT=3101 DISABLE_HMR=true`: the server port refuses a `vite-hmr` WebSocket, but in middleware mode Vite opens its own WebSocket server on port 24678, and `/@vite/client` dials it (SRV-10).
+- With `PORT=3100` and HMR on, the server listens on 3100 but `/@vite/client` dials HMR on 3000, because `clientPort` is fixed at 3000 outside Cloud Run (`server.ts:354`, SRV-14). Hot reload then fails silently (the errors are suppressed, next point), or connects to another dev server on 3000.
 - `index.html:12-32` suppresses WebSocket and `@vite/client` errors so that HMR failures in the AI Studio proxy stay silent.
 
 ## Environment variables actually read
 
 | Variable | Where | Effect |
 |---|---|---|
+| `PORT` | `server.ts:8` | Listening port; default 3000 (since cc41f15). Cloud Run sets it to the container port. The HMR `clientPort` ignores it (SRV-14). |
 | `NODE_ENV` | `server.ts:351` | Anything except `production` selects Vite dev middleware. |
 | `K_SERVICE` | `server.ts:353` | Presence only: HMR `clientPort` 443. |
 | `APP_URL` | `server.ts:353` | Presence only: HMR `clientPort` 443. |
-| `DISABLE_HMR` | `vite.config.ts:18`, `:20` | `'true'` turns off HMR and file watching (dev only; see SRV-10). |
+| `DISABLE_HMR` | `vite.config.ts:18`, `:20`; `server.ts:358` (since cc41f15) | `'true'` turns off HMR updates and file watching, but Vite still opens a WebSocket server on port 24678 (dev only; SRV-10). |
 
 Not read:
 
-- **`PORT` and `HOST`.** The port is fixed at 3000 on `0.0.0.0` (`server.ts:8`, `:374`).
-- **`GEMINI_API_KEY`.** It is listed in `.env.example:1-4` but unused.
-- **`.env`.** `dotenv` is a dependency but is never imported, so the server does not load a `.env` file.
+- **`HOST`.** The server always listens on `0.0.0.0` (`server.ts:374`).
+- **`GEMINI_API_KEY`.** It is listed in `.env.example:1-2` but unused.
+- **`.env`.** `dotenv` is a dependency but is never imported, so the server does not load a `.env` file. The `PORT=3000` line that cc41f15 added to `.env.example` therefore only documents the default; set `PORT` in the environment.
 - **`import.meta.env`.** No client code uses it.
 
 ## Data flow
@@ -119,7 +121,7 @@ Browser tab (every tab of every user)
     |  socket: emit update_project | delete_project | update_folder | delete_folder
     |  socket: receive sync_data = whole db -> replaces state and cache (ignored if 0 projects)
     v
-Express process: server.ts, port 3000
+Express process: server.ts, port PORT (default 3000)
   db = { projects, folders }   in memory, untyped (`any`)
     ^
     |  MCP over HTTP (SSE sessions + POST /api/mcp) via mcpContext: same db;
@@ -194,10 +196,10 @@ Keep these unless AI Studio compatibility is deliberately dropped. See [AI Studi
 
 | Assumption | Where | Note |
 |---|---|---|
-| Port 3000 on `0.0.0.0` | `server.ts:8`, `:374` | `PORT` is ignored (SRV-8). |
+| Default port 3000 on `0.0.0.0` | `server.ts:8`, `:374` | Since cc41f15, `PORT` overrides the port; Cloud Run sets it to the container port. Which port AI Studio's preview uses is unverified. |
 | One process serves the SPA, REST, socket.io and MCP from one origin | `server.ts` | API routes are registered before the Vite/static middleware. |
-| HMR behind an HTTPS proxy | `server.ts:353-361` | `clientPort` 443 when `K_SERVICE` or `APP_URL` is set. `.env.example:6-8` says AI Studio injects `APP_URL` with the Cloud Run service URL. |
-| `DISABLE_HMR` switch | `vite.config.ts:15-21` | The file says "Do not modify". Partly ineffective (SRV-10). |
+| HMR behind an HTTPS proxy | `server.ts:353-361` | `clientPort` 443 when `K_SERVICE` or `APP_URL` is set. Before cc41f15, `.env.example` said AI Studio injects `APP_URL` with the Cloud Run service URL; now it says only "Environment / Cloud Run service URL". |
+| `DISABLE_HMR` switch | `vite.config.ts:15-21`; `server.ts:358` (since cc41f15) | `vite.config.ts` says "Do not modify". Partly ineffective: a Vite socket still opens on 24678 (SRV-10). |
 | Silenced HMR socket errors | `index.html:12-32` | Hides WebSocket failures in the AI Studio preview. |
 | Working directory = repo root | `server.ts:9`, `:367`; `stdio.ts:8`; Vite config discovery | Starting from another directory silently creates a fresh, sample-seeded `data.json` there (SRV-8). |
 | `base: './'` | `vite.config.ts:8` | Contradicted by root-absolute `/plotly.min.js`, `/logo.png`, `/api/...` and `/socket.io` (SRV-12). |
@@ -220,12 +222,13 @@ From the [issue registry](../../spec/DOE-Magic/roadmap-backlog.md). Basis: R = c
 | SRV-5 | Medium | `server.ts` is an untyped monolith; upsert logic is copied 4+ times and has drifted. | C |
 | SRV-6 | Medium | The CJS bundle `require()`s ESM-only `uuid@14`; no `engines` declared. The production bundle needs Node ≥ 22.12 (or ≥ 20.19), where `require(esm)` is on by default. Same defect as BLD-13. | R |
 | SRV-7 | Low | In production, unknown `/api/*` and `/mcp/*` GETs return `index.html` with 200; 500s echo internal messages. | C |
-| SRV-8 | Low | Port hard-coded, `.env` never loaded, every path depends on `process.cwd()`. | C |
+| SRV-8 | Low | `.env` never loaded, every path depends on `process.cwd()`. The port was hard-coded until cc41f15. | C |
 | SRV-9 | Low | Every write pretty-prints the whole DB to disk and broadcasts the whole DB; 50 MB body limit. | C |
-| SRV-10 | Low | `DISABLE_HMR` only disables file watching; the inline `hmr` object overrides `hmr: false`. | P |
+| SRV-10 | Low | `DISABLE_HMR=true` still leaves an HMR socket. Before cc41f15 the inline `hmr` object overrode `hmr: false` (inferred). Since cc41f15 it passes `hmr: false`, and Vite then opens its own WebSocket server on port 24678 and points the client at it. | R |
 | SRV-11 | Low | Unused dependencies, Gemini leftovers, template package identity, version string hard-coded in 10 places in 7 files (listed under BLD-8). | C |
 | SRV-12 | Low | Root-absolute asset and API paths contradict Vite `base: './'`; root-only hosting. | C |
 | SRV-13 | Medium | A `data.json` that parses to a non-object (for example `null`) crashes startup instead of re-seeding: `server.ts:28` sets `db` to `null`, `:29` throws inside the `try` (logged as a parse failure), then `:37` throws an uncaught `TypeError`. `stdio.ts:13`, `:14` and `:21` have the same pattern. | R |
+| SRV-14 | Low | With `PORT` set to anything but 3000 (outside Cloud Run), the HMR `clientPort` stays 3000 (`server.ts:354`), so `/@vite/client` dials port 3000: hot reload stops, or attaches to another dev server on 3000. Run with `PORT=3100` on 2026-10-21. | R |
 
 ### Persistence and data integrity (DATA)
 
@@ -258,7 +261,7 @@ From the [issue registry](../../spec/DOE-Magic/roadmap-backlog.md). Basis: R = c
 Related issues in other areas:
 
 - BLD-1 duplicates SRV-3; BLD-2 duplicates SRV-2; BLD-13 duplicates SRV-6.
-- BLD-7: two lockfiles.
+- BLD-7: no lockfile (decision 1) and no declared package manager or Node version.
 - MCP-20: duplicated store bootstrap.
 - MCP-22: SSE sessions are per process.
 - MCP-23: double broadcast.

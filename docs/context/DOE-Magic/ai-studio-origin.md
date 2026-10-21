@@ -1,6 +1,6 @@
 # DOE-Magic — AI Studio Origin
 
-> Created: 2026-10-20. Status: describes the repo's history and its AI Studio coupling as of branch `chore/project-structure-and-core-docs` (commits through 534ec68, followed by the docs commit). AI Studio behaviour is inferred from the repo, not from AI Studio documentation; anything not checked is marked "unverified".
+> Created: 2026-10-20. Status: describes the repo's history and its AI Studio coupling as of branch `chore/project-structure-and-core-docs` (commits through 534ec68, followed by the docs commit), updated on 2026-10-21 for the owner's AI Studio push cc41f15 after that branch merged. AI Studio behaviour is inferred from the repo, not from AI Studio documentation; anything not checked is marked "unverified".
 > Related: [README](../../../README.md), [AGENTS.md](../../../AGENTS.md), [Status and handoff](../../task/DOE-Magic/status-and-handoff.md), [Goals](../../task/DOE-Magic/goals.md), [Design spec](../../spec/DOE-Magic/design-spec.md), [Roadmap and backlog](../../spec/DOE-Magic/roadmap-backlog.md), [Server and persistence](server-and-persistence.md), [Web UI](web-ui.md), [Lesson: AI Studio sync overwrites the repo](../../memory/DOE-Magic/ai-studio-sync-overwrites-repo.md), [Lesson: patch scripts in the repo root](../../memory/DOE-Magic/patch-scripts-in-repo-root.md)
 
 DOE Magic was built in Google AI Studio's app builder ("Build", aistudio.google.com/apps) by M-Alekseychuk, who prompted AI Studio's coding agent and has no software background. The GitHub repo is an export of that AI Studio workspace. This page covers what the export contained, what the code assumes about AI Studio, and how to keep AI Studio and git from overwriting each other.
@@ -16,6 +16,8 @@ DOE Magic was built in Google AI Studio's app builder ("Build", aistudio.google.
 | 2026-10-19 21:01 and 21:22 | 1c67055, e3503e1 | Small follow-up pushes: teal palette and `color-scheme` (3 files); dynamic sample timestamps and MCP modal footer (2 files). Same author and message style, so probably AI Studio syncs (unverified). | |
 | 2026-10-20 08:47 | 0d05f8c | `.aistudio/artifacts/brain/7528599c-…/` (the plan) deleted by hand on GitHub. | Committer "GitHub"; GitHub's default "Delete … directory" message. |
 | 2026-10-20 | b8dc9f6 … 534ec68, then the docs commit | This branch: cleanup, reorganisation, checks and docs (§7). | |
+| 2026-10-21 08:13 (UTC) | b2a9f85 | PR #1 merged into `main`. | GitHub merge commit |
+| 2026-10-21 10:26 (+0200) | cc41f15 "build: configure server port and HMR settings" | AI Studio push, 13 minutes after the merge. It changes 6 files and matches `main` everywhere else, so the workspace had been refreshed from `main`. It makes the port configurable (`PORT`), passes `hmr: false` when `DISABLE_HMR=true`, rewrites `.env.example`, adds a duplicate `node_modules` line to `.gitignore`, and deletes `package-lock.json`, `bun.lock` and `assets/.aistudio/.gitignore`. The message mentions none of the deletions. Decision 1 then settled on no lockfile ([lesson](../../memory/DOE-Magic/lockfile-drift.md)). | `git show --stat cc41f15` |
 
 ## 2. What the AI Studio export (ef15736) contained
 
@@ -24,10 +26,10 @@ DOE Magic was built in Google AI Studio's app builder ("Build", aistudio.google.
 | App source | 37 files under `src/`, old layout (`components/`, `pages/`, `utils/`, `context/`, `data/`, `i18n/`, `mcp/`) | Moved into `src/core`, `src/server` and `src/web` by 95fce20; the unreferenced `jiuzhou_logo_*.jpg` was deleted |
 | Root config and entries | `server.ts`, `index.html`, `vite.config.ts`, `tsconfig.json`, `package.json`, `metadata.json`, `.env.example`, `.gitignore` | Kept in place (§5). `tsconfig.json` got `include`/`exclude` (95fce20); `.gitignore` got `data.json` (64eed78) |
 | Static files | `public/logo.png`, `public/plotly.min.js` (Plotly 3.7.0, loaded by `index.html:8`) | Kept |
-| AI Studio scaffolding | `assets/.aistudio/.gitignore` (contains `*`) | Kept. Purpose unknown; harmless. The root `.gitignore` pattern `/.aistudio/` is anchored to the repo root, so it does not touch this folder |
+| AI Studio scaffolding | `assets/.aistudio/.gitignore` (contains `*`) | Kept by PR #1, then deleted by cc41f15. Purpose unknown; whether to restore it is the owner's call. The root `.gitignore` pattern `/.aistudio/` is anchored to the repo root, so it does not touch this folder |
 | Agent artifacts | `.aistudio/artifacts/brain/7528599c-…/implementation_plan.md` and `.metadata.json` | Deleted upstream in 0d05f8c. `.gitignore` ignores `/.aistudio/` since ea8091e (anchored in bd786d9). That only keeps it out of commits made with git; if a sync re-adds it, `npm run check` fails R9 with a "re-added by an AI Studio sync" message (03f1ba0) |
 | Runtime store | `data.json` (the Suzuki demo project, 27 runs, one folder) | Untracked and gitignored (64eed78). R9 reports it if a sync commits it again (03f1ba0) |
-| Lockfiles | `bun.lock` (matched `package.json`) and `package-lock.json` (did not) | `package-lock.json` synced (50c088c); both kept until BLD-7 is decided |
+| Lockfiles | `bun.lock` (matched `package.json`) and `package-lock.json` (did not) | `package-lock.json` synced (50c088c). cc41f15 deleted both; decision 1 (2026-10-21) keeps none, and `.gitignore` lists both |
 | Scratch | 195 one-off scripts, 4 text dumps, 2 HTML mock-ups | Removed (b8dc9f6) |
 | `README.md` | Deleted (it held the AI Studio template text) | New README written on this branch |
 
@@ -35,6 +37,7 @@ What this says about the exporter:
 
 - It deleted `README.md`, which existed only on GitHub. A push makes the repo match the workspace; it does not merge in changes made elsewhere.
 - It exported no `node_modules/` or `dist/`, which suggests it skips gitignored paths. But it did export `assets/.aistudio/.gitignore`, which plain git ignores because the file's own `*` matches it (`git check-ignore -v --no-index` reports `assets/.aistudio/.gitignore:1:*`). Its ignore handling therefore differs from git's, and it may ignore `.gitignore` altogether. `.gitignore` only keeps files out of commits made with git; whether a gitignored `data.json` or `.aistudio/` stays out of future AI Studio pushes is unverified. Since 03f1ba0, R9 fails with a specific message ("re-added by an AI Studio sync; remove it from git with `git rm -r --cached`") when either is tracked again.
+- A push from a workspace refreshed from `main` still deletes files. cc41f15 dropped both lockfiles and `assets/.aistudio/.gitignore`. Either the refresh did not carry them or AI Studio removed them; which is unverified. ef15736 did contain both lockfiles, so AI Studio does not always drop them.
 
 Other traces of the AI Studio workflow:
 
@@ -70,7 +73,7 @@ It also planned a test pass: compile, live switching, persistence across reloads
 - Leftovers:
   - the `@google/genai` dependency (`package.json:15`; BLD-5, SRV-11);
   - `MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API` in `metadata.json:5-7` (BLD-10);
-  - `GEMINI_API_KEY` in `.env.example:1-4` (BLD-10);
+  - `GEMINI_API_KEY` in `.env.example:1-2` (BLD-10; an empty value since cc41f15, before that the placeholder `"MY_GEMINI_API_KEY"`);
   - LaTeX clean-up regexes for stored optimisation reports in `src/web/features/optimization/ProjectOptimization.tsx:666-678`. They probably date from LLM-written reports (UI-30; unverified).
 - `src/web/features/mcp-panel/McpModal.tsx:218-219` names Gemini only as an example MCP client. That is not a leftover.
 - The capability and the key stay until someone checks whether AI Studio needs them (BLD-10).
@@ -79,13 +82,13 @@ It also planned a test pass: compile, live switching, persistence across reloads
 
 | Assumption | Where | Basis |
 |---|---|---|
-| One Node process on port 3000, listening on all interfaces | `server.ts:8`, `server.ts:374` | Template convention. That AI Studio's preview expects port 3000 is unverified; AGENTS.md keeps 3000 |
-| In development, Vite runs as Express middleware in the same process. The HMR client port is 443 when `K_SERVICE` or `APP_URL` is set (behind the AI Studio or Cloud Run proxy), otherwise 3000 | `server.ts:351-365` (`isCloudRun` at `:353`) | Code |
-| AI Studio sets `DISABLE_HMR=true` to stop HMR and file watching while its agent edits | `vite.config.ts:15-21` (comment says "Do not modify") | Template comment. The inline `hmr` object in `server.ts` probably overrides `hmr: false` (SRV-10, unverified). Line 17 holds a mojibake dash (BLD-14) |
+| One Node process on `PORT`, default 3000, listening on all interfaces | `server.ts:8`, `server.ts:374` | Template convention; `PORT` is read since cc41f15. Cloud Run sets `PORT` to the container port. Which port AI Studio's preview expects or sets is unverified; AGENTS.md keeps the default 3000 |
+| In development, Vite runs as Express middleware in the same process. The HMR client port is 443 when `K_SERVICE` or `APP_URL` is set (behind the AI Studio or Cloud Run proxy), otherwise 3000, whatever `PORT` says (SRV-14) | `server.ts:351-365` (`isCloudRun` at `:353`) | Code |
+| AI Studio sets `DISABLE_HMR=true` to stop HMR and file watching while its agent edits | `vite.config.ts:15-21` (comment says "Do not modify"); since cc41f15 also `server.ts:358` | Template comment. Since cc41f15 the inline `hmr` object becomes `false` too. Vite then opens its own WebSocket server on port 24678 instead (SRV-10, confirmed by running). Line 17 holds a mojibake dash (BLD-14) |
 | The AI Studio proxy rejects the HMR WebSocket, so those errors are suppressed | `index.html:12-32` | Template comment |
-| `GEMINI_API_KEY` comes from AI Studio's Secrets panel; `APP_URL` is the Cloud Run service URL, injected at runtime | `.env.example:1-9` | Template comments |
+| `GEMINI_API_KEY` comes from AI Studio's Secrets panel; `APP_URL` is the Cloud Run service URL, injected at runtime | `.env.example` before cc41f15 (`:1-9`) | Template comments. cc41f15 shortened them to "configured automatically by AI Studio" and "Environment / Cloud Run service URL", and added `PORT=3000`. That line only documents the default, because `.env` is never loaded (SRV-8) |
 | Applet manifest: name, description, `requestFramePermissions: []`, `majorCapabilities` | `metadata.json:1-8` | AI Studio file. The meaning of fields other than name and description is unverified |
-| Scaffolding folder | `assets/.aistudio/.gitignore` | Unknown purpose; keep |
+| Scaffolding folder | `assets/.aistudio/.gitignore` | Unknown purpose. Deleted by cc41f15; restoring it is the owner's call |
 | Vite entry is `src/main.tsx`, referenced from `index.html:36` | `src/main.tsx` | Template layout. R8 in `npm run check` fails if it disappears |
 | Every path resolves from `process.cwd()`, which must be the repo root | `server.ts:9`, `server.ts:367`, `src/server/mcp/stdio.ts:8` | Code (SRV-8) |
 | Production means `npm run build`, then `node dist/server.cjs` | `package.json:8-9` | Whether AI Studio's deploy sets `NODE_ENV=production` is unverified (BLD-1, SRV-3) |
@@ -94,6 +97,8 @@ It also planned a test pass: compile, live switching, persistence across reloads
 AGENTS.md lists the files and settings that must not move for this reason.
 
 ## 6. Sync-overwrite risk and the safe workflow after this PR
+
+Update 2026-10-21: PR #1 merged, and the first AI Studio push after it (cc41f15) came from a workspace refreshed from `main`, so the scenario below did not happen. It still describes what any workspace older than `main` would do, and cc41f15 shows that even a refreshed one can delete files (§2).
 
 A sync makes the repo match the AI Studio workspace (§2). The existing AI Studio workspace predates this branch. If it pushes after this PR merges, ef15736's behaviour suggests the push would do the following (not tested for this case):
 
@@ -112,7 +117,7 @@ Pick one way of working after the merge:
 
 | Option | Steps |
 |---|---|
-| A. Keep editing in AI Studio | 1. Stop editing and syncing in the old AI Studio app, and export every real project with **Export JSON**. 2. Merge this PR. 3. Start an AI Studio project from current `main`, by re-importing the repo or by starting a fresh app with `main`'s files (the exact AI Studio steps are unverified), then bring the projects back with **Import Project** on the Dashboard. 4. Make one trivial change, push it, and check on GitHub that the commit touches only that file. 5. After every push, read the commit's file list (look for deletions, new root files, or `package.json` changed without the lockfiles), then run `npm ci && npm run check && npm run build`. Do this locally until CI exists (BLD-4). 6. Whenever `main` changes outside AI Studio (any merged PR), export the projects again and re-import before the next AI Studio edit. |
+| A. Keep editing in AI Studio | 1. Stop editing and syncing in the old AI Studio app, and export every real project with **Export JSON**. 2. Merge this PR. 3. Start an AI Studio project from current `main`, by re-importing the repo or by starting a fresh app with `main`'s files (the exact AI Studio steps are unverified), then bring the projects back with **Import Project** on the Dashboard. 4. Make one trivial change, push it, and check on GitHub that the commit touches only that file. 5. After every push, read the commit's file list (look for deletions the message does not mention and for new root files), then run `npm install && npm run check && npm run build`. Do this locally until CI exists (BLD-4). 6. Whenever `main` changes outside AI Studio (any merged PR), export the projects again and re-import before the next AI Studio edit. |
 | B. Stop syncing from AI Studio | Work through git: clone to a short path ([windows-long-paths](../../memory/DOE-Magic/windows-long-paths.md)), make a branch, edit by hand or with an AI coding assistant that reads AGENTS.md, run `npm run check` and `npm run build`, and open a PR. AI Studio can still be used to try ideas, but its changes are copied into the repo by hand, never pushed by its sync. |
 
 Signs that a push came from a stale workspace:
@@ -151,14 +156,16 @@ These were left alone on purpose, for AI Studio:
 
 - every root file in §5;
 - the `DISABLE_HMR` block;
-- port 3000;
-- `bun.lock`;
+- port 3000 (cc41f15 later made it configurable, default 3000);
+- `bun.lock` (cc41f15 later deleted it with `package-lock.json`);
 - the Gemini capability and key;
 - the `@google/genai` dependency (removing it is BLD-5).
 
 ## 8. Open questions (unverified)
 
-- Which installer AI Studio uses (bun or npm). This decides which lockfile to keep (BLD-7).
+- Which installer AI Studio uses (bun or npm), and why cc41f15 dropped both lockfiles. Decision 1 no longer waits for this (no lockfile for now), but it matters if a lockfile comes back.
+- Whether AI Studio needs `assets/.aistudio/.gitignore` (deleted by cc41f15).
+- Which `PORT` AI Studio's preview sets, if any.
 - Whether AI Studio needs `MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API` or `GEMINI_API_KEY` (BLD-10).
 - Whether AI Studio's deploy sets `NODE_ENV=production` (BLD-1, SRV-3).
 - Whether AI Studio's export honours `.gitignore`, for example for `data.json` and `.aistudio/`.
