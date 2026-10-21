@@ -8,7 +8,7 @@ DOE Magic exposes its projects, design generator and statistics engine to AI cli
 | Piece | File | Role |
 |---|---|---|
 | Server factory | [`src/server/mcp/doeMcpServer.ts`](../../../src/server/mcp/doeMcpServer.ts) | `createDoeMcpServer(context)` registers 11 tools, 3 resources and 2 prompts (`:46-1314`). Also exports the activity log (`:17-41`) and the hand-written JSON-RPC dispatcher `handleDirectJsonRpc` (`:1319-1447`). |
-| HTTP host | [`server.ts`](../../../server.ts) | Mounts MCP on the Express app at port 3000: SSE, messages, direct JSON-RPC, info, logs (`server.ts:204-348`). |
+| HTTP host | [`server.ts`](../../../server.ts) | Mounts MCP on the Express app at port 3000: SSE, messages, direct JSON-RPC, info, logs (`server.ts:219-363`). |
 | stdio host | [`src/server/mcp/stdio.ts`](../../../src/server/mcp/stdio.ts) | `npm run mcp` (`package.json:10`). A separate Node process with its own copy of the store. |
 
 SDK: `@modelcontextprotocol/sdk` 1.32.1 (installed), zod 4. Server info: name `doe-magic-mcp`, version `1.5.2` (hard-coded, `doeMcpServer.ts:49-50`). Everything is registered with the older `server.tool` / `server.resource` / `server.prompt` overloads; no tool declares an `outputSchema` or returns `structuredContent` (MCP-23).
@@ -71,11 +71,11 @@ All of these live in the Express process on port 3000, with no authentication an
 
 | Family | Method and paths | Lines | Behaviour (verified by running unless noted) |
 |---|---|---|---|
-| SSE stream | `GET /mcp/sse`, `GET /api/mcp/sse` | `server.ts:233-257` | Creates a new `McpServer` and an SDK `SSEServerTransport` per connection. The first event is `event: endpoint` / `data: /api/mcp/messages?sessionId=<uuid>`, always the `/api` path. Sessions are kept in an in-memory `Map` and removed when the request closes. This is the SDK's deprecated transport, with DNS-rebinding protection off (MCP-22). |
-| SSE messages | `POST /mcp/messages`, `POST /api/mcp/messages` | `server.ts:259-282` | Session id from `?sessionId=` or the `x-session-id` header. Returns 202, and the JSON-RPC reply arrives on the SSE stream as `event: message`. Missing id gives 400 `{"error":"Missing sessionId query parameter"}`; an unknown id gives 404. The SDK negotiates the protocol version (a `2025-06-18` request was echoed back). |
-| Direct JSON-RPC | `POST /mcp`, `POST /api/mcp` | `server.ts:284-299`; `doeMcpServer.ts:1319-1447` | One shared server instance (`server.ts:230`) and a hand-written dispatcher, not an SDK transport. See [Direct JSON-RPC dispatcher](#direct-json-rpc-dispatcher). The in-app MCP playground uses this path. |
-| Info | `GET /mcp/info`, `GET /api/mcp/info` | `server.ts:301-343` | `{status, name, version, protocolVersion: '2024-11-05', activeSessions (SSE count), endpoints, toolsCount, tools[{name, description, parameters}], resources, prompts[{name, description}]}`. Built from the SDK's private `_registeredTools` / `_registeredResources` / `_registeredPrompts`. `parameters` is serialised zod, not JSON Schema, and `resources` lists only `doe://projects` (MCP-17). |
-| Logs | `GET /api/mcp/logs` (no `/mcp` alias) | `server.ts:345-348` | The activity log array, newest first. |
+| SSE stream | `GET /mcp/sse`, `GET /api/mcp/sse` | `server.ts:248-272` | Creates a new `McpServer` and an SDK `SSEServerTransport` per connection. The first event is `event: endpoint` / `data: /api/mcp/messages?sessionId=<uuid>`, always the `/api` path. Sessions are kept in an in-memory `Map` and removed when the request closes. This is the SDK's deprecated transport, with DNS-rebinding protection off (MCP-22). |
+| SSE messages | `POST /mcp/messages`, `POST /api/mcp/messages` | `server.ts:274-297` | Session id from `?sessionId=` or the `x-session-id` header. Returns 202, and the JSON-RPC reply arrives on the SSE stream as `event: message`. Missing id gives 400 `{"error":"Missing sessionId query parameter"}`; an unknown id gives 404. The SDK negotiates the protocol version (a `2025-06-18` request was echoed back). |
+| Direct JSON-RPC | `POST /mcp`, `POST /api/mcp` | `server.ts:299-314`; `doeMcpServer.ts:1319-1447` | One shared server instance (`server.ts:245`) and a hand-written dispatcher, not an SDK transport. See [Direct JSON-RPC dispatcher](#direct-json-rpc-dispatcher). The in-app MCP playground uses this path. |
+| Info | `GET /mcp/info`, `GET /api/mcp/info` | `server.ts:316-358` | `{status, name, version, protocolVersion: '2024-11-05', activeSessions (SSE count), endpoints, toolsCount, tools[{name, description, parameters}], resources, prompts[{name, description}]}`. Built from the SDK's private `_registeredTools` / `_registeredResources` / `_registeredPrompts`. `parameters` is serialised zod, not JSON Schema, and `resources` lists only `doe://projects` (MCP-17). |
+| Logs | `GET /api/mcp/logs` (no `/mcp` alias) | `server.ts:360-363` | The activity log array, newest first. |
 
 ### Direct JSON-RPC dispatcher
 
@@ -111,7 +111,7 @@ It logs only to stderr. Points to know:
 
 Tools never touch the file system. They go through the `McpDatabaseContext` interface (`doeMcpServer.ts:8-15`), which each host implements over its own in-memory `db`:
 
-| Member | `server.ts:207-228` (HTTP host) | `stdio.ts:40-58` (stdio host) |
+| Member | `server.ts:222-243` (HTTP host) | `stdio.ts:40-58` (stdio host) |
 |---|---|---|
 | `getProjects` / `getFolders` | `db.projects \|\| []` / `db.folders \|\| []` | `db.projects` / `db.folders` |
 | `saveProject(p)` | Sets `updatedAt`, upserts, rewrites `data.json`, `io.emit('sync_data', db)` to every browser | Upserts and rewrites `data.json`; no `updatedAt`, no broadcast |
@@ -122,7 +122,7 @@ Tools never touch the file system. They go through the `McpDatabaseContext` inte
 Consequences:
 
 - **HTTP host (SSE and direct JSON-RPC).** MCP and the web UI share one in-memory `db`. MCP writes reach open browser tabs immediately through socket.io. They are still whole-project last-writer-wins against browser saves (DATA-4).
-- **Tools mutate the live project object in place** before calling `saveProject` (for example `doeMcpServer.ts:350-355`, `:469-472`, `:553`, `:916-923`). Because the seeded `db` holds the sample module's own objects, MCP edits also change what "reset sample data" restores (DATA-14).
+- **Tools mutate the live project object in place** before calling `saveProject` (for example `doeMcpServer.ts:350-355`, `:469-472`, `:553`, `:916-923`). Because the seeded `db` holds the sample module's own objects, MCP edits also change the module-level `sampleProjects` (DATA-14). Until P0.1 that edited object was what "reset sample data" restored; the reset now builds new objects with `createSampleProjects()`.
 - **stdio host.** It is a second process with its own copy of `data.json`, loaded once. Neither process reloads the file, and whichever writes last overwrites the other's changes. stdio writes never reach the browser (DATA-3, MCP-20).
 
 For the full data flow see [Server and persistence](server-and-persistence.md#data-flow).
@@ -198,8 +198,8 @@ curl -X POST http://localhost:3000/api/mcp -H "Content-Type: application/json" \
 | Optimum grid search | **Re-implemented**; differs from core's 512-cap grid | `doeMcpServer.ts:797-867` (MCP-11, STAT-4) |
 | Monte Carlo robustness and Cpk | **Re-implemented**; differs from the UI copy | `doeMcpServer.ts:992-1074` (MCP-2, MCP-16, STAT-9) |
 | Field mapping of analysis results | Hand-written against an untyped result | `doeMcpServer.ts:627-670` (MCP-1, MCP-6, MCP-9) |
-| MCP protocol handling for `POST /mcp` | **Re-implemented** instead of an SDK transport | `doeMcpServer.ts:1319-1447`, `server.ts:284-299`; the info endpoint reads private SDK fields at `server.ts:301-343` (MCP-5, MCP-17) |
-| Store bootstrap (load, seed, purge, save) | **Duplicated** between the hosts | `stdio.ts:8-58` vs `server.ts:9-68`, `:207-228` (MCP-20) |
+| MCP protocol handling for `POST /mcp` | **Re-implemented** instead of an SDK transport | `doeMcpServer.ts:1319-1447`, `server.ts:299-314`; the info endpoint reads private SDK fields at `server.ts:316-358` (MCP-5, MCP-17) |
+| Store bootstrap (load, seed, purge, save) | **Duplicated** between the hosts | `stdio.ts:8-58` vs `server.ts:9-68`, `:222-243` (MCP-20) |
 
 The modules the MCP server imports are free of DOM globals and of `console.log`, so stdout stays clean on stdio (grep of `src/core` and `src/server`).
 
@@ -210,7 +210,7 @@ The modules the MCP server imports are free of DOM globals and of `console.log`,
 
 - New tools go in `createDoeMcpServer` and must call `src/core` for any calculation. Never add a fourth copy of a formula (see [forked logic drifts](../../memory/DOE-Magic/forked-logic-drifts.md)).
 - Tool names, inputs, defaults and outputs are a contract. Write the change into this doc before implementing it, in the same PR ([design spec](../../spec/DOE-Magic/design-spec.md) §9.2). Update the tool list in design spec §6.3 if a tool is added, renamed or removed.
-- Until MCP-20 is fixed, any change to the store context must be made in both `server.ts:207-228` and `stdio.ts:40-58`.
+- Until MCP-20 is fixed, any change to the store context must be made in both `server.ts:222-243` and `stdio.ts:40-58`.
 - After editing, restart `npm run dev`. `tsx server.ts` runs without watch mode, so the server keeps the old MCP code until it restarts.
 
 ## Known issues

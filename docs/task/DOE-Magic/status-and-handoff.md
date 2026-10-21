@@ -1,13 +1,13 @@
 # DOE-Magic — Status and Handoff (START HERE)
 
-> Created: 2026-10-20. Status: START HERE. Current as of 2026-10-20. Written for PR `chore/project-structure-and-core-docs` before it was merged. If you are reading this on `main`, the PR has been merged: do the after-merge steps below if not done yet.
+> Created: 2026-10-20. Status: START HERE. Current as of 2026-10-20, with the P0.1 fix (demo buttons) added on 2026-10-21. Written for PR `chore/project-structure-and-core-docs` before it was merged. If you are reading this on `main`, the PR has been merged: do the after-merge steps below if not done yet.
 > Related: [Goals](goals.md), [Roadmap and backlog](../../spec/DOE-Magic/roadmap-backlog.md), [Design spec](../../spec/DOE-Magic/design-spec.md), [AI Studio origin](../../context/DOE-Magic/ai-studio-origin.md), [README](../../../README.md), [AGENTS.md](../../../AGENTS.md)
 
 ## First screen: what you must know
 
 - **Until the PR is merged, do not push from AI Studio.**
 - **The app works and runs, but several results are wrong.** Do not use the outputs in [Top risks](#top-risks-right-now) for process decisions, batch records or reports until they are fixed. There are no automated tests, and no comparison of outputs against established statistics software (such as JMP or R) is recorded in the repository.
-- **Some buttons delete data without asking.** "Demo Studies" / "Load Demo Experiments" on the dashboard replace *all* projects for everyone. "Generate Design Matrix", Excel import and "Simulate Sample Data" overwrite measured results. Export each project as JSON before you touch them (the Dashboard can import that file again as a copy).
+- **Some buttons delete data without asking.** "Generate Design Matrix", Excel import and "Simulate Sample Data" overwrite measured results. Export each project as JSON before you touch them (the Dashboard can import that file again as a copy). Since P0.1, "Demo Studies" / "Load Demo Experiments" only add a copy of the demo study; the full reset is "Reset Sample Data" in the Archive view, which asks first and makes the server copy `data.json` aside.
 - **If you use Google AI Studio:** first export every real project with **Export JSON** on its page; a new AI Studio project starts with only the demo project, and the browser's copy is not a backup. After the merge, re-import the project from `main` (or start a fresh AI Studio project from `main`) before you edit again, then bring each project back with **Import Project** on the Dashboard. Otherwise AI Studio's sync will push its old copy over this work. Nobody has confirmed the exact AI Studio steps yet ([AI Studio origin §6](../../context/DOE-Magic/ai-studio-origin.md#6-sync-overwrite-risk-and-the-safe-workflow-after-this-pr)). See [AI Studio warning](#ai-studio-warning).
 - **There is no login.** Anyone who can open the app's address can read and delete all data, and so can any other website open in the same browser (SRV-1). If the app was shared or deployed from AI Studio, anyone with the link can too. Run it only on your own machine or a trusted network.
 
@@ -15,7 +15,7 @@
 
 DOE Magic is a working Design-of-Experiments web app with an MCP server. M-Alekseychuk built it in Google AI Studio for Jiuzhou Pharmaceutical process scientists. It plans designs (factorial, DSD, CCD, BBD, Plackett-Burman, D-optimal), analyses results (OLS, ANOVA, effects, diagnostics, desirability), compares responses, runs Monte Carlo robustness and Bayesian next-run suggestions, and exports JSON, Excel and HTML. It works in English and Chinese.
 
-This branch reorganises the repository and documents it without changing any behaviour. A review of the code (some of it confirmed by running the engine) registered 160 issue IDs: 14 Critical, listed below, 47 High, 63 Medium and 36 Low. Some IDs describe the same bug from two angles. All of them are recorded in the [backlog](../../spec/DOE-Magic/roadmap-backlog.md) and none are fixed yet. The next work is Phase 1 of the [goals](goals.md): tests plus statistical correctness.
+This branch reorganises the repository and documents it without changing any behaviour. A review of the code (some of it confirmed by running the engine) registered 160 issue IDs: 14 Critical, listed below, 47 High, 63 Medium and 36 Low. Some IDs describe the same bug from two angles. All of them are recorded in the [backlog](../../spec/DOE-Magic/roadmap-backlog.md). Since the merge, DATA-1 and UI-1 are fixed (P0.1, see [Changes after the merge](#changes-after-the-merge)); none of the others are. The next work is Phase 1 of the [goals](goals.md): tests plus statistical correctness.
 
 ## What this PR changed
 
@@ -48,6 +48,12 @@ All commits sit on top of `origin/main` `0d05f8c`.
 
 Known bugs are still present: the PR fixes none of them, by design.
 
+## Changes after the merge
+
+| Item | Change |
+|---|---|
+| P0.1 (DATA-1, UI-1), 2026-10-21 | "Demo Studies" and "Load Demo Experiments" add a fresh copy of the demo study and open it; they never replace a project. The full reset moved to "Reset Sample Data" in the Archive view, behind the new shared `ConfirmDialog`. `POST /api/reset-sample` now needs the JSON body `{"confirm": true}` (400 and no change otherwise) and copies `data.json` to `data.json.before-reset-<timestamp>` first. Verified by running the dev server and the production bundle; details in the [backlog](../../spec/DOE-Magic/roadmap-backlog.md#p01-outcome). |
+
 ## Repository map
 
 ```text
@@ -77,8 +83,8 @@ Run every command from the repository root. `data.json` is created in the curren
 | `npm run mcp` | Start the stdio MCP server for desktop AI clients. The config snippet shown in the app's MCP panel does not work as given (MCP-18); see [MCP server](../../context/DOE-Magic/mcp-server.md). |
 | `npm run lint` | `tsc --noEmit` only |
 
-- Remote MCP endpoints: `POST /mcp` (a hand-written JSON-RPC dispatcher, MCP-5/MCP-17) and `GET /mcp/sse` (SSE), each also under `/api/`. The SSE stream's `endpoint` event always tells the client to post messages to `POST /api/mcp/messages` ([`server.ts:237`](../../../server.ts)).
-- Data: the server keeps everything in `data.json` in the directory it was started from, and each browser keeps a cache in localStorage, which the server's data overwrites on every load, so it is not a backup. There are no automatic backups (DATA-2, DATA-16). To back up, copy `data.json` while the server is stopped, or export each project as JSON. Do not run `npm run mcp` while the web server uses the same `data.json` (DATA-3). Details: [Server and persistence](../../context/DOE-Magic/server-and-persistence.md).
+- Remote MCP endpoints: `POST /mcp` (a hand-written JSON-RPC dispatcher, MCP-5/MCP-17) and `GET /mcp/sse` (SSE), each also under `/api/`. The SSE stream's `endpoint` event always tells the client to post messages to `POST /api/mcp/messages` ([`server.ts:252`](../../../server.ts)).
+- Data: the server keeps everything in `data.json` in the directory it was started from, and each browser keeps a cache in localStorage, which the server's data overwrites on every load, so it is not a backup. There are no automatic backups (DATA-2, DATA-16), except the copy `data.json.before-reset-<timestamp>` that a confirmed "Reset Sample Data" writes next to `data.json`. To back up, copy `data.json` while the server is stopped, or export each project as JSON. Do not run `npm run mcp` while the web server uses the same `data.json` (DATA-3). Details: [Server and persistence](../../context/DOE-Magic/server-and-persistence.md).
 - Connecting an AI client (Claude Desktop over stdio, or SSE at `http://localhost:3000/mcp/sse`): see [MCP server: connecting a client](../../context/DOE-Magic/mcp-server.md#connecting-a-client).
 - Verified on Node 24.13.0. The production bundle `require()`s the ESM-only `uuid` package, so it needs Node 22.12 or newer (or 20.19 or newer on the 20.x line), where `require(esm)` is on by default. Confirmed by running: `node --no-experimental-require-module dist/server.cjs`, which simulates an older Node, fails with `ERR_REQUIRE_ESM` (SRV-6/BLD-13).
 
@@ -104,9 +110,10 @@ The Critical issues:
 | DES-3 | "Definitive Screening Design" is not a DSD. Main effects are correlated (\|r\| up to 0.67, 0.80 and 0.86 for 4, 6 and 8 factors). | DSD designs and the screening conclusions drawn from them |
 | MCP-1 | MCP `run_analysis` reports the model's degrees of freedom as `summary.pValue` (for example 14). The HTML report prints the same number as "Model p-value" (UI-31, High, fixed together). | The MCP model p-value, the report's "Model p-value", and any conclusion based on them |
 | MCP-2 | MCP `simulate_robustness` clamps samples to [0.9·min, 1.1·max]. That is wrong for zero or negative ranges and cuts the tails. | MCP Cpk, PPM and pass rate |
-| DATA-1, UI-1 | The "Demo Studies" / "Load Demo Experiments" buttons replace every project and folder on the server, for every connected user, without asking. | Do not click them. |
 | UI-3 (= STAT-7) | In multi-response projects, the Prediction Profiler fits every response except the selected one with the full model and ignores its excluded terms. | Profiler predictions and global desirability for the other responses |
 | UI-4 (= STAT-8) | The HTML export draws response surfaces from the intercept plus numeric main effects only. Interactions and categorical terms are dropped. | Surface and contour plots in exported reports |
+
+Fixed since the review: DATA-1 and UI-1, the demo buttons that replaced every project for every user (P0.1, 2026-10-21).
 
 Other high-impact risks:
 - SRV-1: no authentication, CORS open to every origin, and the server listens on 0.0.0.0.
@@ -121,7 +128,7 @@ Other high-impact risks:
 2. **Owner, with help: move to an AI Studio project made from `main`.** Re-import the project from `main`, or start a fresh one from it, then bring each project back with **Import Project** on the Dashboard. The exact AI Studio steps are unverified (see [AI Studio warning](#ai-studio-warning)).
 3. **Answer the open decisions below.** The owner answers decisions 3, 4, 5 and 6 in plain words; a developer settles decisions 1, 2, 7 and 8.
 4. **Follow the "suggested PR sequence" in the [roadmap and backlog](../../spec/DOE-Magic/roadmap-backlog.md).** It is the authoritative order. In outline:
-   - guard the one-click data-loss buttons
+   - guard the remaining one-click data-loss buttons (P0.2; the demo buttons are done, P0.1)
    - add tests and CI (BLD-4)
    - fix the Critical statistics and design issues, one PR each, each with a reference test
 
@@ -179,3 +186,4 @@ Root files that AI Studio needs stay in place: `server.ts`, `index.html`, `vite.
 | [Tailwind scans whole repo](../../memory/DOE-Magic/tailwind-scans-whole-repo.md) | Non-source files became CSS |
 | [Windows long paths](../../memory/DOE-Magic/windows-long-paths.md) | Path-length limits on Windows broke clone, `npm install` and a `git init` in a temp folder; keep every working copy on a short path |
 | [AI Studio sync overwrites repo](../../memory/DOE-Magic/ai-studio-sync-overwrites-repo.md) | AI Studio pushes its whole workspace |
+| [Demo button wiped all data](../../memory/DOE-Magic/demo-button-wiped-all-data.md) | A "load demo" button ran a reset that deleted every user's projects |

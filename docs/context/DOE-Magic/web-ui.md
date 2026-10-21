@@ -1,6 +1,6 @@
 # DOE-Magic — Web UI
 
-> Created: 2026-10-20. Status: Reference for the browser layer `src/web/` as of branch `chore/project-structure-and-core-docs`. It describes current behaviour; none of the listed issues is fixed yet.
+> Created: 2026-10-20. Status: Reference for the browser layer `src/web/` as of branch `chore/project-structure-and-core-docs`. It describes current behaviour. UI-1 is fixed (P0.1, 2026-10-21); none of the other listed issues is.
 > Related: [Design spec](../../spec/DOE-Magic/design-spec.md), [Roadmap and backlog](../../spec/DOE-Magic/roadmap-backlog.md), [Status and handoff](../../task/DOE-Magic/status-and-handoff.md), [Statistics engine](statistics-engine.md), [Design generation](design-generation.md), [Server and persistence](server-and-persistence.md), [MCP server](mcp-server.md), [AI Studio origin](ai-studio-origin.md), [Forked logic drifts](../../memory/DOE-Magic/forked-logic-drifts.md), [AGENTS.md](../../../AGENTS.md)
 
 The UI is a React 19 single-page app: HashRouter, Tailwind v4, Recharts, and Plotly for the contour/3D surface plots only. It has 3 routes, 6 project tabs and an MCP panel. All project data lives in one React context, which writes the whole project to `localStorage`, REST and socket.io on every edit. Most statistics come from `src/core/analysis/analysisCore.ts`. However, a lot of domain logic (design generation, Bayesian optimisation, Monte Carlo, diagnostics, plot data) still sits inside the components, often in two or three diverging copies. About 600 inline `zh`/`en` branches bypass the translation dictionary.
@@ -21,7 +21,7 @@ Routes (HashRouter, so URLs look like `/#/project/<id>`):
 
 | Path | Element | Notes |
 |---|---|---|
-| `/` (index) | `src/web/pages/Dashboard.tsx` | `?folder=<id>` filters by folder. `?folder=archive` shows archived projects (`Dashboard.tsx:31-44`). |
+| `/` (index) | `src/web/pages/Dashboard.tsx` | `?folder=<id>` filters by folder. `?folder=archive` shows archived projects (`Dashboard.tsx:34-47`). |
 | `/project/:id` | `src/web/pages/ProjectView.tsx` | Shows "Experiment not found" if the id is unknown (`ProjectView.tsx:28`). |
 | `/guide` | `src/web/pages/GuideView.tsx` | SOP step editor. |
 
@@ -33,14 +33,14 @@ All three routes render inside `Layout` (`App.tsx:21`). There is no catch-all ro
 |---|---|---|---|
 | Sidebar | Always visible | `src/web/Layout.tsx:56-175` | Logo, "Current Experiment" name, All Experiments, folder list with create (`:40-47`) and delete (`:49-51`, no confirm), Archive link, link to the open project, Guide link, `LanguageSelector`, MCP button (`:152-159`), dark-mode toggle |
 | Language menu | Sidebar | `src/web/i18n/LanguageSelector.tsx:71+` | Lists `SUPPORTED_LANGUAGES` where `isAvailable` (en, zh) |
-| Dashboard | `#/` | `src/web/pages/Dashboard.tsx` | Filter, search and sort (`:34-68`); JSON import (`:73-105`); create project (`:107-122`); cards with archive/restore/move/delete (`:245-327`); the "Demo Studies" toolbar button (`:181`) and the empty-state "Load Demo Experiments" button (`:343`) both call `resetSampleData` (UI-1) |
-| Archive | `#/?folder=archive` | `Dashboard.tsx:37-38`, `:270` | The trash icon on an archived card hard-deletes (`ProjectContext.tsx:201-215`) |
+| Dashboard | `#/` | `src/web/pages/Dashboard.tsx` | Filter, search and sort (`:37-71`); JSON import (`:76-108`); create project (`:110-125`); cards with archive/restore/move/delete (`:287-369`); the "Demo Studies" toolbar button (`:202`) and the empty-state "Load Demo Experiments" button (`:385`) both call `handleLoadDemo` (`:127-130`), which adds a copy of the demo with `loadDemoProject` and opens it. In the Archive view only, "Reset Sample Data" (`:225-234`) opens `ConfirmDialog` (`:238-247`) before `resetSampleData` (`handleReset`, `:132-143`) |
+| Archive | `#/?folder=archive` | `Dashboard.tsx:40-41`, `:312` | The trash icon on an archived card hard-deletes (`ProjectContext.tsx:201-215`) |
 | Project header | `#/project/:id` | `ProjectView.tsx:378-460` | Inline rename (`:30-41`, saved on blur); Export JSON, Excel and HTML buttons (`:438-458`) |
 | Project tabs | Tab bar | `ProjectView.tsx:367-374`, `:462-482`, `:484-491` | See the table below |
 | Guide | Sidebar "Step-by-Step Guide" | `src/web/pages/GuideView.tsx` | SOP steps live in `localStorage.axiom_doe_sop_steps_v1` (`:21`, `:80-107`) and start empty (`:23`); add/edit/move/clear/undo; JSON download (`:225-233`) and upload (`:243-262`); "launch module" ignores its target (UI-26, `:265-271`) |
 | MCP panel | Sidebar "MCP Server" | `src/web/features/mcp-panel/McpModal.tsx` | Modal with tabs `overview`, `tools`, `resources`, `logs` (`:28`). Loads `GET /api/mcp/info` and `/api/mcp/logs` on open (`:51-75`). The tool playground sends `POST /api/mcp` `tools/call` (`:137-149`) with per-tool default args aimed at the demo project (`:78-113`). Shows an SSE URL `${origin}/mcp/sse` (`:42`) and a stdio snippet `{command:'npm', args:['run','mcp']}` (`:178-189`, MCP-18). |
 
-The six project tabs (`ProjectView.tsx:367-374`; display order as below). The English labels in the table are the ones the interface shows: they come from `translations.ts:96-101`. The fallbacks written in `ProjectView.tsx:368-373` ("Design Matrix", "Analysis", "Robustness / Monte Carlo") are never shown in English or Chinese, because both dictionaries define every `tab_*` key. Each tab is mounted only while active (`:485-490`), so its local state resets on every tab switch. None of them has a `key={project.id}`.
+The six project tabs (`ProjectView.tsx:367-374`; display order as below). The English labels in the table are the ones the interface shows: they come from `translations.ts:102-107`. The fallbacks written in `ProjectView.tsx:368-373` ("Design Matrix", "Analysis", "Robustness / Monte Carlo") are never shown in English or Chinese, because both dictionaries define every `tab_*` key. Each tab is mounted only while active (`:485-490`), so its local state resets on every tab switch. None of them has a `key={project.id}`.
 
 | Tab id | Label key (English) | Component | Props | Writes the project? | Main sections (lines) |
 |---|---|---|---|---|---|
@@ -84,7 +84,7 @@ There is no revision check, no `res.ok` check and no user-visible error. Failure
 | Design type, Generate, augment, import | `ProjectDesign.tsx:1175`, `:990`, `:1012`/`:1049`/`:1065`/`:1084`, `:404` | Per action; Generate and import replace all runs (UI-2) |
 | Optimisation run / append | `ProjectOptimization.tsx:636`, `:659-663` | Per action |
 | Factor/response edits | `ProjectSetup.tsx:60-101` | On Save (staged in local state first) |
-| Rename, restore, archive (or hard delete), move, import, create | `ProjectView.tsx:32`; `Dashboard.tsx:94`, `:120`, `:254`, `:270`, `:284` | Per action |
+| Rename, restore, archive (or hard delete), move, import, create | `ProjectView.tsx:32`; `Dashboard.tsx:97`, `:123`, `:296`, `:312`, `:326` | Per action |
 
 **Other browser storage.** `app_language` (`LanguageContext.tsx:16`, `:29`), `darkMode` (`Layout.tsx:27-36`) and `axiom_doe_sop_steps_v1` (`GuideView.tsx:21`). SOP steps never reach the server (DATA-19).
 
@@ -97,7 +97,7 @@ index.html → src/main.tsx → web/App.tsx
   LanguageProvider (web/i18n/LanguageContext → translations)
   ProjectProvider  (web/state/ProjectContext → core/types, core/sampleProject; fetch /api/*, socket.io)
   Layout → LanguageSelector, features/mcp-panel/McpModal (fetch /api/mcp*), assets/logo.png
-    ├ pages/Dashboard   → state, i18n, core/types
+    ├ pages/Dashboard   → state, i18n, shared/ConfirmDialog, core/types
     ├ pages/GuideView   → state, i18n
     └ pages/ProjectView → state, i18n, core/design/doePatterns, core/analysis/analysisCore,
                           features/export/htmlExport, xlsx-js-style (dynamic import), and the six tabs:
@@ -118,7 +118,7 @@ index.html → src/main.tsx → web/App.tsx
 How the layer rules from the [design spec](../../spec/DOE-Magic/design-spec.md) apply today (`npm run check`, [`scripts/check-boundaries.mjs`](../../../scripts/check-boundaries.mjs)):
 
 - No `src/web` file imports `src/server` (R5). The browser reaches the server only through `fetch` and socket.io.
-- No feature imports another feature (R6). Code shared by Analysis and Compare is in `src/web/shared/`: `ResidualsPlots`, `PlotlyErrorBoundary`.
+- No feature imports another feature (R6). Code shared by Analysis and Compare is in `src/web/shared/`: `ResidualsPlots`, `PlotlyErrorBoundary`. `src/web/shared/ConfirmDialog` is the confirmation dialog for destructive actions; the Dashboard uses it today.
 - `ProjectDesign` imports `dOptimal` but not `core/design/doeGenerator`. Only MCP uses that generator (see §6).
 - `ProjectOptimization` imports nothing from `src/core` except types.
 
@@ -143,7 +143,7 @@ Each of these moves into `src/core/` as its own logic PR, after tests exist. Tar
 | Monte Carlo robustness (Box-Muller, defect rate, histogram) | `RobustnessSimulation.tsx:103-282` | `src/core/robustness/monteCarlo.ts` (STAT-9, UI-9) or `src/core/analysis/robustness.ts` (MCP-2, MCP-16) | UI-9, STAT-9, MCP-16 |
 | Bayesian optimiser (Cholesky, GP, EI, candidate search, Markdown report) | `ProjectOptimization.tsx:23-593` (report `:518-592`) | `src/core/optimization/bayesOpt.ts` (STAT-13) or `bayesian.ts` (UI-16) | UI-16, STAT-13, STAT-10 |
 | Excel export (3 sheet types, runs `computeAnalysis` per response) | `ProjectView.tsx:54-353` | `src/web/features/export/excelExport.ts` | UI-8, STAT-17 |
-| JSON export / import | `ProjectView.tsx:44-52`; `Dashboard.tsx:73-105` | `src/core/io/projectJson.ts` + `src/core/schema.ts` | DATA-10 |
+| JSON export / import | `ProjectView.tsx:44-52`; `Dashboard.tsx:76-108` | `src/core/io/projectJson.ts` + `src/core/schema.ts` | DATA-10 |
 | Report-side statistics (main effects, interaction, surface, level matching) | `htmlExport.ts:544-700`, `:1094-1221`, `:1223-1461`, `:473-479` | Precompute in core and embed (`surfaceGrid.ts`, `effectPlots.ts`) | UI-4, STAT-8 |
 
 ## 6. Duplicated logic
@@ -180,7 +180,7 @@ Background on why the forks drift: [forked-logic-drifts](../../memory/DOE-Magic/
 | Artefact | Code | Language | Notes |
 |---|---|---|---|
 | Project JSON (export) | `ProjectView.tsx:44-52` | n/a | Raw `Project` as a `data:` URL; no format or version marker (DATA-10) |
-| Project JSON (import) | `Dashboard.tsx:73-105` | Error text en/zh | Checks only that `factors`/`responses`/`runs` are arrays; new uuid; keeps `folderId`/`isArchived` (DATA-10, UI-23) |
+| Project JSON (import) | `Dashboard.tsx:76-108` | Error text en/zh | Checks only that `factors`/`responses`/`runs` are arrays; new uuid; keeps `folderId`/`isArchived` (DATA-10, UI-23) |
 | Excel workbook | `ProjectView.tsx:54-353` | English only | `import('xlsx-js-style')` with no `.catch`. Sheets: `Setup`, `Design Matrix`, and `<first 25 chars of name> Analysis` per response (`:347`, UI-8). Effect Tests hard-code Nparm/DF = 1 (`:298-299`, STAT-17). |
 | HTML report | `ProjectView.tsx:355-364` → `htmlExport.ts:6` | Starts in English | `generateExportHTML(project)` gets no locale, so `initialLocale` defaults to `'en'`; the report has its own language select (`htmlExport.ts:93`, `:412`). Embeds the project and per-response analysis JSON (`:318-319`), a 197 kB base64 logo (`logoBase64.ts`), its own en/zh table (`:321-408`) and ~1,150 lines of report script (`:317-1474`). Names are not HTML-escaped (`:52`, `:83-84`, UI-11). |
 | Plot PNGs | `ProjectAnalysis.tsx:119-165`, `CompareResponses.tsx:331-371`, `ResidualsPlots.tsx:9-41`, `:82-115` | English file names | `html-to-image` `toPng`; failure → English `alert` (`ProjectAnalysis.tsx:159`) |
@@ -194,13 +194,13 @@ Background on why the forks drift: [forked-logic-drifts](../../memory/DOE-Magic/
 
 The locale comes from `localStorage.app_language`, which accepts `en|zh|de|es|fr|it` (`:16-19`); otherwise it is `zh` when `navigator.language` starts with `zh`, else `en` (`:21-24`). The provider also sets `<html lang>` (`:32-36`).
 
-`src/web/i18n/translations.ts` holds flat snake_case keys: 187 in `en` (`:17-224`) and the same 187 in `zh` (`:226-433`). `de`/`es`/`fr`/`it` are empty stubs (`:436-439`), and the menu offers only en and zh (`:11-14`).
+`src/web/i18n/translations.ts` holds flat snake_case keys: 193 in `en` (`:17-230`) and the same 193 in `zh` (`:232-445`). `de`/`es`/`fr`/`it` are empty stubs (`:448-451`), and the menu offers only en and zh (`:11-14`).
 
 **Real state (measured with a regex scan of `src/web`).**
 
-- 69 `t()` calls use 54 distinct keys, in 6 files: Dashboard 30, ProjectView 16, Layout 14, ProjectSetup 6, LanguageSelector 2, GuideView 1. **133 of the 187 keys are unused.** Some describe features that do not exist, such as `toggle_exclude` / `status_excluded` (`:151`, `:147`; run exclusion is not implemented) and `discrete` (`:116`). Others would fix registered issues: `delete_confirm_msg` (`:83`) and `reset_sample_confirm` (`:87`) are never shown (UI-1, UI-20).
-- **532 inline `locale === 'zh' ? … : …` branches in 12 components**, plus 1 in `LanguageContext` for `<html lang>`. Occurrence counts: ProjectAnalysis 193, ProjectDesign 80, RobustnessSimulation 48, ProjectSetup 41, GuideView 34, McpModal 34, CompareResponses 25, ProjectOptimization 25, ResidualsPlots 17, Dashboard 13, PredictionProfiler 11, TwoLevelDesignSelector 11. The per-file figures in I18N-1 are line counts, so they are lower.
-- The HTML export has **54 more `currentLang === 'zh'` branches** in its report script, a separate dictionary (`htmlExport.ts:321-408`) and an en/zh design-name map (`:32-40`). `ProjectOptimization` adds `descZh` literals (`:823-842`). In total there are about 600 inline branches: a grep finds 599 `=== 'zh'` comparisons in `src/web`. Some other counts (~640) included lines or object literals.
+- 81 `t()` calls use 63 distinct keys, in 7 files: Dashboard 40, ProjectView 16, Layout 14, ProjectSetup 6, ConfirmDialog 2, LanguageSelector 2, GuideView 1 (recounted after P0.1, 2026-10-21; before it, 69 calls, 54 keys, 6 files). **130 of the 193 keys are unused.** Some describe features that do not exist, such as `toggle_exclude` / `status_excluded` (`:151`, `:147`; run exclusion is not implemented) and `discrete` (`:116`). Others would fix registered issues: `delete_confirm_msg` (`:83`) is never shown (UI-20). (`reset_sample_confirm`, `:87`, is shown since P0.1.)
+- **529 inline `locale === 'zh' ? … : …` branches in 12 components**, plus 1 in `LanguageContext` for `<html lang>`. Occurrence counts: ProjectAnalysis 193, ProjectDesign 80, RobustnessSimulation 48, ProjectSetup 41, GuideView 34, McpModal 34, CompareResponses 25, ProjectOptimization 25, ResidualsPlots 17, PredictionProfiler 11, TwoLevelDesignSelector 11, Dashboard 10 (13 before P0.1 moved the demo-button labels into `t()`). The per-file figures in I18N-1 are line counts, so they are lower.
+- The HTML export has **54 more `currentLang === 'zh'` branches** in its report script, a separate dictionary (`htmlExport.ts:321-408`) and an en/zh design-name map (`:32-40`). `ProjectOptimization` adds `descZh` literals (`:823-842`). In total there are about 600 inline branches: a grep finds 596 `=== 'zh'` comparisons in `src/web` (599 before P0.1). Some other counts (~640) included lines or object literals.
 - Nine components destructure `t` and never call it: PredictionProfiler, ProjectAnalysis, CompareResponses, ProjectDesign, TwoLevelDesignSelector, McpModal, ProjectOptimization, RobustnessSimulation, ResidualsPlots (twice). Confirmed with `tsc --noUnusedLocals`.
 - **English-only output:** the Excel export, the optimisation report, the HTML report's initial language and date (`htmlExport.ts:43-45`), and PNG file names. In the UI itself: 31 `title="…"` attributes, toasts in GuideView, the error at `RobustnessSimulation.tsx:107`, `ProjectOptimization.tsx:618`, the Excel import status, the `PlotlyErrorBoundary` text and the image-download `alert`s (I18N-2, I18N-4).
 
@@ -212,7 +212,7 @@ UI and I18N issues from the registry. Full text, evidence and fixes are in the [
 
 | ID | Sev. | Issue | Main location |
 |---|---|---|---|
-| UI-1 | Critical | "Demo Studies" / "Load Demo Experiments" wipe every project and folder for all users, without confirmation | `Dashboard.tsx:181`, `:343`; `ProjectContext.tsx:269-281` |
+| UI-1 | Critical | **Fixed in P0.1 (2026-10-21).** "Demo Studies" / "Load Demo Experiments" wiped every project and folder for all users, without confirmation; they now add a copy of the demo | `Dashboard.tsx:202`, `:385`; `ProjectContext.tsx:293-301` |
 | UI-2 | Critical | Generate Design Matrix, Excel import and Simulate Sample Data overwrite measured results without confirmation | `ProjectDesign.tsx:1188`, `:990`, `:404`; `ProjectAnalysis.tsx:189-235` |
 | UI-3 | Critical | Profiler fits non-active responses without their saved excluded terms | `ProjectAnalysis.tsx:262`, `:2514` |
 | UI-4 | Critical | HTML export surfaces use intercept + numeric main effects only | `htmlExport.ts:1287-1311` |
@@ -231,15 +231,15 @@ UI and I18N issues from the registry. Full text, evidence and fixes are in the [
 | UI-17 | Medium | Diagnostics rule engine embedded with inline bilingual text | `ProjectAnalysis.tsx:584-1053` |
 | UI-18 | Medium | Surface grid ×3; categoricals held at a fractional index | `ProjectAnalysis.tsx:397-582` |
 | UI-19 | Medium | Analysis/Compare duplicate tooltip, PNG download, tables and effects plot | §6 |
-| UI-20 | Medium | Other destructive actions unconfirmed; playground defaults target the demo project | `Layout.tsx:49-51`; `Dashboard.tsx:270`; `McpModal.tsx:78-113` |
+| UI-20 | Medium | Other destructive actions unconfirmed; playground defaults target the demo project | `Layout.tsx:49-51`; `Dashboard.tsx:312`; `McpModal.tsx:78-113` |
 | UI-21 | Medium | HTML report needs CDNs; Plotly 2.27.0 vs app 3.7.0 | `htmlExport.ts:53-54` |
 | UI-22 | Medium | `crypto.randomUUID` / `navigator.clipboard` break over plain HTTP on a LAN | `ProjectOptimization.tsx:651`; `McpModal.tsx:46` |
-| UI-23 | Medium | No app-level error boundary; a project without `description` crashes search | `App.tsx:15-31`; `Dashboard.tsx:50` |
+| UI-23 | Medium | No app-level error boundary; a project without `description` crashes search | `App.tsx:15-31`; `Dashboard.tsx:53` |
 | UI-24 | Medium | DOE mean plot labels runs by filtered position | `ProjectAnalysis.tsx:386-394`; `CompareResponses.tsx:155-157` |
 | UI-25 | Medium | Tab not in URL; tab components lack `key={project.id}` | `ProjectView.tsx:21`, `:485-490` |
 | UI-26 | Medium | Guide "launch module" ignores its target, opens `projects[0]` | `GuideView.tsx:78`, `:265-271` |
 | UI-27 | Medium | Setup accepts min ≥ max; target input mangles `-` and `1.` | `ProjectSetup.tsx:450-455` |
-| UI-28 | Low | Dead code (unused imports/vars, `loadDemoProject`, `socket`, `loading`) | `tsc --noUnusedLocals` |
+| UI-28 | Low | Dead code (unused imports/vars, `socket`, `loading`; `loadDemoProject` has callers since P0.1) | `tsc --noUnusedLocals` |
 | UI-29 | Low | Stale memo deps; active response fitted twice | `ProjectAnalysis.tsx:257-383` |
 | UI-30 | Low | Gemini-era LaTeX clean-up regexes | `ProjectOptimization.tsx:666-678` |
 | UI-31 | High | HTML report's "Model p-value" card prints `analysis.p`, which is the model DF (`p_model = rank − 1`, 14 on the demo project), not a p-value. Same root cause as MCP-1; fixed with it (backlog P0.5) | `htmlExport.ts:27`, `:736`, `:750`; `analysisCore.ts:468`, `:1164`, `:890` |
@@ -249,8 +249,8 @@ UI and I18N issues from the registry. Full text, evidence and fixes are in the [
 | I18N-2 | Medium | Exports English-only; HTML export ignores UI locale | `ProjectView.tsx:356` |
 | I18N-3 | Medium | Parallel dictionaries (export I18N, design-type names ×3) | `htmlExport.ts:32-40`, `:321-408` |
 | I18N-4 | Medium | English-only help, errors, toasts, titles | §9 |
-| I18N-5 | Low | 133 of 187 keys unused | `translations.ts` |
-| I18N-6 | Low | Empty de/es/fr/it locales, logical-OR fall-through for empty strings, version string in dictionary | `translations.ts:1`, `:20`, `:436-439` |
+| I18N-5 | Low | 130 of 193 keys unused | `translations.ts` |
+| I18N-6 | Low | Empty de/es/fr/it locales, logical-OR fall-through for empty strings, version string in dictionary | `translations.ts:1`, `:20`, `:448-451` |
 
 Other registry IDs that show up in the UI: DATA-1 (= UI-1), DES-1 (Generate), STAT-7 (= UI-3), STAT-8 (= UI-4), STAT-10 (= UI-10), STAT-16, STAT-17, STAT-18, STAT-19, STAT-23, DES-2, DES-11 (D-optimal freezes the tab), DES-13, DES-15, DES-19 (centre runs on all-categorical designs), DES-20 (augmentation with `levels: []`), DATA-4/-5/-8 (write path), DATA-6, DATA-10, DATA-15, DATA-17, DATA-18, DATA-19, DATA-20, DATA-21 (live sync gives up after 3 reconnects), DATA-22 (Setup writes categorical `min`/`max` as 0 and L−1), DATA-23 (Excel import matches columns by name), SRV-4, SRV-12, BLD-6 (payload), BLD-8 (version strings), BLD-11 (`Remix …` title, `axiom_` key).
 
