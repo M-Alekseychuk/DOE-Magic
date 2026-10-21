@@ -1,0 +1,285 @@
+{
+  "id": "montgomery-ex8-1-half-fraction",
+  "title": "Filtration rate, 2^(4-1) resolution IV half fraction, D = ABC (8 runs, saturated)",
+  "provenance": {
+    "data": "Montgomery, D. C. (2013). Design and Analysis of Experiments, 8th ed. Wiley. Example 8.1: the 2^(4−1) fraction (I = ABCD) of the Example 6.2 experiment.",
+    "published": "Example 8.1: effect estimates ℓA = 19.00, ℓB = 1.50, ℓC = 14.00, ℓD = 16.50, ℓAB+CD = −1.00, ℓAC+BD = −18.50, ℓAD+BC = 19.00.",
+    "derived": "The engine model (main effects + 2FIs) has rank 8 on 8 runs, so error DF = 0 and the effect tests use Lenth. Lenth PSE = 1.5 × median(|ℓ|) = 24.75 over the 7 contrasts (no contrast is trimmed), from the definition in Lenth (1989), Technometrics 31:469–473.",
+    "recorded": "2026-10-21"
+  },
+  "factors": [
+    {
+      "id": "A",
+      "name": "Temperature",
+      "type": "numeric",
+      "min": -1,
+      "max": 1,
+      "unit": ""
+    },
+    {
+      "id": "B",
+      "name": "Pressure",
+      "type": "numeric",
+      "min": -1,
+      "max": 1,
+      "unit": ""
+    },
+    {
+      "id": "C",
+      "name": "Formaldehyde",
+      "type": "numeric",
+      "min": -1,
+      "max": 1,
+      "unit": ""
+    },
+    {
+      "id": "D",
+      "name": "Stirring Rate",
+      "type": "numeric",
+      "min": -1,
+      "max": 1,
+      "unit": ""
+    }
+  ],
+  "responses": [
+    {
+      "id": "y",
+      "name": "Filtration Rate",
+      "unit": "gal/h",
+      "goal": "maximize"
+    }
+  ],
+  "runs": [
+    {
+      "label": "(1)",
+      "factors": {
+        "A": -1,
+        "B": -1,
+        "C": -1,
+        "D": -1
+      },
+      "responses": {
+        "y": 45
+      }
+    },
+    {
+      "label": "ab",
+      "factors": {
+        "A": 1,
+        "B": 1,
+        "C": -1,
+        "D": -1
+      },
+      "responses": {
+        "y": 65
+      }
+    },
+    {
+      "label": "ac",
+      "factors": {
+        "A": 1,
+        "B": -1,
+        "C": 1,
+        "D": -1
+      },
+      "responses": {
+        "y": 60
+      }
+    },
+    {
+      "label": "bc",
+      "factors": {
+        "A": -1,
+        "B": 1,
+        "C": 1,
+        "D": -1
+      },
+      "responses": {
+        "y": 80
+      }
+    },
+    {
+      "label": "ad",
+      "factors": {
+        "A": 1,
+        "B": -1,
+        "C": -1,
+        "D": 1
+      },
+      "responses": {
+        "y": 100
+      }
+    },
+    {
+      "label": "bd",
+      "factors": {
+        "A": -1,
+        "B": 1,
+        "C": -1,
+        "D": 1
+      },
+      "responses": {
+        "y": 45
+      }
+    },
+    {
+      "label": "cd",
+      "factors": {
+        "A": -1,
+        "B": -1,
+        "C": 1,
+        "D": 1
+      },
+      "responses": {
+        "y": 75
+      }
+    },
+    {
+      "label": "abcd",
+      "factors": {
+        "A": 1,
+        "B": 1,
+        "C": 1,
+        "D": 1
+      },
+      "responses": {
+        "y": 96
+      }
+    }
+  ],
+  "models": [
+    {
+      "name": "main effects + 2FI (engine default)",
+      "responseId": "y",
+      "excludedTerms": []
+    }
+  ],
+  "published": {
+    "effects": {
+      "A": 19.0,
+      "B": 1.5,
+      "C": 14.0,
+      "D": 16.5,
+      "A*B": -1.0,
+      "A*C": -18.5,
+      "A*D": 19.0
+    },
+    "aliasedTerms": [
+      "B*C",
+      "B*D",
+      "C*D"
+    ],
+    "lenth": {
+      "PSE": 24.75
+    }
+  },
+  "reference": {
+    "tool": "statsmodels 0.14.4 OLS (numpy 2.1.3, scipy 1.15.3, Python 3.13.5) via tests/fixtures/compute_reference.py",
+    "computed": "2026-10-21",
+    "models": [
+      {
+        "name": "main effects + 2FI (engine default)",
+        "responseId": "y",
+        "excludedTerms": [],
+        "n": 8,
+        "rank": 8,
+        "dfModel": 7,
+        "dfError": 0,
+        "aliasedColumns": [
+          "Pressure*Formaldehyde",
+          "Pressure*Stirring Rate",
+          "Formaldehyde*Stirring Rate"
+        ],
+        "sse": 7.472090494253424e-27,
+        "sst": 3071.5,
+        "rSquared": 1.0,
+        "coefficients": {
+          "Intercept": {
+            "estimate": 70.74999999999997
+          },
+          "Temperature": {
+            "estimate": 9.500000000000009,
+            "vif": 1.0
+          },
+          "Pressure": {
+            "estimate": 0.7500000000000036,
+            "vif": 1.0
+          },
+          "Formaldehyde": {
+            "estimate": 7.000000000000005,
+            "vif": 1.0
+          },
+          "Stirring Rate": {
+            "estimate": 8.250000000000004,
+            "vif": 1.0
+          },
+          "Temperature*Pressure": {
+            "estimate": -0.5000000000000018,
+            "vif": 1.0
+          },
+          "Temperature*Formaldehyde": {
+            "estimate": -9.249999999999996,
+            "vif": 1.0
+          },
+          "Temperature*Stirring Rate": {
+            "estimate": 9.499999999999998,
+            "vif": 1.0
+          }
+        },
+        "fitted": [
+          44.99999999999994,
+          64.99999999999999,
+          59.999999999999986,
+          79.99999999999997,
+          99.99999999999999,
+          44.99999999999997,
+          74.99999999999996,
+          95.99999999999999
+        ],
+        "leverage": [
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0
+        ],
+        "lenth": {
+          "contrasts": {
+            "Temperature": 19.000000000000018,
+            "Pressure": 1.500000000000007,
+            "Formaldehyde": 14.00000000000001,
+            "Stirring Rate": 16.500000000000007,
+            "Temperature*Pressure": -1.0000000000000036,
+            "Temperature*Formaldehyde": -18.499999999999993,
+            "Temperature*Stirring Rate": 18.999999999999996
+          },
+          "s0": 24.75000000000001,
+          "PSE": 24.75000000000001,
+          "df": 2.3333333333333335,
+          "ME": 93.16204603457565,
+          "SME": 222.95560107013466,
+          "t": {
+            "Temperature": 0.7676767676767681,
+            "Pressure": 0.060606060606060864,
+            "Formaldehyde": 0.5656565656565659,
+            "Stirring Rate": 0.6666666666666666,
+            "Temperature*Pressure": 0.04040404040404053,
+            "Temperature*Formaldehyde": 0.7474747474747468,
+            "Temperature*Stirring Rate": 0.7676767676767672
+          }
+        },
+        "lackOfFit": {
+          "ssPure": 0.0,
+          "dfPure": 0,
+          "ssLof": 7.472090494253424e-27,
+          "dfLof": 0,
+          "fLof": null,
+          "pLof": null
+        }
+      }
+    ]
+  }
+}

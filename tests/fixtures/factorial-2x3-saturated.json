@@ -1,0 +1,178 @@
+{
+  "id": "factorial-2x3-saturated",
+  "title": "2 × 3 full factorial, one numeric and one 3-level categorical factor, unreplicated (6 runs, saturated)",
+  "provenance": {
+    "data": "Synthetic. Reproduces the MCP-9 crash reported in docs/spec/DOE-Magic/roadmap-backlog.md (P0.5): the 3-level categorical adds reference-level rows whose stdError is undefined when error DF = 0.",
+    "published": "None.",
+    "derived": "Intercept + 1 + 2 + 2 columns = 6 = number of runs, so the model is saturated (error DF 0).",
+    "recorded": "2026-10-21"
+  },
+  "factors": [
+    {
+      "id": "A",
+      "name": "Temp",
+      "type": "numeric",
+      "min": 20,
+      "max": 40,
+      "unit": "°C"
+    },
+    {
+      "id": "B",
+      "name": "Catalyst",
+      "type": "categorical",
+      "min": 0,
+      "max": 2,
+      "levels": [
+        "Pd",
+        "Ni",
+        "Cu"
+      ],
+      "unit": ""
+    }
+  ],
+  "responses": [
+    {
+      "id": "y",
+      "name": "Yield",
+      "unit": "%",
+      "goal": "maximize"
+    }
+  ],
+  "runs": [
+    {
+      "label": "20/Pd",
+      "factors": {
+        "A": 20,
+        "B": "Pd"
+      },
+      "responses": {
+        "y": 10.0
+      }
+    },
+    {
+      "label": "20/Ni",
+      "factors": {
+        "A": 20,
+        "B": "Ni"
+      },
+      "responses": {
+        "y": 12.0
+      }
+    },
+    {
+      "label": "20/Cu",
+      "factors": {
+        "A": 20,
+        "B": "Cu"
+      },
+      "responses": {
+        "y": 15.0
+      }
+    },
+    {
+      "label": "40/Pd",
+      "factors": {
+        "A": 40,
+        "B": "Pd"
+      },
+      "responses": {
+        "y": 11.0
+      }
+    },
+    {
+      "label": "40/Ni",
+      "factors": {
+        "A": 40,
+        "B": "Ni"
+      },
+      "responses": {
+        "y": 14.0
+      }
+    },
+    {
+      "label": "40/Cu",
+      "factors": {
+        "A": 40,
+        "B": "Cu"
+      },
+      "responses": {
+        "y": 19.0
+      }
+    }
+  ],
+  "models": [
+    {
+      "name": "main effects + 2FI (engine default)",
+      "responseId": "y",
+      "excludedTerms": []
+    }
+  ],
+  "reference": {
+    "tool": "statsmodels 0.14.4 OLS (numpy 2.1.3, scipy 1.15.3, Python 3.13.5) via tests/fixtures/compute_reference.py",
+    "computed": "2026-10-21",
+    "models": [
+      {
+        "name": "main effects + 2FI (engine default)",
+        "responseId": "y",
+        "excludedTerms": [],
+        "n": 6,
+        "rank": 6,
+        "dfModel": 5,
+        "dfError": 0,
+        "aliasedColumns": [],
+        "sse": 2.8398992587956425e-28,
+        "sst": 53.5,
+        "rSquared": 1.0,
+        "coefficients": {
+          "Intercept": {
+            "estimate": 13.500000000000005
+          },
+          "Temp": {
+            "estimate": 1.1666666666666647,
+            "vif": 1.0
+          },
+          "Catalyst[Pd]": {
+            "estimate": -2.9999999999999964,
+            "vif": 1.3333333333333333
+          },
+          "Catalyst[Ni]": {
+            "estimate": -0.5000000000000036,
+            "vif": 1.3333333333333333
+          },
+          "Temp*Catalyst[Pd]": {
+            "estimate": -0.6666666666666705,
+            "vif": 1.3333333333333333
+          },
+          "Temp*Catalyst[Ni]": {
+            "estimate": -0.16666666666666385,
+            "vif": 1.3333333333333333
+          }
+        },
+        "fitted": [
+          10.000000000000014,
+          12.000000000000002,
+          15.000000000000007,
+          11.000000000000004,
+          14.000000000000002,
+          19.000000000000004
+        ],
+        "leverage": [
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0,
+          1.0
+        ],
+        "lackOfFit": {
+          "ssPure": 0.0,
+          "dfPure": 0,
+          "ssLof": 2.8398992587956425e-28,
+          "dfLof": 0,
+          "fLof": null,
+          "pLof": null
+        }
+      }
+    ]
+  }
+}

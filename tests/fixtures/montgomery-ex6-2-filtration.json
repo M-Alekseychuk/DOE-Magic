@@ -1,0 +1,1076 @@
+{
+  "id": "montgomery-ex6-2-filtration",
+  "title": "Pilot-plant filtration rate, unreplicated 2^4 full factorial (16 runs)",
+  "provenance": {
+    "data": "Montgomery, D. C. (2013). Design and Analysis of Experiments, 8th ed. Wiley. Example 6.2: filtration rate (gal/h); A = temperature, B = pressure, C = formaldehyde concentration, D = stirring rate. The example gives coded levels only, so factors are stored as −1/+1.",
+    "published": "Example 6.2: the 15 effect estimates and the final model ŷ = 70.06 + 10.81 x1 + 4.94 x3 + 7.31 x4 − 9.06 x1x3 + 8.31 x1x4. Section 6.5 applies Lenth (1989) to these effects: PSE = 2.625, ME = 6.75, SME = 13.70.",
+    "derived": "PSE, ME and SME are also recomputed from the Lenth (1989) definition by compute_reference.py, so the pin does not rest on transcription alone.",
+    "recorded": "2026-10-21"
+  },
+  "factors": [
+    {
+      "id": "A",
+      "name": "Temperature",
+      "type": "numeric",
+      "min": -1,
+      "max": 1,
+      "unit": ""
+    },
+    {
+      "id": "B",
+      "name": "Pressure",
+      "type": "numeric",
+      "min": -1,
+      "max": 1,
+      "unit": ""
+    },
+    {
+      "id": "C",
+      "name": "Formaldehyde",
+      "type": "numeric",
+      "min": -1,
+      "max": 1,
+      "unit": ""
+    },
+    {
+      "id": "D",
+      "name": "Stirring Rate",
+      "type": "numeric",
+      "min": -1,
+      "max": 1,
+      "unit": ""
+    }
+  ],
+  "responses": [
+    {
+      "id": "y",
+      "name": "Filtration Rate",
+      "unit": "gal/h",
+      "goal": "maximize"
+    }
+  ],
+  "runs": [
+    {
+      "label": "(1)",
+      "factors": {
+        "A": -1,
+        "B": -1,
+        "C": -1,
+        "D": -1
+      },
+      "responses": {
+        "y": 45
+      }
+    },
+    {
+      "label": "a",
+      "factors": {
+        "A": 1,
+        "B": -1,
+        "C": -1,
+        "D": -1
+      },
+      "responses": {
+        "y": 71
+      }
+    },
+    {
+      "label": "b",
+      "factors": {
+        "A": -1,
+        "B": 1,
+        "C": -1,
+        "D": -1
+      },
+      "responses": {
+        "y": 48
+      }
+    },
+    {
+      "label": "ab",
+      "factors": {
+        "A": 1,
+        "B": 1,
+        "C": -1,
+        "D": -1
+      },
+      "responses": {
+        "y": 65
+      }
+    },
+    {
+      "label": "c",
+      "factors": {
+        "A": -1,
+        "B": -1,
+        "C": 1,
+        "D": -1
+      },
+      "responses": {
+        "y": 68
+      }
+    },
+    {
+      "label": "ac",
+      "factors": {
+        "A": 1,
+        "B": -1,
+        "C": 1,
+        "D": -1
+      },
+      "responses": {
+        "y": 60
+      }
+    },
+    {
+      "label": "bc",
+      "factors": {
+        "A": -1,
+        "B": 1,
+        "C": 1,
+        "D": -1
+      },
+      "responses": {
+        "y": 80
+      }
+    },
+    {
+      "label": "abc",
+      "factors": {
+        "A": 1,
+        "B": 1,
+        "C": 1,
+        "D": -1
+      },
+      "responses": {
+        "y": 65
+      }
+    },
+    {
+      "label": "d",
+      "factors": {
+        "A": -1,
+        "B": -1,
+        "C": -1,
+        "D": 1
+      },
+      "responses": {
+        "y": 43
+      }
+    },
+    {
+      "label": "ad",
+      "factors": {
+        "A": 1,
+        "B": -1,
+        "C": -1,
+        "D": 1
+      },
+      "responses": {
+        "y": 100
+      }
+    },
+    {
+      "label": "bd",
+      "factors": {
+        "A": -1,
+        "B": 1,
+        "C": -1,
+        "D": 1
+      },
+      "responses": {
+        "y": 45
+      }
+    },
+    {
+      "label": "abd",
+      "factors": {
+        "A": 1,
+        "B": 1,
+        "C": -1,
+        "D": 1
+      },
+      "responses": {
+        "y": 104
+      }
+    },
+    {
+      "label": "cd",
+      "factors": {
+        "A": -1,
+        "B": -1,
+        "C": 1,
+        "D": 1
+      },
+      "responses": {
+        "y": 75
+      }
+    },
+    {
+      "label": "acd",
+      "factors": {
+        "A": 1,
+        "B": -1,
+        "C": 1,
+        "D": 1
+      },
+      "responses": {
+        "y": 86
+      }
+    },
+    {
+      "label": "bcd",
+      "factors": {
+        "A": -1,
+        "B": 1,
+        "C": 1,
+        "D": 1
+      },
+      "responses": {
+        "y": 70
+      }
+    },
+    {
+      "label": "abcd",
+      "factors": {
+        "A": 1,
+        "B": 1,
+        "C": 1,
+        "D": 1
+      },
+      "responses": {
+        "y": 96
+      }
+    }
+  ],
+  "models": [
+    {
+      "name": "main effects + 2FI (engine default)",
+      "responseId": "y",
+      "excludedTerms": []
+    },
+    {
+      "name": "Montgomery final model: A, C, D, AC, AD",
+      "responseId": "y",
+      "excludedTerms": [
+        "B",
+        "A*B",
+        "B*C",
+        "B*D",
+        "C*D"
+      ]
+    }
+  ],
+  "published": {
+    "effects": {
+      "A": 21.625,
+      "B": 3.125,
+      "C": 9.875,
+      "D": 14.625,
+      "A*B": 0.125,
+      "A*C": -18.125,
+      "A*D": 16.625,
+      "B*C": 2.375,
+      "B*D": -0.375,
+      "C*D": -1.125,
+      "A*B*C": 1.875,
+      "A*B*D": 4.125,
+      "A*C*D": -1.625,
+      "B*C*D": -2.625,
+      "A*B*C*D": 1.375
+    },
+    "finalModel": {
+      "Intercept": 70.06,
+      "A": 10.81,
+      "C": 4.94,
+      "D": 7.31,
+      "A*C": -9.06,
+      "A*D": 8.31
+    },
+    "lenth": {
+      "PSE": 2.625,
+      "ME": 6.75,
+      "SME": 13.7
+    }
+  },
+  "reference": {
+    "tool": "statsmodels 0.14.4 OLS (numpy 2.1.3, scipy 1.15.3, Python 3.13.5) via tests/fixtures/compute_reference.py",
+    "computed": "2026-10-21",
+    "models": [
+      {
+        "name": "main effects + 2FI (engine default)",
+        "responseId": "y",
+        "excludedTerms": [],
+        "n": 16,
+        "rank": 11,
+        "dfModel": 10,
+        "dfError": 5,
+        "aliasedColumns": [],
+        "sse": 127.8124999999998,
+        "sst": 5730.9375,
+        "rSquared": 0.9776978024974099,
+        "coefficients": {
+          "Intercept": {
+            "estimate": 70.06250000000003,
+            "stdError": 1.263984276009792,
+            "tRatio": 55.429882578268135,
+            "pValue": 3.614687808831871e-08
+          },
+          "Temperature": {
+            "estimate": 10.812499999999996,
+            "stdError": 1.263984276009792,
+            "tRatio": 8.554299452310776,
+            "pValue": 0.0003595891683933824,
+            "vif": 1.0
+          },
+          "Pressure": {
+            "estimate": 1.5624999999999973,
+            "stdError": 1.263984276009792,
+            "tRatio": 1.2361704410853707,
+            "pValue": 0.27129685102881684,
+            "vif": 1.0
+          },
+          "Formaldehyde": {
+            "estimate": 4.937499999999997,
+            "stdError": 1.263984276009792,
+            "tRatio": 3.9062985938297756,
+            "pValue": 0.011337142552897314,
+            "vif": 1.0
+          },
+          "Stirring Rate": {
+            "estimate": 7.312499999999992,
+            "stdError": 1.263984276009792,
+            "tRatio": 5.785277664279538,
+            "pValue": 0.002171805363318279,
+            "vif": 1.0
+          },
+          "Temperature*Pressure": {
+            "estimate": 0.0625000000000071,
+            "stdError": 1.263984276009792,
+            "tRatio": 0.04944681764342053,
+            "pValue": 0.9624776610019452,
+            "vif": 1.0
+          },
+          "Temperature*Formaldehyde": {
+            "estimate": -9.062499999999995,
+            "stdError": 1.263984276009792,
+            "tRatio": -7.169788558295158,
+            "pValue": 0.0008208468176195253,
+            "vif": 1.0
+          },
+          "Temperature*Stirring Rate": {
+            "estimate": 8.3125,
+            "stdError": 1.263984276009792,
+            "tRatio": 6.5764267465741835,
+            "pValue": 0.0012200139977022186,
+            "vif": 1.0
+          },
+          "Pressure*Formaldehyde": {
+            "estimate": 1.1874999999999956,
+            "stdError": 1.263984276009792,
+            "tRatio": 0.9394895352248798,
+            "pValue": 0.39061263927064793,
+            "vif": 1.0
+          },
+          "Pressure*Stirring Rate": {
+            "estimate": -0.18749999999999112,
+            "stdError": 1.263984276009792,
+            "tRatio": -0.1483404529302377,
+            "pValue": 0.8878709866310086,
+            "vif": 1.0
+          },
+          "Formaldehyde*Stirring Rate": {
+            "estimate": -0.562500000000008,
+            "stdError": 1.263984276009792,
+            "tRatio": -0.4450213587907405,
+            "pValue": 0.6749088951922599,
+            "vif": 1.0
+          }
+        },
+        "fitted": [
+          45.18750000000004,
+          68.18750000000003,
+          46.18750000000003,
+          69.43750000000003,
+          71.93750000000007,
+          58.68750000000005,
+          77.68750000000003,
+          64.68750000000006,
+          44.68750000000003,
+          100.9375,
+          44.93750000000004,
+          101.43750000000006,
+          69.1875,
+          89.18749999999997,
+          74.1875,
+          94.43750000000003
+        ],
+        "leverage": [
+          0.6875,
+          0.6875,
+          0.6875,
+          0.6875,
+          0.6875,
+          0.6875,
+          0.6875,
+          0.6875,
+          0.6875,
+          0.6875,
+          0.6875,
+          0.6875,
+          0.6875,
+          0.6875,
+          0.6875,
+          0.6875
+        ],
+        "mse": 25.56249999999996,
+        "rmse": 5.055937104039168,
+        "adjRSquared": 0.9330934074922298,
+        "fRatio": 21.919315403423017,
+        "modelPValue": 0.0016344779386651166,
+        "studentizedResiduals": [
+          -0.0663398673130421,
+          0.9950980096953953,
+          0.6412853840259178,
+          -1.5700435264083161,
+          -1.3931372135735927,
+          0.46437907119117156,
+          0.8181916968606565,
+          0.11056644552169159,
+          -0.5970588058172532,
+          -0.3316993365651351,
+          0.022113289104327256,
+          0.9066448532780158,
+          2.0565358867038377,
+          -1.1277777443214494,
+          -1.4815903699909367,
+          0.5528322276085484
+        ],
+        "cooksDistance": [
+          0.0008801955990224064,
+          0.1980440097799474,
+          0.08224938875305379,
+          0.49300733496333216,
+          0.3881662591687188,
+          0.043129584352075034,
+          0.1338875305623441,
+          0.002444987775060239,
+          0.07129584352078489,
+          0.02200488997555016,
+          9.77995110023117e-05,
+          0.16440097799510295,
+          0.845867970660148,
+          0.2543765281173553,
+          0.43902200488997617,
+          0.06112469437652598
+        ],
+        "adequatePrecision": 13.537169037263832,
+        "typeIII": {
+          "A": {
+            "name": "Temperature",
+            "df": 1,
+            "ss": 1870.5625,
+            "fRatio": 73.17603911980451,
+            "pValue": 0.00035958916839338154
+          },
+          "B": {
+            "name": "Pressure",
+            "df": 1,
+            "ss": 39.06250000000037,
+            "fRatio": 1.5281173594132198,
+            "pValue": 0.27129685102881396
+          },
+          "C": {
+            "name": "Formaldehyde",
+            "df": 1,
+            "ss": 390.0625000000002,
+            "fRatio": 15.259168704156512,
+            "pValue": 0.011337142552897273
+          },
+          "D": {
+            "name": "Stirring Rate",
+            "df": 1,
+            "ss": 855.5625000000007,
+            "fRatio": 33.46943765281181,
+            "pValue": 0.0021718053633182637
+          },
+          "A*B": {
+            "name": "Temperature*Pressure",
+            "df": 1,
+            "ss": 0.06250000000018474,
+            "fRatio": 0.0024449877750683554,
+            "pValue": 0.962477661001894
+          },
+          "A*C": {
+            "name": "Temperature*Formaldehyde",
+            "df": 1,
+            "ss": 1314.0625000000002,
+            "fRatio": 51.40586797066023,
+            "pValue": 0.0008208468176195233
+          },
+          "A*D": {
+            "name": "Temperature*Stirring Rate",
+            "df": 1,
+            "ss": 1105.5624999999993,
+            "fRatio": 43.24938875305627,
+            "pValue": 0.00122001399770222
+          },
+          "B*C": {
+            "name": "Pressure*Formaldehyde",
+            "df": 1,
+            "ss": 22.562500000000142,
+            "fRatio": 0.8826405867970729,
+            "pValue": 0.39061263927064493
+          },
+          "B*D": {
+            "name": "Pressure*Stirring Rate",
+            "df": 1,
+            "ss": 0.562500000000199,
+            "fRatio": 0.02200488997555794,
+            "pValue": 0.8878709866309829
+          },
+          "C*D": {
+            "name": "Formaldehyde*Stirring Rate",
+            "df": 1,
+            "ss": 5.062500000000313,
+            "fRatio": 0.19804400977996364,
+            "pValue": 0.6749088951922546
+          }
+        },
+        "boxCox": {
+          "shift": 0.0,
+          "optimalLambda": -1.0,
+          "grid": [
+            {
+              "lambda": -2.0,
+              "logLikelihood": -14.842174851957852
+            },
+            {
+              "lambda": -1.9,
+              "logLikelihood": -14.70410475082401
+            },
+            {
+              "lambda": -1.8,
+              "logLikelihood": -14.582443234947906
+            },
+            {
+              "lambda": -1.7,
+              "logLikelihood": -14.476941292886515
+            },
+            {
+              "lambda": -1.6,
+              "logLikelihood": -14.387323095159731
+            },
+            {
+              "lambda": -1.5,
+              "logLikelihood": -14.313290629266875
+            },
+            {
+              "lambda": -1.4,
+              "logLikelihood": -14.254528333008723
+            },
+            {
+              "lambda": -1.3,
+              "logLikelihood": -14.210707627091825
+            },
+            {
+              "lambda": -1.2,
+              "logLikelihood": -14.18149125878696
+            },
+            {
+              "lambda": -1.1,
+              "logLikelihood": -14.166537382368302
+            },
+            {
+              "lambda": -1.0,
+              "logLikelihood": -14.165503316252627
+            },
+            {
+              "lambda": -0.9,
+              "logLikelihood": -14.178048931562046
+            },
+            {
+              "lambda": -0.8,
+              "logLikelihood": -14.203839641145862
+            },
+            {
+              "lambda": -0.7,
+              "logLikelihood": -14.242548971451116
+            },
+            {
+              "lambda": -0.6,
+              "logLikelihood": -14.29386071171568
+            },
+            {
+              "lambda": -0.5,
+              "logLikelihood": -14.35747064547909
+            },
+            {
+              "lambda": -0.4,
+              "logLikelihood": -14.433087878193033
+            },
+            {
+              "lambda": -0.3,
+              "logLikelihood": -14.52043578185905
+            },
+            {
+              "lambda": -0.2,
+              "logLikelihood": -14.619252583079147
+            },
+            {
+              "lambda": -0.1,
+              "logLikelihood": -14.729291624858634
+            },
+            {
+              "lambda": 0.0,
+              "logLikelihood": -14.850321335102846
+            },
+            {
+              "lambda": 0.1,
+              "logLikelihood": -14.982124936175195
+            },
+            {
+              "lambda": 0.2,
+              "logLikelihood": -15.124499930325802
+            },
+            {
+              "lambda": 0.3,
+              "logLikelihood": -15.27725739545155
+            },
+            {
+              "lambda": 0.4,
+              "logLikelihood": -15.440221124657976
+            },
+            {
+              "lambda": 0.5,
+              "logLikelihood": -15.613226641638542
+            },
+            {
+              "lambda": 0.6,
+              "logLikelihood": -15.796120122070526
+            },
+            {
+              "lambda": 0.7,
+              "logLikelihood": -15.988757249173934
+            },
+            {
+              "lambda": 0.8,
+              "logLikelihood": -16.191002029366423
+            },
+            {
+              "lambda": 0.9,
+              "logLikelihood": -16.40272559164445
+            },
+            {
+              "lambda": 1.0,
+              "logLikelihood": -16.62380499197872
+            },
+            {
+              "lambda": 1.1,
+              "logLikelihood": -16.854122041665903
+            },
+            {
+              "lambda": 1.2,
+              "logLikelihood": -17.09356217626001
+            },
+            {
+              "lambda": 1.3,
+              "logLikelihood": -17.342013379430128
+            },
+            {
+              "lambda": 1.4,
+              "logLikelihood": -17.599365173876674
+            },
+            {
+              "lambda": 1.5,
+              "logLikelihood": -17.865507689291128
+            },
+            {
+              "lambda": 1.6,
+              "logLikelihood": -18.140330815279608
+            },
+            {
+              "lambda": 1.7,
+              "logLikelihood": -18.42372344519332
+            },
+            {
+              "lambda": 1.8,
+              "logLikelihood": -18.715572814930823
+            },
+            {
+              "lambda": 1.9,
+              "logLikelihood": -19.015763939006327
+            },
+            {
+              "lambda": 2.0,
+              "logLikelihood": -19.324179144524493
+            }
+          ]
+        },
+        "lackOfFit": {
+          "ssPure": 0.0,
+          "dfPure": 0,
+          "ssLof": 127.8124999999998,
+          "dfLof": 5,
+          "fLof": null,
+          "pLof": null
+        }
+      },
+      {
+        "name": "Montgomery final model: A, C, D, AC, AD",
+        "responseId": "y",
+        "excludedTerms": [
+          "B",
+          "A*B",
+          "B*C",
+          "B*D",
+          "C*D"
+        ],
+        "n": 16,
+        "rank": 6,
+        "dfModel": 5,
+        "dfError": 10,
+        "aliasedColumns": [],
+        "sse": 195.125,
+        "sst": 5730.9375,
+        "rSquared": 0.9659523420033808,
+        "coefficients": {
+          "Intercept": {
+            "estimate": 70.06250000000003,
+            "stdError": 1.1043238881777393,
+            "tRatio": 63.443796471351504,
+            "pValue": 2.3028718499563745e-14
+          },
+          "Temperature": {
+            "estimate": 10.812499999999986,
+            "stdError": 1.1043238881777393,
+            "tRatio": 9.791058688263863,
+            "pValue": 1.9283194010110053e-06,
+            "vif": 1.0
+          },
+          "Formaldehyde": {
+            "estimate": 4.937499999999999,
+            "stdError": 1.1043238881777393,
+            "tRatio": 4.471061481923966,
+            "pValue": 0.0011954552672196225,
+            "vif": 1.0
+          },
+          "Stirring Rate": {
+            "estimate": 7.312499999999988,
+            "stdError": 1.1043238881777393,
+            "tRatio": 6.621698650444345,
+            "pValue": 5.915056426214142e-05,
+            "vif": 1.0
+          },
+          "Temperature*Formaldehyde": {
+            "estimate": -9.0625,
+            "stdError": 1.1043238881777393,
+            "tRatio": -8.206378669354116,
+            "pValue": 9.413924492782368e-06,
+            "vif": 1.0
+          },
+          "Temperature*Stirring Rate": {
+            "estimate": 8.312500000000004,
+            "stdError": 1.1043238881777393,
+            "tRatio": 7.527230089821365,
+            "pValue": 1.999367639483489e-05,
+            "vif": 1.0
+          }
+        },
+        "fitted": [
+          46.25000000000006,
+          69.37500000000003,
+          46.25000000000006,
+          69.37500000000003,
+          74.25000000000006,
+          61.12500000000003,
+          74.25000000000006,
+          61.12500000000003,
+          44.25000000000003,
+          100.625,
+          44.25000000000003,
+          100.625,
+          72.25000000000003,
+          92.375,
+          72.25000000000003,
+          92.375
+        ],
+        "leverage": [
+          0.375,
+          0.375,
+          0.375,
+          0.375,
+          0.375,
+          0.375,
+          0.375,
+          0.375,
+          0.375,
+          0.375,
+          0.375,
+          0.375,
+          0.375,
+          0.375,
+          0.375,
+          0.375
+        ],
+        "mse": 19.5125,
+        "rmse": 4.417295552710957,
+        "adjRSquared": 0.9489285130050712,
+        "fRatio": 56.741191543882124,
+        "modelPValue": 5.140494276443917e-07,
+        "studentizedResiduals": [
+          -0.3579427301652692,
+          0.4653255492148206,
+          0.5011198222313378,
+          -1.2527995555783933,
+          -1.7897136508262808,
+          -0.32214845714873575,
+          1.646536558760147,
+          1.1096224635122758,
+          -0.357942730165261,
+          -0.17897136508262645,
+          0.2147656380991436,
+          0.9664453714461828,
+          0.7874740063635483,
+          -1.8255079238427898,
+          -0.6442969142974634,
+          1.0380339174792335
+        ],
+        "cooksDistance": [
+          0.01281229980781667,
+          0.021652786675207446,
+          0.02511210762331676,
+          0.15695067264574197,
+          0.3203074951953934,
+          0.010377962844331082,
+          0.27110826393337073,
+          0.12312620115310517,
+          0.012812299807816086,
+          0.003203074951953876,
+          0.004612427930813232,
+          0.09340166559897503,
+          0.062011531069825765,
+          0.3332479180012813,
+          0.041511851377323286,
+          0.10775144138372841
+        ],
+        "adequatePrecision": 20.840803700151454,
+        "typeIII": {
+          "A": {
+            "name": "Temperature",
+            "df": 1,
+            "ss": 1870.5625,
+            "fRatio": 95.86483023702755,
+            "pValue": 1.928319401010982e-06
+          },
+          "C": {
+            "name": "Formaldehyde",
+            "df": 1,
+            "ss": 390.0625,
+            "fRatio": 19.99039077514414,
+            "pValue": 0.0011954552672196201
+          },
+          "D": {
+            "name": "Stirring Rate",
+            "df": 1,
+            "ss": 855.5625,
+            "fRatio": 43.84689301729661,
+            "pValue": 5.9150564262140553e-05
+          },
+          "A*C": {
+            "name": "Temperature*Formaldehyde",
+            "df": 1,
+            "ss": 1314.0625000000005,
+            "fRatio": 67.34465086483026,
+            "pValue": 9.413924492782366e-06
+          },
+          "A*D": {
+            "name": "Temperature*Stirring Rate",
+            "df": 1,
+            "ss": 1105.562500000001,
+            "fRatio": 56.65919282511216,
+            "pValue": 1.999367639483485e-05
+          }
+        },
+        "boxCox": {
+          "shift": 0.0,
+          "optimalLambda": -0.5,
+          "grid": [
+            {
+              "lambda": -2.0,
+              "logLikelihood": -20.024046727384242
+            },
+            {
+              "lambda": -1.9,
+              "logLikelihood": -19.73782074017016
+            },
+            {
+              "lambda": -1.8,
+              "logLikelihood": -19.470306328945625
+            },
+            {
+              "lambda": -1.7,
+              "logLikelihood": -19.221939268520803
+            },
+            {
+              "lambda": -1.6,
+              "logLikelihood": -18.993111383471692
+            },
+            {
+              "lambda": -1.5,
+              "logLikelihood": -18.784167071761864
+            },
+            {
+              "lambda": -1.4,
+              "logLikelihood": -18.59540039264841
+            },
+            {
+              "lambda": -1.3,
+              "logLikelihood": -18.427052785799876
+            },
+            {
+              "lambda": -1.2,
+              "logLikelihood": -18.279311469887578
+            },
+            {
+              "lambda": -1.1,
+              "logLikelihood": -18.15230854880637
+            },
+            {
+              "lambda": -1.0,
+              "logLikelihood": -18.04612083171579
+            },
+            {
+              "lambda": -0.9,
+              "logLikelihood": -17.960770351568613
+            },
+            {
+              "lambda": -0.8,
+              "logLikelihood": -17.89622554626282
+            },
+            {
+              "lambda": -0.7,
+              "logLikelihood": -17.8524030481887
+            },
+            {
+              "lambda": -0.6,
+              "logLikelihood": -17.829170012758425
+            },
+            {
+              "lambda": -0.5,
+              "logLikelihood": -17.82634690497038
+            },
+            {
+              "lambda": -0.4,
+              "logLikelihood": -17.84371065560961
+            },
+            {
+              "lambda": -0.3,
+              "logLikelihood": -17.88099809541162
+            },
+            {
+              "lambda": -0.2,
+              "logLikelihood": -17.937909576171897
+            },
+            {
+              "lambda": -0.1,
+              "logLikelihood": -18.014112691982014
+            },
+            {
+              "lambda": 0.0,
+              "logLikelihood": -18.109246020902436
+            },
+            {
+              "lambda": 0.1,
+              "logLikelihood": -18.222922816739583
+            },
+            {
+              "lambda": 0.2,
+              "logLikelihood": -18.354734591427555
+            },
+            {
+              "lambda": 0.3,
+              "logLikelihood": -18.504254540090773
+            },
+            {
+              "lambda": 0.4,
+              "logLikelihood": -18.671040772505155
+            },
+            {
+              "lambda": 0.5,
+              "logLikelihood": -18.854639325822507
+            },
+            {
+              "lambda": 0.6,
+              "logLikelihood": -19.054586943616414
+            },
+            {
+              "lambda": 0.7,
+              "logLikelihood": -19.27041361523617
+            },
+            {
+              "lambda": 0.8,
+              "logLikelihood": -19.501644876928655
+            },
+            {
+              "lambda": 0.9,
+              "logLikelihood": -19.7478038821301
+            },
+            {
+              "lambda": 1.0,
+              "logLikelihood": -20.00841325276652
+            },
+            {
+              "lambda": 1.1,
+              "logLikelihood": -20.282996726433126
+            },
+            {
+              "lambda": 1.2,
+              "logLikelihood": -20.571080616105192
+            },
+            {
+              "lambda": 1.3,
+              "logLikelihood": -20.872195099755114
+            },
+            {
+              "lambda": 1.4,
+              "logLikelihood": -21.185875357117435
+            },
+            {
+              "lambda": 1.5,
+              "logLikelihood": -21.5116625700605
+            },
+            {
+              "lambda": 1.6,
+              "logLikelihood": -21.849104801782403
+            },
+            {
+              "lambda": 1.7,
+              "logLikelihood": -22.197757768522276
+            },
+            {
+              "lambda": 1.8,
+              "logLikelihood": -22.557185515814375
+            },
+            {
+              "lambda": 1.9,
+              "logLikelihood": -22.926961009628208
+            },
+            {
+              "lambda": 2.0,
+              "logLikelihood": -23.306666651127795
+            }
+          ]
+        },
+        "lackOfFit": {
+          "ssPure": 179.5,
+          "dfPure": 8,
+          "ssLof": 15.625,
+          "dfLof": 2,
+          "fLof": 0.34818941504178275,
+          "pLof": 0.7161535471908382
+        }
+      }
+    ]
+  }
+}
