@@ -1,6 +1,6 @@
 # DOE-Magic — Roadmap and Backlog
 
-> Created: 2026-10-20. Status: in progress. P0.1 is done (2026-10-21), and so is the `.baseline-dist/` part of P3.10; no other item is started. This file is the issue registry and the prioritised backlog. Update it in every PR that closes or changes an item.
+> Created: 2026-10-20. Status: in progress. Done: P0.1 (PR #2, 2026-10-21), P2.1 step 1 (the test harness, PR #3, 2026-10-21) and the `.baseline-dist/` part of P3.10; no other item is started. This file is the issue registry and the prioritised backlog. Update it in every PR that closes or changes an item.
 > Related: [Status and handoff](../../task/DOE-Magic/status-and-handoff.md), [Goals](../../task/DOE-Magic/goals.md), [Design spec](design-spec.md), [Statistics engine](../../context/DOE-Magic/statistics-engine.md), [Design generation](../../context/DOE-Magic/design-generation.md), [MCP server](../../context/DOE-Magic/mcp-server.md), [Server and persistence](../../context/DOE-Magic/server-and-persistence.md), [Web UI](../../context/DOE-Magic/web-ui.md), [AI Studio origin](../../context/DOE-Magic/ai-studio-origin.md), [AGENTS.md](../../../AGENTS.md)
 
 ## How to use this backlog
@@ -30,7 +30,7 @@ The full change process is §9 of the [design spec](design-spec.md). The rules t
 3. **Contract first.** Statistical semantics, term IDs, the persisted format and MCP inputs and outputs change in the docs before the code, in the same PR (design spec §9.2).
 4. **One implementation per calculation, in `src/core`.** When a consolidation switches callers to the core function, delete the fork in that PR. See [forked logic drifts](../../memory/DOE-Magic/forked-logic-drifts.md).
 5. **Persisted format.** Before P2.16 (schema version) lands, only additive optional fields may be added to `src/core/types.ts`. Any change to an existing field waits for the migration pipeline.
-6. **Checks.** Run `npm run check`, `npm run build` and, once P2.1 exists, `npm test`. For server or MCP changes, also rerun the smoke check used for the restructuring PR: REST, MCP over HTTP including `run_analysis` on the demo project, stdio MCP, and dev-mode Vite.
+6. **Checks.** Run `npm run check`, `npm test` and `npm run build`. For server or MCP changes, also rerun the smoke check used for the restructuring PR: REST, MCP over HTTP including `run_analysis` on the demo project, stdio MCP, and dev-mode Vite.
 7. **AI Studio-sensitive changes** are flagged below. They touch `package.json` scripts, `server.ts` host or port, `index.html`, `metadata.json`, `.env.example`, `vite.config.ts` or the `dist/` layout. Check them in a fresh AI Studio import before merging, and re-import AI Studio from `main` after every merge, exporting every real project with Export JSON first (a new workspace starts with only the demo project). See [AI Studio sync overwrites the repo](../../memory/DOE-Magic/ai-studio-sync-overwrites-repo.md).
 8. **Dependencies.** While both lockfiles are tracked (decision 1), every dependency change updates `package-lock.json` and `bun.lock`; if bun is not available, the PR says that `bun.lock` was not updated (design spec §9.8). See [lockfile drift](../../memory/DOE-Magic/lockfile-drift.md).
 9. **No scratch scripts in the repo.** See [patch scripts in the repo root](../../memory/DOE-Magic/patch-scripts-in-repo-root.md).
@@ -43,8 +43,8 @@ PR 0 is the current branch `chore/project-structure-and-core-docs`. It removes t
 
 | # | PR | Item | Type | Why here |
 |---|---|---|---|---|
-| 1 | Test harness and reference datasets for `src/core/analysis` | P2.1 step 1 | tests and tooling | Every P0 statistics fix needs pinned reference values |
-| 2 | Demo buttons stop wiping all data | P0.1 | logic, S | **Done 2026-10-21.** One click destroyed every project. Needs no harness, so it can land before or alongside PR 1 |
+| 1 | Test harness and reference datasets for `src/core/analysis` | P2.1 step 1 | tests and tooling | **Done 2026-10-21 (PR #3).** Every P0 statistics fix needs pinned reference values |
+| 2 | Demo buttons stop wiping all data | P0.1 | logic, S | **Done 2026-10-21 (PR #2).** One click destroyed every project. Needs no harness, so it can land before or alongside PR 1 |
 | 3 | Confirm before replacing measured runs (UI and MCP) | P0.2 | logic, M | Same: silent loss of lab results |
 | 4 | CI: `npm ci`, `npm run check`, `npm test`, `npm run build` | P2.1 step 2 | tooling, S | Guards every later PR |
 | 5 | QR least-squares solver | P0.3 | logic, M | Standard errors, p-values, leverage and intervals depend on it. Needed by P0.9 and P2.6 |
@@ -187,6 +187,7 @@ Done in one PR, client and server together.
   - `:216-319`: the default model.
   - Consumers: `:586` (1-df Type III SS), `:909` (VIF), `:935-940` (SE, t, p), `:1012-1032` (leverage, studentized residuals, Cook's D), `:736` (CI and PI), `:1094` (Box-Cox).
 - **Measured:** PB12 with 6 factors and 3 centre points, default model (rank 12, error DF 3). The leverages sum to 11 and the maximum is 1.067. The SE of F0 is 0.092; the reduced model gives 0.151. The worst term's SE is understated by a factor of 2.45. A regular 2^(4−1) design with centre points was correct.
+- **Measured again with the test fixtures (2026-10-21):** on `tests/fixtures/pb12-6f-3cp.json` the engine reports SE 0 (so t 0 and p 1) for the main effect `Offset` and for `Temperature*Loading`, whose correct SEs are 0.379 and 0.408, and understates the SE of `Time` 2.83×. On the 6-factor DSD fixture the main effects are right, but `X2*X3` gets SE 0 and other 2FI SEs are off in both directions. `tests/core/analysis/rankDeficient.test.ts` pins this.
 - **Change:**
   - Replace `solveOLS` with a Householder QR on X itself, not on X'X.
   - Process columns in model order. A column is aliased when its remaining norm falls below a relative tolerance (define the tolerance in the statistics-engine doc). This keeps today's convention: the later term in model order is the one reported as aliased.
@@ -932,7 +933,7 @@ Each calculation should exist once, in `src/core`, with typed results. Several i
 
 | Item | Title | Covers | Phase | Type | Size | Status |
 |---|---|---|---|---|---|---|
-| P2.1 | Test harness, reference datasets and CI | BLD-4 | 1 | tooling | M | open |
+| P2.1 | Test harness, reference datasets and CI | BLD-4 | 1 | tooling | M | in progress (step 1 done in PR #3; step 2 open) |
 | P2.2 | One package manager, one lockfile, a declared Node version | BLD-7, SRV-6, BLD-13 | 3 (after decision 1) | tooling | S | open |
 | P2.3 | One design generator | DES-8, MCP-19, UI-15 | 2 | logic | L | open |
 | P2.4 | Design algorithm gaps | DES-9, DES-11, DES-12 | 2 | logic | M | open |
@@ -957,6 +958,13 @@ Each calculation should exist once, in `src/core`, with typed results. Several i
 ### P2.1 Test harness, reference datasets and CI
 
 - **Covers:** BLD-4 (Medium, C). Tooling. Step 1 M, step 2 S.
+- **Status (2026-10-21):** step 1 is done in PR #3. `npm test` runs vitest 4.1 on `tests/`: 118 passing tests, 38 expected failures (`it.fails`, named after STAT-1, STAT-2, STAT-3, STAT-4, STAT-5, STAT-21, MCP-1/UI-31, MCP-6, MCP-7, MCP-8 and MCP-9) and 2 `it.todo`. The case table (fixture, source, issue IDs, which backlog item flips each test) is in the [statistics engine doc](../../context/DOE-Magic/statistics-engine.md#reference-tests). Differences from the plan below:
+  - Reference values are published examples (Montgomery, *Design and Analysis of Experiments*, 8th ed., Examples 6.1, 6.2, 8.1 and 11.2; Lenth 1989) plus statsmodels 0.14.4 OLS via `tests/fixtures/compute_reference.py`, because R was not installed (decision 5 is still open). The Lenth worked example is Montgomery's application of Lenth's method to Example 6.2 (PSE 2.625, ME 6.75, SME 13.70), not the example in Lenth's paper, which was not at hand; it is an `it.todo` until P0.4 adds a core Lenth function.
+  - Added fixtures beyond the minimum set: an unreplicated 2^4 (Example 6.2, two models) and a real 6-factor DSD built from a conference matrix (rank-deficient, like PB12).
+  - The design helpers (run counts, level balance, max |r|, resolution, D-efficiency) are not in this step; P0.11 adds them before it changes the generators. Seeded random rank-deficient 3-level designs are left to P0.3.
+  - MCP tool tests cover `run_analysis` only (MCP-1, MCP-6 to MCP-9), through the SDK's `InMemoryTransport`.
+  - No lockfile was updated: commit cc41f15 on `main` (2026-10-21, just after PR #1 merged) deleted both `package-lock.json` and `bun.lock`, so this PR changes `package.json` only and `npm ci` cannot run until a lockfile is restored (see [Unregistered findings](#unregistered-findings-awaiting-ids)). Before that deletion, `npm install` added only vitest and its dependencies to `package-lock.json`, with Vite deduplicated at 6.4.3. bun is not installed here.
+  - The `dist/` output is byte-identical to a build of `main` with the same `node_modules` (also checked against PR #1's build while its lockfile still existed).
 - **Problem:** There are no automated tests and no CI. Every P0 statistics and design fix needs a pinned reference value, and today nothing catches a regression.
 - **Evidence:** `package.json:6-13` has no `test` script. There are no `*.test.*` or `*.spec.*` files and no `.github/` directory.
 - **Change, step 1 (the first PR after PR 0):**
@@ -1680,7 +1688,9 @@ These were found while writing the doc set and checked against the current code.
 
 Registered on 2026-10-20 with the docs commit: UI-31 (HTML report "Model p-value", including `optimalConditions.pModel`), STAT-27, DES-19, DES-20, DES-21, UI-32, UI-33, DATA-21, DATA-22, DATA-23 and SRV-13.
 
-None are open.
+Open:
+
+- **Both lockfiles deleted on `main`** (found 2026-10-21 while writing P2.1 step 1). Commit cc41f15 ("build: configure server port and HMR settings", M-Alekseychuk, 2026-10-21, 13 minutes after PR #1 merged) deletes `package-lock.json` and `bun.lock` and also `assets/.aistudio/.gitignore`, which matches the AI Studio whole-workspace push described in [AI Studio sync overwrites the repo](../../memory/DOE-Magic/ai-studio-sync-overwrites-repo.md); its message mentions none of the deletions. `npm ci` (process rule 8, design spec §9.8, P2.1 step 2) fails without a lockfile, and installs float within the `package.json` ranges. Belongs with BLD-7 in P2.2; restoring a lockfile is decision 1. The same commit makes the port configurable (`PORT`, `server.ts:8`) and adds a `DISABLE_HMR` switch to the inline HMR options, so the docs that say the port is hard-coded (design spec §7.2 and §7.4, SRV-8) are out of date. Confirmed by reading the commit.
 
 Resolved without an ID:
 

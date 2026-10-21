@@ -1,0 +1,560 @@
+{
+  "id": "half-fraction-2x4-1-3cp",
+  "title": "Regular 2^(4-1) resolution IV fraction (D = ABC) with 3 centre runs (11 runs, regular aliasing)",
+  "provenance": {
+    "data": "Design: the standard 2^(4-1) fraction with generator D = ABC (I = ABCD), as tabulated in Montgomery (2013) Section 8.2, plus 3 centre runs. Response: synthetic, y = 60 + 6 x1 + 1 x2 + 4 x3 + 3 x4 - 2.5 x1x3 + e in coded units, e ~ N(0, 0.8^2) from numpy default_rng(20261023), rounded to 0.01.",
+    "published": "None; the response is synthetic.",
+    "derived": "The default model has 3 aliased 2FI columns (BC = AD, BD = AC, CD = AB; the later term is aliased), rank 8 on 11 runs, error DF 3 (2 pure error, 1 lack of fit: curvature). The aliasing is exact and orthogonal, so the engine is already right here; P0.3 must leave these outputs unchanged.",
+    "recorded": "2026-10-21"
+  },
+  "factors": [
+    {
+      "id": "A",
+      "name": "Temperature",
+      "type": "numeric",
+      "min": 60,
+      "max": 80,
+      "unit": "°C"
+    },
+    {
+      "id": "B",
+      "name": "Pressure",
+      "type": "numeric",
+      "min": 1,
+      "max": 3,
+      "unit": "bar"
+    },
+    {
+      "id": "C",
+      "name": "Concentration",
+      "type": "numeric",
+      "min": 10,
+      "max": 20,
+      "unit": "%"
+    },
+    {
+      "id": "D",
+      "name": "Stirring Rate",
+      "type": "numeric",
+      "min": 100,
+      "max": 300,
+      "unit": "rpm"
+    }
+  ],
+  "responses": [
+    {
+      "id": "y",
+      "name": "Response",
+      "unit": "",
+      "goal": "maximize"
+    }
+  ],
+  "runs": [
+    {
+      "label": "run 1",
+      "factors": {
+        "A": 60.0,
+        "B": 1.0,
+        "C": 10.0,
+        "D": 100.0
+      },
+      "responses": {
+        "y": 44.85
+      }
+    },
+    {
+      "label": "run 2",
+      "factors": {
+        "A": 80.0,
+        "B": 1.0,
+        "C": 10.0,
+        "D": 300.0
+      },
+      "responses": {
+        "y": 68.06
+      }
+    },
+    {
+      "label": "run 3",
+      "factors": {
+        "A": 60.0,
+        "B": 3.0,
+        "C": 10.0,
+        "D": 300.0
+      },
+      "responses": {
+        "y": 52.44
+      }
+    },
+    {
+      "label": "run 4",
+      "factors": {
+        "A": 80.0,
+        "B": 3.0,
+        "C": 10.0,
+        "D": 100.0
+      },
+      "responses": {
+        "y": 61.19
+      }
+    },
+    {
+      "label": "run 5",
+      "factors": {
+        "A": 60.0,
+        "B": 1.0,
+        "C": 20.0,
+        "D": 300.0
+      },
+      "responses": {
+        "y": 62.76
+      }
+    },
+    {
+      "label": "run 6",
+      "factors": {
+        "A": 80.0,
+        "B": 1.0,
+        "C": 20.0,
+        "D": 100.0
+      },
+      "responses": {
+        "y": 63.43
+      }
+    },
+    {
+      "label": "run 7",
+      "factors": {
+        "A": 60.0,
+        "B": 3.0,
+        "C": 20.0,
+        "D": 100.0
+      },
+      "responses": {
+        "y": 59.09
+      }
+    },
+    {
+      "label": "run 8",
+      "factors": {
+        "A": 80.0,
+        "B": 3.0,
+        "C": 20.0,
+        "D": 300.0
+      },
+      "responses": {
+        "y": 71.81
+      }
+    },
+    {
+      "label": "centre",
+      "factors": {
+        "A": 70.0,
+        "B": 2.0,
+        "C": 15.0,
+        "D": 200.0
+      },
+      "responses": {
+        "y": 59.13
+      }
+    },
+    {
+      "label": "centre",
+      "factors": {
+        "A": 70.0,
+        "B": 2.0,
+        "C": 15.0,
+        "D": 200.0
+      },
+      "responses": {
+        "y": 60.32
+      }
+    },
+    {
+      "label": "centre",
+      "factors": {
+        "A": 70.0,
+        "B": 2.0,
+        "C": 15.0,
+        "D": 200.0
+      },
+      "responses": {
+        "y": 60.01
+      }
+    }
+  ],
+  "models": [
+    {
+      "name": "main effects + 2FI (engine default)",
+      "responseId": "y",
+      "excludedTerms": []
+    }
+  ],
+  "reference": {
+    "tool": "statsmodels 0.14.4 OLS (numpy 2.1.3, scipy 1.15.3, Python 3.13.5) via tests/fixtures/compute_reference.py",
+    "computed": "2026-10-21",
+    "models": [
+      {
+        "name": "main effects + 2FI (engine default)",
+        "responseId": "y",
+        "excludedTerms": [],
+        "n": 11,
+        "rank": 8,
+        "dfModel": 7,
+        "dfError": 3,
+        "aliasedColumns": [
+          "Pressure*Concentration",
+          "Pressure*Stirring Rate",
+          "Concentration*Stirring Rate"
+        ],
+        "sse": 1.63850340909092,
+        "sst": 512.733890909091,
+        "rSquared": 0.9968043785711418,
+        "coefficients": {
+          "Intercept": {
+            "estimate": 60.280909090909084,
+            "stdError": 0.22282643123584017,
+            "tRatio": 270.5285398890026,
+            "pValue": 1.1138074485744543e-07
+          },
+          "Temperature": {
+            "estimate": 5.668750000000003,
+            "stdError": 0.2612871511934491,
+            "tRatio": 21.695479376263062,
+            "pValue": 0.00021431438685375417,
+            "vif": 1.0
+          },
+          "Pressure": {
+            "estimate": 0.6787500000000053,
+            "stdError": 0.2612871511934491,
+            "tRatio": 2.5977167147322886,
+            "pValue": 0.08053459753250154,
+            "vif": 1.0
+          },
+          "Concentration": {
+            "estimate": 3.818750000000011,
+            "stdError": 0.2612871511934491,
+            "tRatio": 14.615146525795769,
+            "pValue": 0.0006946879526391535,
+            "vif": 1.0
+          },
+          "Stirring Rate": {
+            "estimate": 3.313750000000002,
+            "stdError": 0.2612871511934491,
+            "tRatio": 12.682407017965463,
+            "pValue": 0.0010573767403426815,
+            "vif": 1.0
+          },
+          "Temperature*Pressure": {
+            "estimate": -0.3012499999999969,
+            "stdError": 0.2612871511934491,
+            "tRatio": -1.1529460925423025,
+            "pValue": 0.33246012558541055,
+            "vif": 1.0
+          },
+          "Temperature*Concentration": {
+            "estimate": -2.3212500000000045,
+            "stdError": 0.2612871511934491,
+            "tRatio": -8.88390412386341,
+            "pValue": 0.003007432463412968,
+            "vif": 1.0
+          },
+          "Temperature*Stirring Rate": {
+            "estimate": 0.49874999999999226,
+            "stdError": 0.2612871511934491,
+            "tRatio": 1.9088194644164989,
+            "pValue": 0.15230282929123645,
+            "vif": 1.0
+          }
+        },
+        "fitted": [
+          44.67715909090906,
+          67.88715909090905,
+          52.267159090909075,
+          61.0171590909091,
+          62.5871590909091,
+          63.25715909090908,
+          58.917159090909095,
+          71.63715909090908,
+          60.280909090909084,
+          60.280909090909084,
+          60.280909090909084
+        ],
+        "leverage": [
+          0.9659090909090909,
+          0.9659090909090909,
+          0.9659090909090909,
+          0.9659090909090909,
+          0.9659090909090909,
+          0.9659090909090909,
+          0.9659090909090909,
+          0.9659090909090909,
+          0.09090909090909091,
+          0.09090909090909091,
+          0.09090909090909091
+        ],
+        "mse": 0.5461678030303067,
+        "rmse": 0.7390316657832103,
+        "adjRSquared": 0.9893479285704727,
+        "fRatio": 133.68350602253057,
+        "modelPValue": 0.0009766717671718438,
+        "studentizedResiduals": [
+          1.2666720957158755,
+          1.2666720957159276,
+          1.2666720957157194,
+          1.266672095715563,
+          1.266672095715563,
+          1.2666720957157194,
+          1.2666720957156152,
+          1.2666720957157194,
+          -1.6333314171398434,
+          0.055476501530036776,
+          -0.3844650571150621
+        ],
+        "cooksDistance": [
+          5.682456118147758,
+          5.682456118148227,
+          5.682456118146358,
+          5.682456118144955,
+          5.682456118144955,
+          5.682456118146358,
+          5.682456118145423,
+          5.682456118146358,
+          0.03334714397770062,
+          3.847052777515216e-05,
+          0.0018476672517811
+        ],
+        "adequatePrecision": 42.77678979791308,
+        "typeIII": {
+          "A": {
+            "name": "Temperature",
+            "df": 1,
+            "ss": 257.07781249999994,
+            "fRatio": 470.69382536585516,
+            "pValue": 0.00021431438685375452
+          },
+          "B": {
+            "name": "Pressure",
+            "df": 1,
+            "ss": 3.685612500000026,
+            "fRatio": 6.748132129999456,
+            "pValue": 0.08053459753250237
+          },
+          "C": {
+            "name": "Concentration",
+            "df": 1,
+            "ss": 116.66281250000009,
+            "fRatio": 213.602507970479,
+            "pValue": 0.0006946879526391587
+          },
+          "D": {
+            "name": "Stirring Rate",
+            "df": 1,
+            "ss": 87.84751249999971,
+            "fRatio": 160.84344776933892,
+            "pValue": 0.0010573767403426896
+          },
+          "A*B": {
+            "name": "Temperature*Pressure",
+            "df": 1,
+            "ss": 0.7260125000000006,
+            "fRatio": 1.3292846923085915,
+            "pValue": 0.33246012558540683
+          },
+          "A*C": {
+            "name": "Temperature*Concentration",
+            "df": 1,
+            "ss": 43.10561249999986,
+            "fRatio": 78.92375248199671,
+            "pValue": 0.0030074324634130007
+          },
+          "A*D": {
+            "name": "Temperature*Stirring Rate",
+            "df": 1,
+            "ss": 1.990012499999992,
+            "fRatio": 3.6435917477353876,
+            "pValue": 0.15230282929123276
+          }
+        },
+        "boxCox": {
+          "shift": 0.0,
+          "optimalLambda": -0.1,
+          "grid": [
+            {
+              "lambda": -2.0,
+              "logLikelihood": 5.587141364069832
+            },
+            {
+              "lambda": -1.9,
+              "logLikelihood": 6.113115341791012
+            },
+            {
+              "lambda": -1.8,
+              "logLikelihood": 6.651723355334529
+            },
+            {
+              "lambda": -1.7,
+              "logLikelihood": 7.202845723841754
+            },
+            {
+              "lambda": -1.6,
+              "logLikelihood": 7.76607805654276
+            },
+            {
+              "lambda": -1.5,
+              "logLikelihood": 8.340625020308709
+            },
+            {
+              "lambda": -1.4,
+              "logLikelihood": 8.925162242328781
+            },
+            {
+              "lambda": -1.3,
+              "logLikelihood": 9.517659947120343
+            },
+            {
+              "lambda": -1.2,
+              "logLikelihood": 10.115163355305608
+            },
+            {
+              "lambda": -1.1,
+              "logLikelihood": 10.71352927951097
+            },
+            {
+              "lambda": -1.0,
+              "logLikelihood": 11.307127953798538
+            },
+            {
+              "lambda": -0.9,
+              "logLikelihood": 11.888536771232392
+            },
+            {
+              "lambda": -0.8,
+              "logLikelihood": 12.448280812982464
+            },
+            {
+              "lambda": -0.7,
+              "logLikelihood": 12.974713456080089
+            },
+            {
+              "lambda": -0.6,
+              "logLikelihood": 13.454170721194467
+            },
+            {
+              "lambda": -0.5,
+              "logLikelihood": 13.871553203357182
+            },
+            {
+              "lambda": -0.4,
+              "logLikelihood": 14.211452072240785
+            },
+            {
+              "lambda": -0.3,
+              "logLikelihood": 14.45980359301252
+            },
+            {
+              "lambda": -0.2,
+              "logLikelihood": 14.60583263971197
+            },
+            {
+              "lambda": -0.1,
+              "logLikelihood": 14.643815505433885
+            },
+            {
+              "lambda": 0.0,
+              "logLikelihood": 14.574111551036202
+            },
+            {
+              "lambda": 0.1,
+              "logLikelihood": 14.4030969433894
+            },
+            {
+              "lambda": 0.2,
+              "logLikelihood": 14.142024937528609
+            },
+            {
+              "lambda": 0.3,
+              "logLikelihood": 13.805213905234405
+            },
+            {
+              "lambda": 0.4,
+              "logLikelihood": 13.4081167201895
+            },
+            {
+              "lambda": 0.5,
+              "logLikelihood": 12.965719302847981
+            },
+            {
+              "lambda": 0.6,
+              "logLikelihood": 12.491479474595037
+            },
+            {
+              "lambda": 0.7,
+              "logLikelihood": 11.996801248938738
+            },
+            {
+              "lambda": 0.8,
+              "logLikelihood": 11.490919541521109
+            },
+            {
+              "lambda": 0.9,
+              "logLikelihood": 10.981041652074522
+            },
+            {
+              "lambda": 1.0,
+              "logLikelihood": 10.472616016647589
+            },
+            {
+              "lambda": 1.1,
+              "logLikelihood": 9.96963969088963
+            },
+            {
+              "lambda": 1.2,
+              "logLikelihood": 9.474953476350365
+            },
+            {
+              "lambda": 1.3,
+              "logLikelihood": 8.99050053174559
+            },
+            {
+              "lambda": 1.4,
+              "logLikelihood": 8.517540881088381
+            },
+            {
+              "lambda": 1.5,
+              "logLikelihood": 8.056823101666268
+            },
+            {
+              "lambda": 1.6,
+              "logLikelihood": 7.608718444805226
+            },
+            {
+              "lambda": 1.7,
+              "logLikelihood": 7.173323836078685
+            },
+            {
+              "lambda": 1.8,
+              "logLikelihood": 6.750539998323166
+            },
+            {
+              "lambda": 1.9,
+              "logLikelihood": 6.340130145875836
+            },
+            {
+              "lambda": 2.0,
+              "logLikelihood": 5.941763740651731
+            }
+          ]
+        },
+        "lackOfFit": {
+          "ssPure": 0.762199999999996,
+          "dfPure": 2,
+          "ssLof": 0.8763034090909241,
+          "dfLof": 1,
+          "fLof": 2.2994054292598496,
+          "pLof": 0.2686865245635926
+        }
+      }
+    ]
+  }
+}

@@ -15,7 +15,8 @@ const CORE_PACKAGES = new Set(['jstat', 'uuid']);
 const SRC_TOP_LEVEL = new Set(['main.tsx', 'vite-env.d.ts', 'core', 'server', 'web']);
 const REPO_TOP_LEVEL = new Set([
   '.env.example', '.github', '.gitignore', 'AGENTS.md', 'CLAUDE.md', 'LICENSE', 'README.md', 'assets', 'bun.lock', 'docs',
-  'index.html', 'metadata.json', 'package-lock.json', 'package.json', 'public', 'scripts', 'server.ts', 'src', 'tsconfig.json', 'vite.config.ts',
+  'index.html', 'metadata.json', 'package-lock.json', 'package.json', 'public', 'scripts', 'server.ts', 'src', 'tests', 'tsconfig.json', 'vite.config.ts',
+  'vitest.config.ts',
 ]);
 const AI_STUDIO_LEFTOVERS = new Set(['.aistudio', 'data.json']);
 const DOM_GLOBALS = new Set(['window', 'document', 'localStorage', 'sessionStorage', 'navigator']);
@@ -80,7 +81,7 @@ try {
 }
 for (const entry of new Set((tracked ?? []).map((f) => f.split('/')[0]))) {
   if (AI_STUDIO_LEFTOVERS.has(entry)) fail('R9', entry, 're-added by an AI Studio sync; remove it from git with `git rm -r --cached` (it is in .gitignore)');
-  else if (!REPO_TOP_LEVEL.has(entry)) fail('R9', entry, 'not an agreed repo-root entry; put code in src/, tools in scripts/, docs in docs/ (or update the list in this script and AGENTS.md)');
+  else if (!REPO_TOP_LEVEL.has(entry)) fail('R9', entry, 'not an agreed repo-root entry; put code in src/, tests in tests/, tools in scripts/, docs in docs/ (or update the list in this script and AGENTS.md)');
 }
 
 const files = [...walk('src').filter(isCode), 'server.ts'];

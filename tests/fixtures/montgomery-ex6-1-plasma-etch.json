@@ -1,0 +1,623 @@
+{
+  "id": "montgomery-ex6-1-plasma-etch",
+  "title": "Plasma etch rate, replicated 2^3 full factorial (16 runs)",
+  "provenance": {
+    "data": "Montgomery, D. C. (2013). Design and Analysis of Experiments, 8th ed. Wiley. Example 6.1: etch rate (Å/min) of silicon nitride; A = anode-cathode gap 0.80/1.20 cm, B = C2F6 flow 125/200 SCCM, C = RF power 275/325 W; n = 2 replicates.",
+    "published": "Example 6.1: effect estimates, sums of squares of the full 2^3 model (error 18,020.50 on 8 df, total 531,420.9375 on 15 df) and the fitted model ŷ = 776.0625 − 50.8125 x1 + 153.0625 x3 − 76.8125 x1x3.",
+    "derived": "The engine fits main effects + 2FIs, so its residual is the published Error plus the ABC sum of squares; pure error is the published Error (8 df) and lack of fit is ABC (1 df).",
+    "recorded": "2026-10-21"
+  },
+  "factors": [
+    {
+      "id": "A",
+      "name": "Gap",
+      "type": "numeric",
+      "min": 0.8,
+      "max": 1.2,
+      "unit": "cm"
+    },
+    {
+      "id": "B",
+      "name": "C2F6 Flow",
+      "type": "numeric",
+      "min": 125,
+      "max": 200,
+      "unit": "SCCM"
+    },
+    {
+      "id": "C",
+      "name": "Power",
+      "type": "numeric",
+      "min": 275,
+      "max": 325,
+      "unit": "W"
+    }
+  ],
+  "responses": [
+    {
+      "id": "y",
+      "name": "Etch Rate",
+      "unit": "Å/min",
+      "goal": "maximize"
+    }
+  ],
+  "runs": [
+    {
+      "label": "(1) rep 1",
+      "factors": {
+        "A": 0.8,
+        "B": 125,
+        "C": 275
+      },
+      "responses": {
+        "y": 550
+      }
+    },
+    {
+      "label": "(1) rep 2",
+      "factors": {
+        "A": 0.8,
+        "B": 125,
+        "C": 275
+      },
+      "responses": {
+        "y": 604
+      }
+    },
+    {
+      "label": "a rep 1",
+      "factors": {
+        "A": 1.2,
+        "B": 125,
+        "C": 275
+      },
+      "responses": {
+        "y": 669
+      }
+    },
+    {
+      "label": "a rep 2",
+      "factors": {
+        "A": 1.2,
+        "B": 125,
+        "C": 275
+      },
+      "responses": {
+        "y": 650
+      }
+    },
+    {
+      "label": "b rep 1",
+      "factors": {
+        "A": 0.8,
+        "B": 200,
+        "C": 275
+      },
+      "responses": {
+        "y": 633
+      }
+    },
+    {
+      "label": "b rep 2",
+      "factors": {
+        "A": 0.8,
+        "B": 200,
+        "C": 275
+      },
+      "responses": {
+        "y": 601
+      }
+    },
+    {
+      "label": "ab rep 1",
+      "factors": {
+        "A": 1.2,
+        "B": 200,
+        "C": 275
+      },
+      "responses": {
+        "y": 642
+      }
+    },
+    {
+      "label": "ab rep 2",
+      "factors": {
+        "A": 1.2,
+        "B": 200,
+        "C": 275
+      },
+      "responses": {
+        "y": 635
+      }
+    },
+    {
+      "label": "c rep 1",
+      "factors": {
+        "A": 0.8,
+        "B": 125,
+        "C": 325
+      },
+      "responses": {
+        "y": 1037
+      }
+    },
+    {
+      "label": "c rep 2",
+      "factors": {
+        "A": 0.8,
+        "B": 125,
+        "C": 325
+      },
+      "responses": {
+        "y": 1052
+      }
+    },
+    {
+      "label": "ac rep 1",
+      "factors": {
+        "A": 1.2,
+        "B": 125,
+        "C": 325
+      },
+      "responses": {
+        "y": 749
+      }
+    },
+    {
+      "label": "ac rep 2",
+      "factors": {
+        "A": 1.2,
+        "B": 125,
+        "C": 325
+      },
+      "responses": {
+        "y": 868
+      }
+    },
+    {
+      "label": "bc rep 1",
+      "factors": {
+        "A": 0.8,
+        "B": 200,
+        "C": 325
+      },
+      "responses": {
+        "y": 1075
+      }
+    },
+    {
+      "label": "bc rep 2",
+      "factors": {
+        "A": 0.8,
+        "B": 200,
+        "C": 325
+      },
+      "responses": {
+        "y": 1063
+      }
+    },
+    {
+      "label": "abc rep 1",
+      "factors": {
+        "A": 1.2,
+        "B": 200,
+        "C": 325
+      },
+      "responses": {
+        "y": 729
+      }
+    },
+    {
+      "label": "abc rep 2",
+      "factors": {
+        "A": 1.2,
+        "B": 200,
+        "C": 325
+      },
+      "responses": {
+        "y": 860
+      }
+    }
+  ],
+  "models": [
+    {
+      "name": "main effects + 2FI (engine default)",
+      "responseId": "y",
+      "excludedTerms": []
+    }
+  ],
+  "published": {
+    "effects": {
+      "A": -101.625,
+      "B": 7.375,
+      "C": 306.125,
+      "A*B": -24.875,
+      "A*C": -153.625,
+      "B*C": -2.125,
+      "A*B*C": 5.625
+    },
+    "sumOfSquares": {
+      "A": 41310.5625,
+      "B": 217.5625,
+      "C": 374850.0625,
+      "A*B": 2475.0625,
+      "A*C": 94402.5625,
+      "B*C": 18.0625,
+      "A*B*C": 126.5625,
+      "error": 18020.5,
+      "total": 531420.9375
+    },
+    "errorDf": 8,
+    "totalDf": 15,
+    "intercept": 776.0625
+  },
+  "reference": {
+    "tool": "statsmodels 0.14.4 OLS (numpy 2.1.3, scipy 1.15.3, Python 3.13.5) via tests/fixtures/compute_reference.py",
+    "computed": "2026-10-21",
+    "models": [
+      {
+        "name": "main effects + 2FI (engine default)",
+        "responseId": "y",
+        "excludedTerms": [],
+        "n": 16,
+        "rank": 7,
+        "dfModel": 6,
+        "dfError": 9,
+        "aliasedColumns": [],
+        "sse": 18147.0625,
+        "sst": 531420.9375,
+        "rSquared": 0.9658518112113338,
+        "coefficients": {
+          "Intercept": {
+            "estimate": 776.0625000000003,
+            "stdError": 11.225919443907975,
+            "tRatio": 69.13130847568571,
+            "pValue": 1.4010549302088587e-13
+          },
+          "Gap": {
+            "estimate": -50.81250000000003,
+            "stdError": 11.225919443907975,
+            "tRatio": -4.52635530246698,
+            "pValue": 0.001433667420298034,
+            "vif": 1.0
+          },
+          "C2F6 Flow": {
+            "estimate": 3.6874999999998863,
+            "stdError": 11.225919443907975,
+            "tRatio": 0.3284808891089095,
+            "pValue": 0.7500618765107079,
+            "vif": 1.0
+          },
+          "Power": {
+            "estimate": 153.06249999999991,
+            "stdError": 11.225919443907975,
+            "tRatio": 13.634740634368537,
+            "pValue": 2.57648310057472e-07,
+            "vif": 1.0
+          },
+          "Gap*C2F6 Flow": {
+            "estimate": -12.437499999999922,
+            "stdError": 11.225919443907975,
+            "tRatio": -1.1079270666555017,
+            "pValue": 0.2966225896274301,
+            "vif": 1.0
+          },
+          "Gap*Power": {
+            "estimate": -76.8125,
+            "stdError": 11.225919443907975,
+            "tRatio": -6.842423944319698,
+            "pValue": 7.537121447301439e-05,
+            "vif": 1.0
+          },
+          "C2F6 Flow*Power": {
+            "estimate": -1.0624999999999787,
+            "stdError": 11.225919443907975,
+            "tRatio": -0.09464703584494104,
+            "pValue": 0.9266689249102545,
+            "vif": 1.0
+          }
+        },
+        "fitted": [
+          579.8125000000007,
+          579.8125000000007,
+          656.6875000000005,
+          656.6875000000005,
+          614.1875000000002,
+          614.1875000000002,
+          641.3125000000005,
+          641.3125000000005,
+          1041.6875000000005,
+          1041.6875000000005,
+          811.3125000000002,
+          811.3125000000002,
+          1071.8125,
+          1071.8125,
+          791.6875000000002,
+          791.6875000000002
+        ],
+        "leverage": [
+          0.4375,
+          0.4375,
+          0.4375,
+          0.4375,
+          0.4375,
+          0.4375,
+          0.4375,
+          0.4375,
+          0.4375,
+          0.4375,
+          0.4375,
+          0.4375,
+          0.4375,
+          0.4375,
+          0.4375,
+          0.4375
+        ],
+        "mse": 2016.3402777777778,
+        "rmse": 44.9036777756319,
+        "adjRSquared": 0.9430863520188896,
+        "fRatio": 42.42619501090052,
+        "modelPValue": 4.2442358063863085e-06,
+        "studentizedResiduals": [
+          -0.8852281587850749,
+          0.7182039778821939,
+          0.3655973737539818,
+          -0.1985731928511683,
+          0.558603093908382,
+          -0.39157891300555503,
+          0.020414066554778114,
+          -0.18743824745764562,
+          -0.13918681741904726,
+          0.3062109983218607,
+          -1.8502567595570287,
+          1.6832325786541746,
+          0.09464703584494294,
+          -0.26167121674778343,
+          -1.8613917049505513,
+          2.0284158858533785
+        ],
+        "cooksDistance": [
+          0.08706987701177932,
+          0.057312994871756326,
+          0.014851271077312076,
+          0.00438125699101192,
+          0.034670824058224074,
+          0.017037116123401336,
+          4.630379036699004e-05,
+          0.003903677401110399,
+          0.002152552238138133,
+          0.01041835283258562,
+          0.38038334180960853,
+          0.3148079904269758,
+          0.0009953401549148795,
+          0.007607980630473939,
+          0.3849754532509689,
+          0.4571634451091496
+        ],
+        "adequatePrecision": 16.565103789467738,
+        "typeIII": {
+          "A": {
+            "name": "Gap",
+            "df": 1,
+            "ss": 41310.5625,
+            "fRatio": 20.48789232417092,
+            "pValue": 0.0014336674202980392
+          },
+          "B": {
+            "name": "C2F6 Flow",
+            "df": 1,
+            "ss": 217.5625,
+            "fRatio": 0.10789969450978636,
+            "pValue": 0.7500618765107006
+          },
+          "C": {
+            "name": "Power",
+            "df": 1,
+            "ss": 374850.0625,
+            "fRatio": 185.90615216650076,
+            "pValue": 2.5764831005747054e-07
+          },
+          "A*B": {
+            "name": "Gap*C2F6 Flow",
+            "df": 1,
+            "ss": 2475.0625,
+            "fRatio": 1.22750238502788,
+            "pValue": 0.2966225896274272
+          },
+          "A*C": {
+            "name": "Gap*Power",
+            "df": 1,
+            "ss": 94402.5625,
+            "fRatio": 46.81876543379955,
+            "pValue": 7.537121447301431e-05
+          },
+          "B*C": {
+            "name": "C2F6 Flow*Power",
+            "df": 1,
+            "ss": 18.0625,
+            "fRatio": 0.008958061394233914,
+            "pValue": 0.9266689249102568
+          }
+        },
+        "boxCox": {
+          "shift": 0.0,
+          "optimalLambda": 0.5,
+          "grid": [
+            {
+              "lambda": -2.0,
+              "logLikelihood": -58.27703521819034
+            },
+            {
+              "lambda": -1.9,
+              "logLikelihood": -58.10435145082863
+            },
+            {
+              "lambda": -1.8,
+              "logLikelihood": -57.93948829352701
+            },
+            {
+              "lambda": -1.7,
+              "logLikelihood": -57.782464887365066
+            },
+            {
+              "lambda": -1.6,
+              "logLikelihood": -57.63328725937847
+            },
+            {
+              "lambda": -1.5,
+              "logLikelihood": -57.49194834662944
+            },
+            {
+              "lambda": -1.4,
+              "logLikelihood": -57.358428125395896
+            },
+            {
+              "lambda": -1.3,
+              "logLikelihood": -57.232693832622545
+            },
+            {
+              "lambda": -1.2,
+              "logLikelihood": -57.114700285154186
+            },
+            {
+              "lambda": -1.1,
+              "logLikelihood": -57.00439028627617
+            },
+            {
+              "lambda": -1.0,
+              "logLikelihood": -56.901695117439004
+            },
+            {
+              "lambda": -0.9,
+              "logLikelihood": -56.80653510701307
+            },
+            {
+              "lambda": -0.8,
+              "logLikelihood": -56.71882026811088
+            },
+            {
+              "lambda": -0.7,
+              "logLikelihood": -56.638450997160824
+            },
+            {
+              "lambda": -0.6,
+              "logLikelihood": -56.56531882386536
+            },
+            {
+              "lambda": -0.5,
+              "logLikelihood": -56.499307203134634
+            },
+            {
+              "lambda": -0.4,
+              "logLikelihood": -56.44029233920702
+            },
+            {
+              "lambda": -0.3,
+              "logLikelihood": -56.38814403238301
+            },
+            {
+              "lambda": -0.2,
+              "logLikelihood": -56.3427265389331
+            },
+            {
+              "lambda": -0.1,
+              "logLikelihood": -56.30389943517554
+            },
+            {
+              "lambda": 0.0,
+              "logLikelihood": -56.271518477241464
+            },
+            {
+              "lambda": 0.1,
+              "logLikelihood": -56.24543644869743
+            },
+            {
+              "lambda": 0.2,
+              "logLikelihood": -56.225503988942386
+            },
+            {
+              "lambda": 0.3,
+              "logLikelihood": -56.2115703961026
+            },
+            {
+              "lambda": 0.4,
+              "logLikelihood": -56.203484399001056
+            },
+            {
+              "lambda": 0.5,
+              "logLikelihood": -56.20109489364228
+            },
+            {
+              "lambda": 0.6,
+              "logLikelihood": -56.20425164052106
+            },
+            {
+              "lambda": 0.7,
+              "logLikelihood": -56.21280591989998
+            },
+            {
+              "lambda": 0.8,
+              "logLikelihood": -56.22661114300564
+            },
+            {
+              "lambda": 0.9,
+              "logLikelihood": -56.24552341784058
+            },
+            {
+              "lambda": 1.0,
+              "logLikelihood": -56.26940206899803
+            },
+            {
+              "lambda": 1.1,
+              "logLikelihood": -56.29811011148399
+            },
+            {
+              "lambda": 1.2,
+              "logLikelihood": -56.331514679097694
+            },
+            {
+              "lambda": 1.3,
+              "logLikelihood": -56.36948740839204
+            },
+            {
+              "lambda": 1.4,
+              "logLikelihood": -56.41190477963037
+            },
+            {
+              "lambda": 1.5,
+              "logLikelihood": -56.45864841647839
+            },
+            {
+              "lambda": 1.6,
+              "logLikelihood": -56.50960534642227
+            },
+            {
+              "lambda": 1.7,
+              "logLikelihood": -56.56466822408957
+            },
+            {
+              "lambda": 1.8,
+              "logLikelihood": -56.6237355197766
+            },
+            {
+              "lambda": 1.9,
+              "logLikelihood": -56.686711675556204
+            },
+            {
+              "lambda": 2.0,
+              "logLikelihood": -56.75350723136357
+            }
+          ]
+        },
+        "lackOfFit": {
+          "ssPure": 18020.5,
+          "dfPure": 8,
+          "ssLof": 126.5625,
+          "dfLof": 1,
+          "fLof": 0.05618601037707056,
+          "pLof": 0.8185860578539553
+        }
+      }
+    ]
+  }
+}

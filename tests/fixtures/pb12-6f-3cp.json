@@ -1,0 +1,733 @@
+{
+  "id": "pb12-6f-3cp",
+  "title": "Plackett-Burman 12-run design, 6 numeric factors, 3 centre points (15 runs, rank-deficient default model)",
+  "provenance": {
+    "data": "Design: Plackett, R. L. & Burman, J. P. (1946), Biometrika 33:305–325, N = 12 generator row (+ + − + + + − − − + −), cyclic shifts plus a row of minuses, first 6 columns; the same construction as generateDesign(..., \"plackett_burman\") in src/core/design/doeGenerator.ts:298-345. Response: synthetic, y = 50 + 4 x1 − 3 x2 + 2 x3 + 0.5 x4 + 1.5 x1x2 + e in coded units, e ~ N(0, 0.5²) from numpy default_rng(20261021), rounded to 0.01.",
+    "published": "None; the response is synthetic.",
+    "derived": "The default model (intercept, 6 main effects, 15 2FIs) has rank 12 on 15 runs (error DF 3), so 10 2FI columns are aliased. The reference fits the explicit reduced model on the estimable columns, which is what R lm() reports with NA for aliased terms.",
+    "recorded": "2026-10-21"
+  },
+  "factors": [
+    {
+      "id": "X1",
+      "name": "Temperature",
+      "type": "numeric",
+      "min": 60,
+      "max": 80,
+      "unit": "°C"
+    },
+    {
+      "id": "X2",
+      "name": "Pressure",
+      "type": "numeric",
+      "min": 100,
+      "max": 200,
+      "unit": "kPa"
+    },
+    {
+      "id": "X3",
+      "name": "Ratio",
+      "type": "numeric",
+      "min": 1,
+      "max": 3,
+      "unit": ""
+    },
+    {
+      "id": "X4",
+      "name": "Offset",
+      "type": "numeric",
+      "min": -20,
+      "max": -10,
+      "unit": "mm"
+    },
+    {
+      "id": "X5",
+      "name": "Loading",
+      "type": "numeric",
+      "min": 0.5,
+      "max": 2.5,
+      "unit": "mol%"
+    },
+    {
+      "id": "X6",
+      "name": "Time",
+      "type": "numeric",
+      "min": 5,
+      "max": 25,
+      "unit": "min"
+    }
+  ],
+  "responses": [
+    {
+      "id": "y",
+      "name": "Response",
+      "unit": "",
+      "goal": "maximize"
+    }
+  ],
+  "runs": [
+    {
+      "label": "PB row 1",
+      "factors": {
+        "X1": 80.0,
+        "X2": 200.0,
+        "X3": 1.0,
+        "X4": -10.0,
+        "X5": 2.5,
+        "X6": 25.0
+      },
+      "responses": {
+        "y": 50.14
+      }
+    },
+    {
+      "label": "PB row 2",
+      "factors": {
+        "X1": 60.0,
+        "X2": 200.0,
+        "X3": 3.0,
+        "X4": -20.0,
+        "X5": 2.5,
+        "X6": 25.0
+      },
+      "responses": {
+        "y": 42.87
+      }
+    },
+    {
+      "label": "PB row 3",
+      "factors": {
+        "X1": 80.0,
+        "X2": 100.0,
+        "X3": 3.0,
+        "X4": -10.0,
+        "X5": 0.5,
+        "X6": 25.0
+      },
+      "responses": {
+        "y": 57.63
+      }
+    },
+    {
+      "label": "PB row 4",
+      "factors": {
+        "X1": 60.0,
+        "X2": 200.0,
+        "X3": 1.0,
+        "X4": -10.0,
+        "X5": 2.5,
+        "X6": 5.0
+      },
+      "responses": {
+        "y": 39.99
+      }
+    },
+    {
+      "label": "PB row 5",
+      "factors": {
+        "X1": 60.0,
+        "X2": 100.0,
+        "X3": 3.0,
+        "X4": -20.0,
+        "X5": 2.5,
+        "X6": 25.0
+      },
+      "responses": {
+        "y": 52.1
+      }
+    },
+    {
+      "label": "PB row 6",
+      "factors": {
+        "X1": 60.0,
+        "X2": 100.0,
+        "X3": 1.0,
+        "X4": -10.0,
+        "X5": 0.5,
+        "X6": 25.0
+      },
+      "responses": {
+        "y": 48.64
+      }
+    },
+    {
+      "label": "PB row 7",
+      "factors": {
+        "X1": 80.0,
+        "X2": 100.0,
+        "X3": 1.0,
+        "X4": -20.0,
+        "X5": 2.5,
+        "X6": 5.0
+      },
+      "responses": {
+        "y": 52.63
+      }
+    },
+    {
+      "label": "PB row 8",
+      "factors": {
+        "X1": 80.0,
+        "X2": 200.0,
+        "X3": 1.0,
+        "X4": -20.0,
+        "X5": 0.5,
+        "X6": 25.0
+      },
+      "responses": {
+        "y": 49.86
+      }
+    },
+    {
+      "label": "PB row 9",
+      "factors": {
+        "X1": 80.0,
+        "X2": 200.0,
+        "X3": 3.0,
+        "X4": -20.0,
+        "X5": 0.5,
+        "X6": 5.0
+      },
+      "responses": {
+        "y": 53.6
+      }
+    },
+    {
+      "label": "PB row 10",
+      "factors": {
+        "X1": 60.0,
+        "X2": 200.0,
+        "X3": 3.0,
+        "X4": -10.0,
+        "X5": 0.5,
+        "X6": 5.0
+      },
+      "responses": {
+        "y": 44.66
+      }
+    },
+    {
+      "label": "PB row 11",
+      "factors": {
+        "X1": 80.0,
+        "X2": 100.0,
+        "X3": 3.0,
+        "X4": -10.0,
+        "X5": 2.5,
+        "X6": 5.0
+      },
+      "responses": {
+        "y": 58.24
+      }
+    },
+    {
+      "label": "PB row 12",
+      "factors": {
+        "X1": 60.0,
+        "X2": 100.0,
+        "X3": 1.0,
+        "X4": -20.0,
+        "X5": 0.5,
+        "X6": 5.0
+      },
+      "responses": {
+        "y": 48.65
+      }
+    },
+    {
+      "label": "centre",
+      "factors": {
+        "X1": 70.0,
+        "X2": 150.0,
+        "X3": 2.0,
+        "X4": -15.0,
+        "X5": 1.5,
+        "X6": 15.0
+      },
+      "responses": {
+        "y": 49.5
+      }
+    },
+    {
+      "label": "centre",
+      "factors": {
+        "X1": 70.0,
+        "X2": 150.0,
+        "X3": 2.0,
+        "X4": -15.0,
+        "X5": 1.5,
+        "X6": 15.0
+      },
+      "responses": {
+        "y": 49.99
+      }
+    },
+    {
+      "label": "centre",
+      "factors": {
+        "X1": 70.0,
+        "X2": 150.0,
+        "X3": 2.0,
+        "X4": -15.0,
+        "X5": 1.5,
+        "X6": 15.0
+      },
+      "responses": {
+        "y": 50.31
+      }
+    }
+  ],
+  "models": [
+    {
+      "name": "main effects + 2FI (engine default)",
+      "responseId": "y",
+      "excludedTerms": []
+    }
+  ],
+  "reference": {
+    "tool": "statsmodels 0.14.4 OLS (numpy 2.1.3, scipy 1.15.3, Python 3.13.5) via tests/fixtures/compute_reference.py",
+    "computed": "2026-10-21",
+    "models": [
+      {
+        "name": "main effects + 2FI (engine default)",
+        "responseId": "y",
+        "excludedTerms": [],
+        "n": 15,
+        "rank": 12,
+        "dfModel": 11,
+        "dfError": 3,
+        "aliasedColumns": [
+          "Temperature*Time",
+          "Pressure*Offset",
+          "Pressure*Loading",
+          "Pressure*Time",
+          "Ratio*Offset",
+          "Ratio*Loading",
+          "Ratio*Time",
+          "Offset*Loading",
+          "Offset*Time",
+          "Loading*Time"
+        ],
+        "sse": 0.33346833333333536,
+        "sst": 333.9170933333335,
+        "rSquared": 0.9990013439264086,
+        "coefficients": {
+          "Intercept": {
+            "estimate": 49.92066666666666,
+            "stdError": 0.08608372324317444,
+            "tRatio": 579.9083123489883,
+            "pValue": 1.1308059764892657e-08
+          },
+          "Temperature": {
+            "estimate": 3.5825000000000067,
+            "stdError": 0.136110317458004,
+            "tRatio": 26.320561636375324,
+            "pValue": 0.00012031868204581877,
+            "vif": 2.0
+          },
+          "Pressure": {
+            "estimate": -2.8475,
+            "stdError": 0.20416547618700603,
+            "tRatio": -13.947020099479616,
+            "pValue": 0.0007980806326595914,
+            "vif": 4.500000000000001
+          },
+          "Ratio": {
+            "estimate": 2.217499999999986,
+            "stdError": 0.18005702543196586,
+            "tRatio": 12.315542782516216,
+            "pValue": 0.0011531793422254284,
+            "vif": 3.4999999999999996
+          },
+          "Offset": {
+            "estimate": -0.05499999999999261,
+            "stdError": 0.37891508747807784,
+            "tRatio": -0.14515125371769377,
+            "pValue": 0.8937949962836595,
+            "vif": 15.499999999999998
+          },
+          "Loading": {
+            "estimate": -0.2825000000000024,
+            "stdError": 0.136110317458004,
+            "tRatio": -2.0755223062878096,
+            "pValue": 0.12955588187236697,
+            "vif": 2.0
+          },
+          "Time": {
+            "estimate": -0.02999999999999048,
+            "stdError": 0.27222063491600795,
+            "tRatio": -0.11020472422763543,
+            "pValue": 0.919205785278167,
+            "vif": 7.999999999999998
+          },
+          "Temperature*Pressure": {
+            "estimate": 1.2174999999999958,
+            "stdError": 0.20416547618700603,
+            "tRatio": 5.963300077652809,
+            "pValue": 0.009434169285477967,
+            "vif": 4.500000000000001
+          },
+          "Temperature*Ratio": {
+            "estimate": 0.17249999999999766,
+            "stdError": 0.2887335853920251,
+            "tRatio": 0.5974365599546985,
+            "pValue": 0.5923048132866595,
+            "vif": 9.000000000000002
+          },
+          "Temperature*Offset": {
+            "estimate": -0.07999999999999212,
+            "stdError": 0.20416547618700603,
+            "tRatio": -0.3918390194761227,
+            "pValue": 0.7213533195213173,
+            "vif": 4.500000000000001
+          },
+          "Temperature*Loading": {
+            "estimate": 0.5574999999999974,
+            "stdError": 0.408330952374012,
+            "tRatio": 1.3653140834872435,
+            "pValue": 0.2655199021590918,
+            "vif": 18.0
+          },
+          "Pressure*Ratio": {
+            "estimate": -0.5499999999999972,
+            "stdError": 0.28873358539202515,
+            "tRatio": -1.904870191159924,
+            "pValue": 0.15289614976240476,
+            "vif": 9.000000000000004
+          }
+        },
+        "fitted": [
+          50.14316666666671,
+          42.87316666666667,
+          57.63316666666669,
+          39.99316666666666,
+          52.103166666666645,
+          48.643166666666666,
+          52.63316666666666,
+          49.86316666666668,
+          53.60316666666663,
+          44.66316666666663,
+          58.24316666666666,
+          48.65316666666664,
+          49.92066666666666,
+          49.92066666666666,
+          49.92066666666666
+        ],
+        "leverage": [
+          0.9833333333333327,
+          0.9833333333333331,
+          0.983333333333333,
+          0.9833333333333334,
+          0.9833333333333343,
+          0.9833333333333334,
+          0.983333333333333,
+          0.9833333333333325,
+          0.9833333333333338,
+          0.9833333333333343,
+          0.9833333333333337,
+          0.9833333333333334,
+          0.06666666666666667,
+          0.06666666666666667,
+          0.06666666666666667
+        ],
+        "mse": 0.11115611111111179,
+        "rmse": 0.333400826500343,
+        "adjRSquared": 0.9953396049899066,
+        "fRatio": 272.821564084726,
+        "modelPValue": 0.00032568091954995513,
+        "studentizedResiduals": [
+          -0.07357178680021527,
+          -0.07357178679939058,
+          -0.0735717867997205,
+          -0.07357178679906115,
+          -0.07357178679873295,
+          -0.07357178679922623,
+          -0.07357178679906018,
+          -0.07357178679955444,
+          -0.0735717867984018,
+          -0.07357178679856788,
+          -0.0735717867990619,
+          -0.07357178679873098,
+          -1.3060296596012573,
+          0.2152568694113235,
+          1.208750112848108
+        ],
+        "cooksDistance": [
+          0.026612971747132636,
+          0.026612971746536554,
+          0.02661297174677505,
+          0.026612971746298765,
+          0.02661297174606277,
+          0.02661297174641819,
+          0.026612971746297343,
+          0.026612971746654192,
+          0.026612971745822476,
+          0.026612971745943344,
+          0.026612971746299847,
+          0.0266129717460599,
+          0.010153056379512953,
+          0.00027580666564740224,
+          0.008696885924466153
+        ],
+        "adequatePrecision": 61.19996914484131,
+        "typeIII": {
+          "X1": {
+            "name": "Temperature",
+            "df": 1,
+            "ss": 77.00583750000007,
+            "fRatio": 692.7719648542304,
+            "pValue": 0.0001203186820458192
+          },
+          "X2": {
+            "name": "Pressure",
+            "df": 1,
+            "ss": 21.622016666666703,
+            "fRatio": 194.51936965528876,
+            "pValue": 0.0007980806326595896
+          },
+          "X3": {
+            "name": "Ratio",
+            "df": 1,
+            "ss": 16.859335714285706,
+            "fRatio": 151.6725940279891,
+            "pValue": 0.0011531793422254087
+          },
+          "X4": {
+            "name": "Offset",
+            "df": 1,
+            "ss": 0.0023419354838707385,
+            "fRatio": 0.02106888645582191,
+            "pValue": 0.8937949962836513
+          },
+          "X5": {
+            "name": "Loading",
+            "df": 1,
+            "ss": 0.47883749999999614,
+            "fRatio": 4.30779284389816,
+            "pValue": 0.1295558818723703
+          },
+          "X6": {
+            "name": "Time",
+            "df": 1,
+            "ss": 0.0013500000000000734,
+            "fRatio": 0.012145081242097537,
+            "pValue": 0.9192057852781396
+          },
+          "X1*X2": {
+            "name": "Temperature*Pressure",
+            "df": 1,
+            "ss": 3.9528166666666746,
+            "fRatio": 35.56094781613432,
+            "pValue": 0.009434169285477849
+          },
+          "X1*X3": {
+            "name": "Temperature*Ratio",
+            "df": 1,
+            "ss": 0.03967499999999968,
+            "fRatio": 0.3569304431705109,
+            "pValue": 0.5923048132866555
+          },
+          "X1*X4": {
+            "name": "Temperature*Offset",
+            "df": 1,
+            "ss": 0.017066666666666674,
+            "fRatio": 0.1535378171840396,
+            "pValue": 0.7213533195212916
+          },
+          "X1*X5": {
+            "name": "Temperature*Loading",
+            "df": 1,
+            "ss": 0.20720416666666475,
+            "fRatio": 1.864082546568611,
+            "pValue": 0.26551990215909227
+          },
+          "X2*X3": {
+            "name": "Pressure*Ratio",
+            "df": 1,
+            "ss": 0.40333333333333177,
+            "fRatio": 3.62853044516967,
+            "pValue": 0.15289614976240384
+          }
+        },
+        "boxCox": {
+          "shift": 0.0,
+          "optimalLambda": 1.0,
+          "grid": [
+            {
+              "lambda": -2.0,
+              "logLikelihood": 14.170822413965686
+            },
+            {
+              "lambda": -1.9,
+              "logLikelihood": 14.6244400260292
+            },
+            {
+              "lambda": -1.8,
+              "logLikelihood": 15.08684345691223
+            },
+            {
+              "lambda": -1.7,
+              "logLikelihood": 15.558283208168925
+            },
+            {
+              "lambda": -1.6,
+              "logLikelihood": 16.038991889853595
+            },
+            {
+              "lambda": -1.5,
+              "logLikelihood": 16.52917621288113
+            },
+            {
+              "lambda": -1.4,
+              "logLikelihood": 17.029006878485276
+            },
+            {
+              "lambda": -1.3,
+              "logLikelihood": 17.538605864512384
+            },
+            {
+              "lambda": -1.2,
+              "logLikelihood": 18.058030499524733
+            },
+            {
+              "lambda": -1.1,
+              "logLikelihood": 18.58725359332849
+            },
+            {
+              "lambda": -1.0,
+              "logLikelihood": 19.126138755138456
+            },
+            {
+              "lambda": -0.9,
+              "logLikelihood": 19.674409888657955
+            },
+            {
+              "lambda": -0.8,
+              "logLikelihood": 20.23161371947807
+            },
+            {
+              "lambda": -0.7,
+              "logLikelihood": 20.797074111571828
+            },
+            {
+              "lambda": -0.6,
+              "logLikelihood": 21.36983691112389
+            },
+            {
+              "lambda": -0.5,
+              "logLikelihood": 21.94860418857251
+            },
+            {
+              "lambda": -0.4,
+              "logLikelihood": 22.531657141635126
+            },
+            {
+              "lambda": -0.3,
+              "logLikelihood": 23.116767728968682
+            },
+            {
+              "lambda": -0.2,
+              "logLikelihood": 23.701100532657804
+            },
+            {
+              "lambda": -0.1,
+              "logLikelihood": 24.281108649248896
+            },
+            {
+              "lambda": 0.0,
+              "logLikelihood": 24.852430836050686
+            },
+            {
+              "lambda": 0.1,
+              "logLikelihood": 25.40980184856107
+            },
+            {
+              "lambda": 0.2,
+              "logLikelihood": 25.946993770570455
+            },
+            {
+              "lambda": 0.3,
+              "logLikelihood": 26.456812467183926
+            },
+            {
+              "lambda": 0.4,
+              "logLikelihood": 26.931178476380037
+            },
+            {
+              "lambda": 0.5,
+              "logLikelihood": 27.361322943242673
+            },
+            {
+              "lambda": 0.6,
+              "logLikelihood": 27.73812290369111
+            },
+            {
+              "lambda": 0.7,
+              "logLikelihood": 28.05258282508669
+            },
+            {
+              "lambda": 0.8,
+              "logLikelihood": 28.296439701049955
+            },
+            {
+              "lambda": 0.9,
+              "logLikelihood": 28.462831262343222
+            },
+            {
+              "lambda": 1.0,
+              "logLikelihood": 28.54693178820508
+            },
+            {
+              "lambda": 1.1,
+              "logLikelihood": 28.546442814893293
+            },
+            {
+              "lambda": 1.2,
+              "logLikelihood": 28.46183949565494
+            },
+            {
+              "lambda": 1.3,
+              "logLikelihood": 28.296319160368647
+            },
+            {
+              "lambda": 1.4,
+              "logLikelihood": 28.05546342669755
+            },
+            {
+              "lambda": 1.5,
+              "logLikelihood": 27.74668589760583
+            },
+            {
+              "lambda": 1.6,
+              "logLikelihood": 27.378573087586176
+            },
+            {
+              "lambda": 1.7,
+              "logLikelihood": 26.960228410644163
+            },
+            {
+              "lambda": 1.8,
+              "logLikelihood": 26.500704085840976
+            },
+            {
+              "lambda": 1.9,
+              "logLikelihood": 26.00856825489987
+            },
+            {
+              "lambda": 2.0,
+              "logLikelihood": 25.491618747162676
+            }
+          ]
+        },
+        "lackOfFit": {
+          "ssPure": 0.33286666666666864,
+          "dfPure": 2,
+          "ssLof": 0.0006016666666667225,
+          "dfLof": 1,
+          "fLof": 0.0036150610855200417,
+          "pLof": 0.9575233090866831
+        }
+      }
+    ]
+  }
+}

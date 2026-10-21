@@ -1,12 +1,12 @@
 # DOE-Magic — Status and Handoff (START HERE)
 
-> Created: 2026-10-20. Status: START HERE. Current as of 2026-10-20, with the P0.1 fix (demo buttons) added on 2026-10-21. Written for PR `chore/project-structure-and-core-docs` before it was merged. If you are reading this on `main`, the PR has been merged: do the after-merge steps below if not done yet.
+> Created: 2026-10-20. Status: START HERE. Current as of 2026-10-21. First written for PR `chore/project-structure-and-core-docs` (PR #1), which was merged on 2026-10-21: do the after-merge steps below if not done yet. Updated for the P0.1 fix (demo buttons, PR #2) and the test harness (backlog P2.1 step 1, PR #3).
 > Related: [Goals](goals.md), [Roadmap and backlog](../../spec/DOE-Magic/roadmap-backlog.md), [Design spec](../../spec/DOE-Magic/design-spec.md), [AI Studio origin](../../context/DOE-Magic/ai-studio-origin.md), [README](../../../README.md), [AGENTS.md](../../../AGENTS.md)
 
 ## First screen: what you must know
 
 - **Until the PR is merged, do not push from AI Studio.**
-- **The app works and runs, but several results are wrong.** Do not use the outputs in [Top risks](#top-risks-right-now) for process decisions, batch records or reports until they are fixed. There are no automated tests, and no comparison of outputs against established statistics software (such as JMP or R) is recorded in the repository.
+- **The app works and runs, but several results are wrong.** Do not use the outputs in [Top risks](#top-risks-right-now) for process decisions, batch records or reports until they are fixed. `npm test` now compares the statistics engine with published textbook examples and with statsmodels reference fits, and pins the known wrong outputs as expected failures ([Reference tests](../../context/DOE-Magic/statistics-engine.md#reference-tests)). No comparison against JMP or R is recorded yet (decision 5).
 - **Some buttons delete data without asking.** "Generate Design Matrix", Excel import and "Simulate Sample Data" overwrite measured results. Export each project as JSON before you touch them (the Dashboard can import that file again as a copy). Since P0.1, "Demo Studies" / "Load Demo Experiments" only add a copy of the demo study; the full reset is "Reset Sample Data" in the Archive view, which asks first and makes the server copy `data.json` aside.
 - **If you use Google AI Studio:** first export every real project with **Export JSON** on its page; a new AI Studio project starts with only the demo project, and the browser's copy is not a backup. After the merge, re-import the project from `main` (or start a fresh AI Studio project from `main`) before you edit again, then bring each project back with **Import Project** on the Dashboard. Otherwise AI Studio's sync will push its old copy over this work. Nobody has confirmed the exact AI Studio steps yet ([AI Studio origin §6](../../context/DOE-Magic/ai-studio-origin.md#6-sync-overwrite-risk-and-the-safe-workflow-after-this-pr)). See [AI Studio warning](#ai-studio-warning).
 - **There is no login.** Anyone who can open the app's address can read and delete all data, and so can any other website open in the same browser (SRV-1). If the app was shared or deployed from AI Studio, anyone with the link can too. Run it only on your own machine or a trusted network.
@@ -15,9 +15,34 @@
 
 DOE Magic is a working Design-of-Experiments web app with an MCP server. M-Alekseychuk built it in Google AI Studio for Jiuzhou Pharmaceutical process scientists. It plans designs (factorial, DSD, CCD, BBD, Plackett-Burman, D-optimal), analyses results (OLS, ANOVA, effects, diagnostics, desirability), compares responses, runs Monte Carlo robustness and Bayesian next-run suggestions, and exports JSON, Excel and HTML. It works in English and Chinese.
 
-This branch reorganises the repository and documents it without changing any behaviour. A review of the code (some of it confirmed by running the engine) registered 160 issue IDs: 14 Critical, listed below, 47 High, 63 Medium and 36 Low. Some IDs describe the same bug from two angles. All of them are recorded in the [backlog](../../spec/DOE-Magic/roadmap-backlog.md). Since the merge, DATA-1 and UI-1 are fixed (P0.1, see [Changes after the merge](#changes-after-the-merge)); none of the others are. The next work is Phase 1 of the [goals](goals.md): tests plus statistical correctness.
+PR #1 reorganised the repository and documented it without changing any behaviour. PR #3 added the test harness (below); it changes no calculation either. A review of the code (some of it confirmed by running the engine) registered 160 issue IDs: 14 Critical, listed below, 47 High, 63 Medium and 36 Low. Some IDs describe the same bug from two angles. All of them are recorded in the [backlog](../../spec/DOE-Magic/roadmap-backlog.md). Since PR #1, DATA-1 and UI-1 are fixed (P0.1, PR #2, see [Changes after the merge](#changes-after-the-merge)); none of the others are. The next work is Phase 1 of the [goals](goals.md): tests plus statistical correctness.
 
-## What this PR changed
+## Test harness (backlog P2.1 step 1, PR #3)
+
+Tests and tooling only; nothing under `src/` changed.
+
+| Change | Where |
+|---|---|
+| vitest ^4.1.11 as a devDependency and `npm test` (`vitest run`); Node environment, separate from `vite.config.ts` | `package.json`, `vitest.config.ts` |
+| `tests/` (mirrors `src/`) is type-checked by `npm run check` and allowed at the repo root by R9; the checker's self-test has a case for it (29 cases) | `tsconfig.json`, `scripts/check-boundaries.mjs`, `scripts/check-boundaries.test.mjs` |
+| 9 reference fixtures with their provenance: Montgomery (2013) Examples 6.1, 6.2, 8.1 and 11.2, PB12 and DSD screening designs, a regular 2^(4−1) with centre runs, a saturated 2 × 3 factorial and the demo project | `tests/fixtures/*.json` |
+| The reference script: statsmodels OLS on the documented model, because R was not installed | `tests/fixtures/compute_reference.py` |
+| Tests for the engine and MCP `run_analysis`: reference comparisons, invariants, a characterization snapshot of the demo project, and 38 expected failures named after STAT-1, STAT-2, STAT-3, STAT-4, STAT-5, STAT-21, MCP-1/UI-31, MCP-6, MCP-7, MCP-8 and MCP-9 | `tests/core/analysis/`, `tests/server/mcp/`, `tests/helpers/` |
+
+The case table (which fixture, which source, which issue IDs, which backlog item flips each test) is in the [statistics engine doc](../../context/DOE-Magic/statistics-engine.md#reference-tests). A new finding while writing the fixtures: on the PB12 fixture STAT-1 gives two estimable terms (the main effect `Offset` and `Temperature*Loading`) an SE of 0, so t 0 and p 1; it is recorded under P0.3 in the backlog.
+
+**How it was verified (2026-10-21, Node 24.13.0)**
+
+| Check | Result |
+|---|---|
+| `npm test` | 10 files: 118 passed, 38 expected failures, 2 todo |
+| Every `it.fails` run as a plain `it` | Each fails on an assertion about its documented value (for example MCP `summary.pValue` 14 instead of 1.09e-12; Pareto t 1.535 instead of the Lenth t 0.768; Σ leverage 11 instead of 12) |
+| `npm run check` | `tsc` 0 errors; `Layer boundaries OK: 35 files, 8 reachable from the Node entry points.` |
+| `node scripts/check-boundaries.test.mjs` | All 29 cases pass |
+| `npm run build` | `dist/` is byte-identical to a build of `main` (cc41f15) with the same `node_modules`. With the lockfile gone, the dependencies resolved newer (for example Vite 6.4.5 instead of 6.4.3), so the main bundle is 2,033,476 bytes instead of PR #1's 2,002,786; with PR #1's lockfile this branch built byte-identical to PR #1 |
+| Lockfiles | None updated. Commit cc41f15 on `main` deleted `package-lock.json` and `bun.lock` just before this PR (backlog, [Unregistered findings](../../spec/DOE-Magic/roadmap-backlog.md#unregistered-findings-awaiting-ids)), so the checks above ran after a fresh `npm install --no-package-lock`. `npm ci` needs a lockfile again (decision 1) |
+
+## What the restructuring PR changed
 
 All commits sit on top of `origin/main` `0d05f8c`.
 
@@ -66,6 +91,7 @@ src/web/            Browser only: App, Layout, state/ProjectContext (save/sync),
 src/web/features/   One folder per feature: the six tabs (setup, design, analysis, compare, robustness, optimization) plus export and mcp-panel
 public/             logo.png, plotly.min.js (served as-is)
 scripts/            check-boundaries.mjs (rules R1–R9)
+tests/              vitest suite: core/analysis, server/mcp, helpers, fixtures (reference data and compute_reference.py)
 docs/               task / spec / context / memory docs (index below)
 ```
 
@@ -78,6 +104,7 @@ Run every command from the repository root. `data.json` is created in the curren
 | `npm install` | Install dependencies |
 | `npm run dev` | Start the development server on http://localhost:3000 (port fixed in [`server.ts:8`](../../../server.ts)) |
 | `npm run check` | Type-check and run the layer rules. Must pass before every commit. |
+| `npm test` | Run the test suite in `tests/` (vitest). Must pass before every commit. Known bugs show as expected failures |
 | `npm run build` | Build the client into `dist/` and the server into `dist/server.cjs` |
 | `NODE_ENV=production npm start` | Run the build. Without `NODE_ENV=production` it runs Vite dev middleware (SRV-3/BLD-1). In PowerShell: `$env:NODE_ENV="production"; npm start`. That leaves `NODE_ENV` set for the window, so a later `npm run dev` there serves the old `dist/`; close the window afterwards or run `Remove-Item Env:NODE_ENV`. |
 | `npm run mcp` | Start the stdio MCP server for desktop AI clients. The config snippet shown in the app's MCP panel does not work as given (MCP-18); see [MCP server](../../context/DOE-Magic/mcp-server.md). |
@@ -129,8 +156,8 @@ Other high-impact risks:
 3. **Answer the open decisions below.** The owner answers decisions 3, 4, 5 and 6 in plain words; a developer settles decisions 1, 2, 7 and 8.
 4. **Follow the "suggested PR sequence" in the [roadmap and backlog](../../spec/DOE-Magic/roadmap-backlog.md).** It is the authoritative order. In outline:
    - guard the remaining one-click data-loss buttons (P0.2; the demo buttons are done, P0.1)
-   - add tests and CI (BLD-4)
-   - fix the Critical statistics and design issues, one PR each, each with a reference test
+   - tests are in (P2.1 step 1); next comes CI that runs `npm ci`, `npm run check`, `npm test` and `npm run build` (P2.1 step 2). It first needs a lockfile again, because cc41f15 deleted both (decision 1)
+   - fix the Critical statistics and design issues, one PR each. Each fix changes its own `it.fails` tests to `it` (for example P0.3 flips the 16 STAT-1 tests) and adds fixtures where the [case table](../../context/DOE-Magic/statistics-engine.md#reference-tests) has gaps
 
    Each PR is either move-only or a logic change, never both.
 
@@ -142,7 +169,7 @@ Other high-impact risks:
 | 2 | Remove the Gemini leftovers: `@google/genai`, the `metadata.json` Gemini capability, and `GEMINI_API_KEY` in `.env.example`? | Developer | They suggest data goes to Gemini, which it does not. The effect on AI Studio is unverified. | BLD-10, SRV-11 |
 | 3 | Where does the app really run: local only, on a LAN, or deployed from AI Studio (Cloud Run)? Unverified. | Owner | This sets the priority of auth (SRV-1) and durable storage (DATA-9). | SRV-1, DATA-9 |
 | 4 | Keep editing in AI Studio after the merge, or move to local development with PRs? | Owner | AI Studio sync overwrites the repo with its own workspace. | see [lesson](../../memory/DOE-Magic/ai-studio-sync-overwrites-repo.md) |
-| 5 | Which reference software defines "correct": JMP, R, or published examples? Is JMP available? | Owner | Phase 1 tests need fixed reference values. | BLD-4 |
+| 5 | Which reference software defines "correct": JMP, R, or published examples? Is JMP available? | Owner | Phase 1 tests need fixed reference values. Until decided, the tests use published examples plus statsmodels (R was not installed). | BLD-4 |
 | 6 | Does the tool fall under GMP or data-integrity rules? | Owner | This decides how far Phase 3 goes (audit trail, identity, backups). | DATA-16 |
 | 7 | Move the server bundle out of `dist/`? It is a path AI Studio is sensitive to. | Developer | Needed to stop serving the source map. | SRV-2, BLD-2 |
 | 8 | Which authentication model: none with localhost-only binding, a shared token, reverse-proxy SSO, or per-user accounts? | Developer | Decides the auth part of the server lock-down and whether changes can record who made them. | SRV-1, DATA-16 |
@@ -172,12 +199,14 @@ Root files that AI Studio needs stay in place: `server.ts`, `index.html`, `vite.
 | [Design spec](../../spec/DOE-Magic/design-spec.md) | Architecture contract: layers, rules R1–R9, where new code goes |
 | [Roadmap and backlog](../../spec/DOE-Magic/roadmap-backlog.md) | Issue registry (STAT, DES, MCP, SRV, DATA, UI, I18N, BLD) and the suggested PR sequence |
 | **context/** | |
-| [Statistics engine](../../context/DOE-Magic/statistics-engine.md) | How `analysisCore.ts` fits, tests and predicts; known issues |
+| [Statistics engine](../../context/DOE-Magic/statistics-engine.md) | How `analysisCore.ts` fits, tests and predicts; known issues; the reference-test case table |
 | [Design generation](../../context/DOE-Magic/design-generation.md) | Design types, the two generators, D-optimal; known issues |
 | [MCP server](../../context/DOE-Magic/mcp-server.md) | Tools, resources, prompts, transports, client configuration |
 | [Server and persistence](../../context/DOE-Magic/server-and-persistence.md) | `server.ts`, REST, socket.io, `data.json`, browser cache |
 | [Web UI](../../context/DOE-Magic/web-ui.md) | Pages, tabs, state, i18n, exports |
 | [AI Studio origin](../../context/DOE-Magic/ai-studio-origin.md) | How the project came from AI Studio and how to keep it compatible |
+| **tests/** | |
+| [Fixtures README](../../../tests/fixtures/README.md) | Fixture format, provenance rules, recomputing reference values, flipping `it.fails` tests |
 | **memory/** | Lessons: mistake → root cause → prevention |
 | [Patch scripts in repo root](../../memory/DOE-Magic/patch-scripts-in-repo-root.md) | 201 throwaway scripts piled up at the root |
 | [Forked logic drifts](../../memory/DOE-Magic/forked-logic-drifts.md) | Copies of calculations that diverged |
