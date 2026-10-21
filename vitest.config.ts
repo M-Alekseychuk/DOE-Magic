@@ -5,5 +5,8 @@ export default defineConfig({
   test: {
     environment: 'node',
     include: ['tests/**/*.test.ts'],
+    // Snapshots are written only with `-u`: a missing snapshot fails instead of being created, and a
+    // CRLF checkout (core.autocrlf on Windows) is not rewritten on every run.
+    update: 'none',
   },
 });

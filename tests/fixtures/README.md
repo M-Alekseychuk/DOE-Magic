@@ -30,4 +30,4 @@ The script rebuilds the model matrix from the contract in design spec §4.2 (cod
 
 A test that fails today because of a registered bug is written as `it.fails('<ID> (<backlog item>): …')`, so `npm test` stays green. When the fix lands, vitest reports those tests as failing because they now pass: change each one to `it(...)` in the same PR. A fix flips only the tests with its own IDs. `it.todo` marks a check that cannot be written until the fix adds an API (the test name says which).
 
-The demo-project snapshot (`tests/core/analysis/__snapshots__/`) records today's output, wrong values included. A PR that changes engine output on purpose updates it with `npx vitest run -u` and explains every changed number.
+The demo-project snapshot (`tests/core/analysis/__snapshots__/`) records today's output, wrong values included. A PR that changes engine output on purpose updates it with `npx vitest run -u` and explains every changed number. `vitest.config.ts` sets `update: 'none'`, so snapshots are written only with `-u`: a new snapshot test fails until then.
