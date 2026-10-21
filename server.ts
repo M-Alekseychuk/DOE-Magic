@@ -17,7 +17,7 @@ const io = new Server(httpServer, {
   cors: { origin: '*' }
 });
 
-import { sampleProjects, sampleFolders } from './src/core/sampleProject';
+import { sampleProjects, sampleFolders, createSampleProjects, createSampleFolders } from './src/core/sampleProject';
 import { SSEServerTransport } from '@modelcontextprotocol/sdk/server/sse.js';
 import { createDoeMcpServer, handleDirectJsonRpc, mcpActivityLogs } from './src/server/mcp/doeMcpServer';
 
@@ -191,14 +191,29 @@ app.delete('/api/folders/:id', (req, res) => {
   res.json({ success: true });
 });
 
+// Deletes every project and folder for every user (DATA-1). A request without the JSON body {"confirm": true}
+// changes nothing, and data.json is copied aside before it is overwritten.
 app.post('/api/reset-sample', (req, res) => {
+  if (!req.body || req.body.confirm !== true) {
+    return res.status(400).json({ error: 'Reset requires the JSON body {"confirm": true}' });
+  }
+  let backupFile: string | null = null;
+  if (fs.existsSync(DATA_FILE)) {
+    backupFile = `${DATA_FILE}.before-reset-${new Date().toISOString().replace(/[:.]/g, '-')}`;
+    try {
+      fs.copyFileSync(DATA_FILE, backupFile, fs.constants.COPYFILE_EXCL);
+    } catch (e) {
+      console.error("Failed to back up data.json before reset", e);
+      return res.status(500).json({ error: 'Could not back up data.json, so nothing was reset' });
+    }
+  }
   db = {
-    projects: [...sampleProjects],
-    folders: [...sampleFolders]
+    projects: createSampleProjects(),
+    folders: createSampleFolders()
   };
   saveData();
   io.emit('sync_data', db);
-  res.json({ success: true, data: db });
+  res.json({ success: true, data: db, backup: backupFile && path.basename(backupFile) });
 });
 
 // ==========================================

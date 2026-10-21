@@ -1,13 +1,14 @@
 import React, { useState, useMemo, useRef } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
-import { Plus, Upload, Trash2, ArrowRight, Search, FolderInput, ArchiveRestore, Sparkles } from 'lucide-react';
+import { Plus, Upload, Trash2, ArrowRight, Search, FolderInput, ArchiveRestore, Sparkles, RotateCcw } from 'lucide-react';
 import { useProjects } from '../state/ProjectContext';
 import { useTranslation } from '../i18n/LanguageContext';
+import ConfirmDialog from '../shared/ConfirmDialog';
 import { v4 as uuidv4 } from 'uuid';
 import { Project } from '../../core/types';
 
 export default function Dashboard() {
-  const { projects, folders, saveProject, deleteProject, resetSampleData, loading } = useProjects();
+  const { projects, folders, saveProject, deleteProject, resetSampleData, loadDemoProject, loading } = useProjects();
   const { t, locale } = useTranslation();
   const navigate = useNavigate();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -26,7 +27,9 @@ export default function Dashboard() {
   const [movingProject, setMovingProject] = useState<string | null>(null);
   const [sortBy, setSortBy] = useState<'name' | 'createdAt' | 'updatedAt'>('updatedAt');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
-  const [importError, setImportError] = useState<string | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [showResetConfirm, setShowResetConfirm] = useState(false);
+  const [resetting, setResetting] = useState(false);
 
   const searchParams = new URLSearchParams(location.search);
   const folderId = searchParams.get('folder');
@@ -74,14 +77,14 @@ export default function Dashboard() {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    setImportError(null);
+    setErrorMessage(null);
     const reader = new FileReader();
     reader.onload = (event) => {
       try {
         const json = JSON.parse(event.target?.result as string);
         // Validate JSON
         if (!json || typeof json !== 'object' || !Array.isArray(json.factors) || !Array.isArray(json.responses) || !Array.isArray(json.runs)) {
-          setImportError(locale === 'zh' ? '项目文件格式无效，缺少核心 DOE 结构。' : 'Invalid project file format. The file is missing essential DOE structures.');
+          setErrorMessage(locale === 'zh' ? '项目文件格式无效，缺少核心 DOE 结构。' : 'Invalid project file format. The file is missing essential DOE structures.');
           return;
         }
         // generate a new id to prevent clashes
@@ -92,9 +95,9 @@ export default function Dashboard() {
           updatedAt: Date.now()
         };
         saveProject(importedProject);
-        setImportError(null);
+        setErrorMessage(null);
       } catch (err) {
-        setImportError(locale === 'zh' ? '解析导入的 JSON 文件失败。' : 'Failed to parse imported JSON file.');
+        setErrorMessage(locale === 'zh' ? '解析导入的 JSON 文件失败。' : 'Failed to parse imported JSON file.');
       }
     };
     reader.readAsText(file);
@@ -121,6 +124,24 @@ export default function Dashboard() {
     navigate(`/project/${newProject.id}`);
   };
 
+  const handleLoadDemo = () => {
+    const demoId = loadDemoProject();
+    navigate(`/project/${demoId}`);
+  };
+
+  const handleReset = async () => {
+    setResetting(true);
+    const ok = await resetSampleData();
+    setResetting(false);
+    setShowResetConfirm(false);
+    if (ok) {
+      setErrorMessage(null);
+      navigate('/');
+    } else {
+      setErrorMessage(t('reset_sample_failed', 'The reset failed: the server did not confirm it. Reload the page to see the current data.'));
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex flex-col items-center justify-center h-64 text-slate-500 dark:text-slate-400 gap-3 animate-in fade-in duration-300">
@@ -132,10 +153,10 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
-      {importError && (
+      {errorMessage && (
         <div className="p-3 bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-800 rounded flex items-center justify-between text-xs text-red-700 dark:text-red-300">
-          <span>{importError}</span>
-          <button onClick={() => setImportError(null)} className="font-bold ml-4 hover:underline">{t('close', 'Dismiss')}</button>
+          <span>{errorMessage}</span>
+          <button onClick={() => setErrorMessage(null)} className="font-bold ml-4 hover:underline">{t('close', 'Dismiss')}</button>
         </div>
       )}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -178,12 +199,12 @@ export default function Dashboard() {
             <div className="flex items-center gap-2">
               <input type="file" accept=".json" style={{ display: 'none' }} ref={fileInputRef} onChange={handleImport} />
               <button
-                onClick={resetSampleData}
-                title={locale === 'zh' ? '加载九洲药业标准实验设计示例 (铃木偶联工艺优化)' : 'Load standard demo study (Mixed-Level Suzuki-Miyaura Coupling)'}
+                onClick={handleLoadDemo}
+                title={t('demo_studies_tooltip', 'Add a copy of the standard demo study (Mixed-Level Suzuki-Miyaura Coupling). Existing projects are kept.')}
                 className="h-8 px-3 bg-teal-50 dark:bg-teal-950/60 text-teal-700 dark:text-teal-300 border border-teal-200 dark:border-teal-800 rounded-md hover:bg-teal-100 dark:hover:bg-teal-900/60 font-medium flex items-center justify-center gap-1.5 text-[11px] transition-colors shrink-0"
               >
                 <Sparkles size={14} className="text-amber-500" />
-                {locale === 'zh' ? '示例项目' : 'Demo Studies'}
+                {t('demo_studies', 'Demo Studies')}
               </button>
               <button
                 onClick={() => fileInputRef.current?.click()}
@@ -201,8 +222,29 @@ export default function Dashboard() {
               </button>
             </div>
           )}
+          {folderId === 'archive' && (
+            <button
+              onClick={() => setShowResetConfirm(true)}
+              title={t('reset_sample_tooltip', 'Delete all projects and folders for every user and restore the demo study')}
+              className="h-8 px-3 bg-white dark:bg-slate-900 text-red-600 dark:text-red-400 border border-red-200 dark:border-red-800 rounded-md hover:bg-red-50 dark:hover:bg-red-950/40 font-medium flex items-center justify-center gap-1.5 text-[11px] transition-colors shrink-0"
+            >
+              <RotateCcw size={14} />
+              {t('reset_sample_data', 'Reset Sample Data')}
+            </button>
+          )}
         </div>
       </div>
+
+      <ConfirmDialog
+        open={showResetConfirm}
+        title={t('reset_sample_data', 'Reset Sample Data')}
+        message={t('reset_sample_confirm', 'This deletes all {projects} projects and {folders} folders on the server, for every user, and puts back only the demo study. Export any project you need first.', { projects: projects.length, folders: folders.length })}
+        confirmLabel={t('reset_sample_confirm_button', 'Delete everything and reset')}
+        destructive
+        busy={resetting}
+        onConfirm={handleReset}
+        onCancel={() => setShowResetConfirm(false)}
+      />
 
       {showNew && (
         <div className="bg-white dark:bg-slate-900 p-4 rounded-lg shadow-sm border border-slate-200 dark:border-slate-600">
@@ -340,11 +382,12 @@ export default function Dashboard() {
                 {t('import_project', 'Import')}
               </button>
               <button
-                onClick={resetSampleData}
+                onClick={handleLoadDemo}
+                title={t('demo_studies_tooltip', 'Add a copy of the standard demo study (Mixed-Level Suzuki-Miyaura Coupling). Existing projects are kept.')}
                 className="px-3 py-1.5 bg-white dark:bg-slate-800 text-brand-600 dark:text-brand-400 border border-brand-200 dark:border-brand-700/50 rounded hover:bg-brand-50 dark:hover:bg-brand-950 font-medium inline-flex items-center gap-1 text-[11px]"
               >
                 <Sparkles size={14} className="text-amber-500" />
-                {locale === 'zh' ? '加载示例项目' : 'Load Demo Experiments'}
+                {t('load_demo_experiments', 'Load Demo Experiments')}
               </button>
               <button
                 onClick={() => setShowNew(true)}
