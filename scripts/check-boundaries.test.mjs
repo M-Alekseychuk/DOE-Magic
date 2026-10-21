@@ -49,6 +49,7 @@ const CASES = [
   // Former false positives that must now pass.
   ['OK', 'unmodified copy', () => {}],
   ['OK', 'git repo with only agreed root entries', gitInit],
+  ['OK', 'tests/ and vitest.config.ts tracked at the repo root', both(write('tests/core/x.test.ts', 'export {};\n'), write('vitest.config.ts', 'export default {};\n'), gitInit)],
   ['OK', 'commented-out web import in core', append('src/core/types.ts', "\n// import { useTranslation } from '../web/i18n/LanguageContext';\n")],
   ['OK', 'import-like text in a string in core', append('src/core/sampleProject.ts', "\nexport const note = \"Tip: import data from 'Excel' via the toolbar\";\n")],
   ['OK', 'the word document. in a core comment', append('src/core/types.ts', '\n// Shared types for the project document. Keep in sync with the UI.\n')],

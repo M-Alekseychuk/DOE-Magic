@@ -10,6 +10,8 @@ coverage/
 
 # Runtime data store written by server.ts / src/server/mcp/stdio.ts (re-seeded from sample data when missing)
 data.json
+# Copies the server makes next to it, e.g. data.json.before-reset-<timestamp> from POST /api/reset-sample
+data.json.*
 
 # AI Studio agent plans (removed by hand in 0d05f8c; keep them out of git)
 /.aistudio/

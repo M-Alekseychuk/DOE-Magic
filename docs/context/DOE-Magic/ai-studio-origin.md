@@ -63,7 +63,7 @@ It also planned a test pass: compile, live switching, persistence across reloads
 | `t(key, fallback?, params?)` with `{count}` placeholders and English fallback | Built (`LanguageContext.tsx:40-53`). No caller passes `params`, and `\|\|` turns an intentionally empty translation into English (I18N-6) |
 | Choice saved in `localStorage` key `app_language`, `<html lang>` kept in sync | Built (`LanguageContext.tsx:16`, `:29`, `:32-36`). With nothing saved, it falls back to the browser language (`:21-23`) |
 | Drop-up menu in the sidebar footer next to dark mode, with globe icon, native names and checkmark | Built: `src/web/i18n/LanguageSelector.tsx`, mounted at `src/web/Layout.tsx:149` |
-| de/es/fr/it listed as "coming soon" | Not shown. `SUPPORTED_LANGUAGES` lists only en and zh (`src/web/i18n/translations.ts:11-14`); de/es/fr/it are empty dictionaries (`translations.ts:436-439`) (I18N-6) |
+| de/es/fr/it listed as "coming soon" | Not shown. `SUPPORTED_LANGUAGES` lists only en and zh (`src/web/i18n/translations.ts:11-14`); de/es/fr/it are empty dictionaries (`translations.ts:448-451`) (I18N-6) |
 | A dictionary grouped by area (common, nav, dashboard, …) used by every view | One flat key map per language. Only 6 files call `t()`; the rest use inline `locale === 'zh'` branches (I18N-1). Most keys are unused (I18N-5) |
 | Exports follow the active language | `generateExportHTML` takes `initialLocale` (`src/web/features/export/htmlExport.ts:6`), but `src/web/pages/ProjectView.tsx:356` does not pass it. Excel export is English only (I18N-2) |
 
@@ -82,17 +82,17 @@ It also planned a test pass: compile, live switching, persistence across reloads
 
 | Assumption | Where | Basis |
 |---|---|---|
-| One Node process on `PORT`, default 3000, listening on all interfaces | `server.ts:8`, `server.ts:374` | Template convention; `PORT` is read since cc41f15. Cloud Run sets `PORT` to the container port. Which port AI Studio's preview expects or sets is unverified; AGENTS.md keeps the default 3000 |
-| In development, Vite runs as Express middleware in the same process. The HMR client port is 443 when `K_SERVICE` or `APP_URL` is set (behind the AI Studio or Cloud Run proxy), otherwise 3000, whatever `PORT` says (SRV-14) | `server.ts:351-365` (`isCloudRun` at `:353`) | Code |
-| AI Studio sets `DISABLE_HMR=true` to stop HMR and file watching while its agent edits | `vite.config.ts:15-21` (comment says "Do not modify"); since cc41f15 also `server.ts:358` | Template comment. Since cc41f15 the inline `hmr` object becomes `false` too. Vite then opens its own WebSocket server on port 24678 instead (SRV-10, confirmed by running). Line 17 holds a mojibake dash (BLD-14) |
+| One Node process on `PORT`, default 3000, listening on all interfaces | `server.ts:8`, `server.ts:389` | Template convention; `PORT` is read since cc41f15. Cloud Run sets `PORT` to the container port. Which port AI Studio's preview expects or sets is unverified; AGENTS.md keeps the default 3000 |
+| In development, Vite runs as Express middleware in the same process. The HMR client port is 443 when `K_SERVICE` or `APP_URL` is set (behind the AI Studio or Cloud Run proxy), otherwise 3000, whatever `PORT` says (SRV-14) | `server.ts:366-380` (`isCloudRun` at `:368`) | Code |
+| AI Studio sets `DISABLE_HMR=true` to stop HMR and file watching while its agent edits | `vite.config.ts:15-21` (comment says "Do not modify"); since cc41f15 also `server.ts:373` | Template comment. Since cc41f15 the inline `hmr` object becomes `false` too. Vite then opens its own WebSocket server on port 24678 instead (SRV-10, confirmed by running). Line 17 holds a mojibake dash (BLD-14) |
 | The AI Studio proxy rejects the HMR WebSocket, so those errors are suppressed | `index.html:12-32` | Template comment |
 | `GEMINI_API_KEY` comes from AI Studio's Secrets panel; `APP_URL` is the Cloud Run service URL, injected at runtime | `.env.example` before cc41f15 (`:1-9`) | Template comments. cc41f15 shortened them to "configured automatically by AI Studio" and "Environment / Cloud Run service URL", and added `PORT=3000`. That line only documents the default, because `.env` is never loaded (SRV-8) |
 | Applet manifest: name, description, `requestFramePermissions: []`, `majorCapabilities` | `metadata.json:1-8` | AI Studio file. The meaning of fields other than name and description is unverified |
 | Scaffolding folder | `assets/.aistudio/.gitignore` | Unknown purpose. Deleted by cc41f15; restoring it is the owner's call |
 | Vite entry is `src/main.tsx`, referenced from `index.html:36` | `src/main.tsx` | Template layout. R8 in `npm run check` fails if it disappears |
-| Every path resolves from `process.cwd()`, which must be the repo root | `server.ts:9`, `server.ts:367`, `src/server/mcp/stdio.ts:8` | Code (SRV-8) |
+| Every path resolves from `process.cwd()`, which must be the repo root | `server.ts:9`, `server.ts:382`, `src/server/mcp/stdio.ts:8` | Code (SRV-8) |
 | Production means `npm run build`, then `node dist/server.cjs` | `package.json:8-9` | Whether AI Studio's deploy sets `NODE_ENV=production` is unverified (BLD-1, SRV-3) |
-| A deployed instance keeps `data.json` on the container's filesystem | `server.ts:9`, `server.ts:353` | Not durable on Cloud Run (DATA-9). How the app is actually deployed is unverified |
+| A deployed instance keeps `data.json` on the container's filesystem | `server.ts:9`, `server.ts:368` | Not durable on Cloud Run (DATA-9). How the app is actually deployed is unverified |
 
 AGENTS.md lists the files and settings that must not move for this reason.
 

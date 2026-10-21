@@ -1,6 +1,6 @@
 # DOE-Magic — Design Spec
 
-> Created: 2026-10-20. Status: normative architecture contract. Sections 2, 3.1 and 4–7 describe the code as it is (verified on branch `chore/project-structure-and-core-docs`, commit 534ec68). Known defects are flagged by issue ID here and fixed in later PRs.
+> Created: 2026-10-20. Status: normative architecture contract. Sections 2, 3.1 and 4–7 describe the code as it is (verified on branch `chore/project-structure-and-core-docs`, commit 534ec68; the reset and demo-load parts of §5 and §6.1 were updated for P0.1 on 2026-10-21). Known defects are flagged by issue ID here and fixed in later PRs.
 > Related: [Status and handoff](../../task/DOE-Magic/status-and-handoff.md), [Goals](../../task/DOE-Magic/goals.md), [Roadmap and backlog](roadmap-backlog.md), [Server and persistence](../../context/DOE-Magic/server-and-persistence.md), [MCP server](../../context/DOE-Magic/mcp-server.md), [Web UI](../../context/DOE-Magic/web-ui.md), [Statistics engine](../../context/DOE-Magic/statistics-engine.md), [Design generation](../../context/DOE-Magic/design-generation.md), [AI Studio origin](../../context/DOE-Magic/ai-studio-origin.md), [AGENTS.md](../../../AGENTS.md)
 
 ## 1. Purpose and scope
@@ -118,7 +118,7 @@ Inside `src/web` the observed directions are below. The checker enforces only R5
 - **R6** `src/web/features/<a>/**` never imports `src/web/features/<b>/**`, and no loose files sit directly in `src/web/features/`; code used by two features goes to `src/web/shared/` (UI) or `src/core/` (logic).
 - **R7** Everything reachable through relative imports from `server.ts` and `src/server/mcp/stdio.ts` (the stdio MCP entry) lies in `src/core/` or `src/server/`.
 - **R8** Entry points exist: `index.html`'s module script (`/src/main.tsx`), the file `npm run mcp` runs, and `server.ts`.
-- **R9** Git tracks only these entries at the repo root: `.env.example`, `.github/`, `.gitignore`, `AGENTS.md`, `CLAUDE.md`, `LICENSE`, `README.md`, `assets/`, `bun.lock`, `docs/`, `index.html`, `metadata.json`, `package-lock.json`, `package.json`, `public/`, `scripts/`, `server.ts`, `src/`, `tsconfig.json`, `vite.config.ts`. A tracked `.aistudio/` or `data.json` fails with its own message: "re-added by an AI Studio sync; remove it from git with `git rm -r --cached` (it is in .gitignore)". `bun.lock` and `package-lock.json` stay on the list although neither is tracked (decision 1, §9.8), so an AI Studio sync that brings one back does not fail the check; untrack it with `git rm --cached`. Adding an entry means updating the list in `scripts/check-boundaries.mjs` and `AGENTS.md`. Skipped with a warning ("not a git checkout (or git is not installed)") when `git ls-files` cannot run.
+- **R9** Git tracks only these entries at the repo root: `.env.example`, `.github/`, `.gitignore`, `AGENTS.md`, `CLAUDE.md`, `LICENSE`, `README.md`, `assets/`, `bun.lock`, `docs/`, `index.html`, `metadata.json`, `package-lock.json`, `package.json`, `public/`, `scripts/`, `server.ts`, `src/`, `tests/`, `tsconfig.json`, `vite.config.ts`, `vitest.config.ts`. A tracked `.aistudio/` or `data.json` fails with its own message: "re-added by an AI Studio sync; remove it from git with `git rm -r --cached` (it is in .gitignore)". `bun.lock` and `package-lock.json` stay on the list although neither is tracked (decision 1, §9.8), so an AI Studio sync that brings one back does not fail the check; untrack it with `git rm --cached`. Adding an entry means updating the list in `scripts/check-boundaries.mjs` and `AGENTS.md`. Skipped with a warning ("not a git checkout (or git is not installed)") when `git ls-files` cannot run.
 
 The rule text is normative. The checker is a heuristic minimum, so passing it does not prove compliance.
 
@@ -135,11 +135,11 @@ How the checker works. It uses the TypeScript compiler API, so it imports `types
 | R8 | Reads the `index.html` module script and the first `.ts` token of `scripts.mcp` (`:131-137`) | — |
 | R9 | Runs `git ls-files` and checks the first path segment of every tracked file against `REPO_TOP_LEVEL`; `.aistudio` and `data.json` get the AI Studio message (`:16-20`, `:74-84`). If git cannot run, it prints a warning and skips the rule | Untracked files until they are committed; stray files inside an allowed folder such as `scripts/` or `docs/`; any run outside a git checkout |
 
-Scope: R2–R8 scan `src/**/*.{ts,tsx,js,jsx,mjs,cjs}` and `server.ts` (`:67`, `:86`); R1 lists `src/`, and R9 lists the files git tracks. `tsc` covers `src`, `server.ts` and `vite.config.ts` (`tsconfig.json` `include`). Adding an npm package to `src/core` MUST update R3 in this spec, `AGENTS.md` and `CORE_PACKAGES` (`scripts/check-boundaries.mjs:14`) in the same PR. One example is zod for shared schemas (DATA-7).
+Scope: R2–R8 scan `src/**/*.{ts,tsx,js,jsx,mjs,cjs}` and `server.ts` (`:67`, `:86`); R1 lists `src/`, and R9 lists the files git tracks. `tsc` covers `src`, `server.ts`, `vite.config.ts`, `vitest.config.ts` and `tests` (`tsconfig.json` `include`). Adding an npm package to `src/core` MUST update R3 in this spec, `AGENTS.md` and `CORE_PACKAGES` (`scripts/check-boundaries.mjs:14`) in the same PR. One example is zod for shared schemas (DATA-7).
 
-The checker has a self-test, `node scripts/check-boundaries.test.mjs` (commit 534ec68). Run it after changing the checker. Its 28 cases are 21 injected violations covering R1–R9 that must fail with the right rule, and 7 former false positives (for example commented-out imports, import-like strings and `localStorage` in a comment) that must pass. On the clean tree `npm run check` prints `Layer boundaries OK: 35 files, 8 reachable from the Node entry points.`
+The checker has a self-test, `node scripts/check-boundaries.test.mjs` (commit 534ec68). Run it after changing the checker. Its 29 cases are 21 injected violations covering R1–R9 that must fail with the right rule, and 8 cases that must pass: 7 former false positives (for example commented-out imports, import-like strings and `localStorage` in a comment) and a tracked `tests/` folder with `vitest.config.ts`. On the clean tree `npm run check` prints `Layer boundaries OK: 35 files, 8 reachable from the Node entry points.`
 
-Consequence for tests (BLD-4): a test file under `src/core/` that imports a test runner (for example `vitest`) fails R3 today. The PR that adds tests MUST either put them outside `src/` (for example `tests/`, mirroring `src/`) or teach the checker to skip `*.test.ts`, and record that choice here.
+Tests (BLD-4, decided in backlog P2.1 step 1): tests live in `tests/` at the repo root, mirroring `src/` (`tests/core/analysis/`, `tests/server/mcp/`), with shared code in `tests/helpers/` and reference data in `tests/fixtures/`. The checker scans only `src/**` and `server.ts`, so tests may import any layer and the test runner; `tsc` type-checks them. Never put a test file under `src/`: a `vitest` import there fails R3 (core) or would ship test code in a layer, and `src/` holds only app code.
 
 ### 3.3 Where does new code go?
 
@@ -160,6 +160,7 @@ Consequence for tests (BLD-4): a test file under `src/core/` that imports a test
 | Store code shared by `server.ts` and `stdio.ts` | `src/server/store/` (planned, MCP-20) | |
 | A static file served as-is at `/` | `public/` | |
 | An image or stylesheet imported by UI code | `src/web/assets/` | |
+| A test or a reference dataset | `tests/`, mirroring `src/`; fixtures in `tests/fixtures/` | Cite the source of every reference value (§9.5, [fixtures README](../../../tests/fixtures/README.md)) |
 | A maintained tool script | `scripts/`, plus an npm script in `package.json` | |
 | A one-off, patch or debug script | Not in the repo. Use a scratch directory outside it | [Lesson](../../memory/DOE-Magic/patch-scripts-in-repo-root.md) |
 | Documentation | `docs/{task,spec,context,memory}/DOE-Magic/` | WF header style |
@@ -174,7 +175,7 @@ Planned module map. These are target locations from the backlog. The PR that cre
 | `src/core/design/{fractions,dsd,randomize,designTypes,planner,augment}.ts` | `generateRuns` in `ProjectDesign.tsx` (DES-8) | DES-2/3/7/18, UI-15 |
 | `src/core/{schema,migrations,projectOps,ids,version}.ts`, `src/core/io/{runMatrixImport,parseNumber,projectJson}.ts` | Validation, migration, number parsing and ID code spread over server, stdio and web | DATA-6/7/10/11/12/20, DES-13, SRV-11 |
 | `src/server/store/{jsonFileStore,changeLog}.ts`, `src/server/routes/`, `src/server/realtime/`, `src/server/http/security.ts`, `src/server/mcp/{http,lookup,activityLog}.ts` | `server.ts` bodies, `stdio.ts` bootstrap, `handleDirectJsonRpc` | SRV-1/5, MCP-4/5/17/20/21/22, DATA-2/3/16 |
-| `src/web/shared/{ConfirmDialog,AppErrorBoundary,HelpTooltip}.tsx`, `src/web/shared/{downloadPng,plotly}.ts` | Duplicated widgets in Analysis and Compare | UI-1/2/13/19/20/23, DATA-17 |
+| `src/web/shared/{ConfirmDialog,AppErrorBoundary,HelpTooltip}.tsx`, `src/web/shared/{downloadPng,plotly}.ts` | Duplicated widgets in Analysis and Compare. `ConfirmDialog` exists since P0.1 | UI-1/2/13/19/20/23, DATA-17 |
 | `src/web/state/{api,localCache}.ts`, `src/web/features/export/excelExport.ts` | HTTP, socket and cache code in `ProjectContext.tsx`; the Excel export in `ProjectView.tsx` | DATA-5/18, SRV-12, UI-8, STAT-17 |
 
 ### 3.4 Conventions per layer
@@ -236,7 +237,7 @@ All project data is persisted as a store object `{ projects: Project[], folders:
 
 | Field | Type | Meaning and convention |
 |---|---|---|
-| `id` | string | uuid; the sample is `proj-suzuki-cross-coupling`. JSON import assigns a new uuid (`Dashboard.tsx:88-93`) |
+| `id` | string | uuid; the sample is `proj-suzuki-cross-coupling`. JSON import assigns a new uuid (`Dashboard.tsx:91-96`) |
 | `folderId` | string? | Reference to `Folder.id`. It is not validated, so it can dangle (DATA-10/11). Deleting a folder unsets it on that folder's projects (`server.ts:185-188`, `ProjectContext.tsx:253-259`) |
 | `name` | string | Display |
 | `description` | string | Required by the type, but imported files may omit it (UI-23) |
@@ -246,7 +247,7 @@ All project data is persisted as a store object `{ projects: Project[], folders:
 | `optimizationResults` | string? | **Two meanings** (MCP-12): the UI's English Markdown report from the Bayesian optimiser (`ProjectOptimization.tsx:636`), or MCP `optimize_desirability`'s one-line summary (`doeMcpServer.ts:923`). The last writer wins |
 | `optimizationCandidates` | `Record<factorId, string \| number>[]`? | Suggested settings. The UI writes Bayesian suggestions with numbers rounded to 2 decimals (`ProjectOptimization.tsx:571`, STAT-19). MCP writes the top 5 desirability settings, which can miss factors (`doeMcpServer.ts:916-922`, MCP-11). "Append" turns them into runs and clears the field (`ProjectOptimization.tsx:645-663`) |
 | `robustnessState` | `any` | Written only by the Robustness tab (`RobustnessSimulation.tsx:79-101`), including on first open (DATA-15). Shape below. MCP neither reads nor writes it |
-| `isArchived` | boolean? | Hidden from the main lists and shown under `#/?folder=archive` (`Dashboard.tsx:37-42`). "Delete" on a non-archived project archives it; on an archived one it hard-deletes (`ProjectContext.tsx:197-220`). MCP `delete_project` always hard-deletes (MCP-4) |
+| `isArchived` | boolean? | Hidden from the main lists and shown under `#/?folder=archive` (`Dashboard.tsx:40-45`). "Delete" on a non-archived project archives it; on an archived one it hard-deletes (`ProjectContext.tsx:197-220`). MCP `delete_project` always hard-deletes (MCP-4) |
 | `createdAt`, `updatedAt` | number | ms since epoch. `updatedAt` is set by the client `saveProject` (mutating its argument, DATA-14), by `POST /api/projects`, and by process A's MCP context. It is not set by socket writes or by the stdio MCP context (MCP-20) |
 
 `robustnessState` shape (as-is; the user inputs are stored as strings, the simulation results as numbers):
@@ -281,7 +282,7 @@ All project data is persisted as a store object `{ projects: Project[], folders:
 
 These were found while writing this spec and are now registered.
 
-- **Categorical `Factor.min`/`max` has no single convention (DATA-22).** The UI stores `0`/`levels.length-1` (`ProjectSetup.tsx:76-77, 115-116`, sample `sampleProject.ts:51-52`). MCP `create_project` stores the zod defaults `0`/`100` when the caller omits them (`doeMcpServer.ts:229-230`), and the direct JSON-RPC path stores `undefined` (MCP-5). Code that falls back to `(min+max)/2` for a categorical factor then picks a different level depending on how the project was created. For example, MCP `simulate_robustness` (`doeMcpServer.ts:1015`) feeds 1 (the middle level) for a UI-created 3-level factor but 50 for an MCP-created one, and 50 falls through to level 0 in `getFactorContrasts` (`analysisCore.ts:65-67`). Fix (backlog P1.10): define categorical `min = 0`, `max = levels.length − 1` (or ignore min/max for categoricals) and enforce it in the shared schema (DATA-7). Confirmed by reading.
+- **Categorical `Factor.min`/`max` has no single convention (DATA-22).** The UI stores `0`/`levels.length-1` (`ProjectSetup.tsx:76-77, 115-116`, sample `sampleProject.ts:52-53`). MCP `create_project` stores the zod defaults `0`/`100` when the caller omits them (`doeMcpServer.ts:229-230`), and the direct JSON-RPC path stores `undefined` (MCP-5). Code that falls back to `(min+max)/2` for a categorical factor then picks a different level depending on how the project was created. For example, MCP `simulate_robustness` (`doeMcpServer.ts:1015`) feeds 1 (the middle level) for a UI-created 3-level factor but 50 for an MCP-created one, and 50 falls through to level 0 in `getFactorContrasts` (`analysisCore.ts:65-67`). Fix (backlog P1.10): define categorical `min = 0`, `max = levels.length − 1` (or ignore min/max for categoricals) and enforce it in the shared schema (DATA-7). Confirmed by reading.
 - **Factor and response names are not required to be unique, but several paths key by name (DATA-23).** Neither the Setup tab nor MCP `create_project` checks for duplicates. Yet MCP `optimize_desirability` builds its candidates as `namedFactors[f.name]` (`doeMcpServer.ts:897-900`) and then saves `optimizationCandidates` as `rawSetting[f.id] = c.factors[f.name]` (`:916-921`). With two factors of the same name, both saved settings get the second factor's value. The same applies to `predicted[r.name]` for responses (`:885`). Name-based lookups (MCP `resolveFactorId`/`resolveResponse`, `doeMcpServer.ts:72-87`; Excel import header matching, `ProjectDesign.tsx:254-292`) silently take the first match. Fix (backlog P1.10): require unique, trimmed, case-insensitive names in the shared schema and the Setup form, and key internal maps by id. Confirmed by reading.
 
 ## 5. Persistence and sync protocol (as-is)
@@ -292,6 +293,7 @@ These were found while writing this spec and are now registered.
 |---|---|---|---|
 | `<cwd>/data.json` | `{projects, folders}`, pretty-printed JSON, no version. Gitignored (`.gitignore`); an AI Studio sync may still commit it, which R9 reports | Process A `saveData` (`server.ts:62-68`) and process B `saveData` (`stdio.ts:32-38`): synchronous whole-file `writeFileSync`, not atomic (DATA-2) | Each process, once at start |
 | Process A memory (`db: any`, `server.ts:25`) | Same | REST, socket.io and HTTP MCP handlers | REST GETs, `sync_data` |
+| `<cwd>/data.json.before-reset-<timestamp>` | A byte copy of `data.json` taken just before a confirmed reset. `<timestamp>` is the ISO time with `:` and `.` replaced by `-`. Gitignored (`data.json.*`) | `POST /api/reset-sample` (`server.ts:200-209`) | Nothing. To restore, stop the server and copy it over `data.json` |
 | Process B memory (`db: any`, `stdio.ts:10`) | Same | stdio MCP tools | stdio MCP tools |
 | localStorage `doe_magic_projects` | `Project[]` cache | `ProjectContext.tsx` on every mutation and server sync | Initial client state (`ProjectContext.tsx:21, 24-47`) |
 | localStorage `doe_magic_folders` | `Folder[]` cache | Same | `ProjectContext.tsx:22, 49-68` |
@@ -321,8 +323,8 @@ Process B (`stdio.ts:10-30`) differs: it seeds only when the store is empty, its
 | Save project | Set `project.updatedAt` (mutating the argument), upsert into state and cache, then `POST /api/projects` **and**, if connected, `socket.emit('update_project')`. Errors are only `console.warn`, and `res.ok` is not checked (DATA-5, DATA-8) | `:172-195` |
 | Delete project | Not archived → save with `isArchived: true`. Archived → remove locally, `DELETE /api/projects/:id`, and `socket.emit('delete_project')` | `:197-220` |
 | Save or delete folder | Same pattern with `/api/folders` and `update_folder`/`delete_folder`. Deleting unsets `folderId` locally | `:222-267` |
-| Reset samples | Replace local state with the samples and `POST /api/reset-sample`, which wipes the server for every user. Called by both "demo" buttons (DATA-1, UI-1) | `:269-281` |
-| Load demo | Additive upsert of the demo project. No callers (UI-1) | `:283-312` |
+| Reset samples | `POST /api/reset-sample` with `{"confirm": true}`. On a 200, replace state and cache with the returned `data` and resolve `true`; on any failure change nothing and resolve `false`. The only caller is "Reset Sample Data" in the Archive view, after `ConfirmDialog` (DATA-1) | `:269-291` |
+| Load demo | Save `createDemoProjectCopy(projects)` (`src/core/sampleProject.ts:280-286`): a fresh deep copy that keeps the demo id unless a project already has it, then a new uuid. Saves the demo folder if it is missing. Never replaces an existing project. Returns the new id. Called by both demo buttons, which then open it (UI-1) | `:293-301` |
 
 Many fields save on every keystroke (DATA-8, SRV-9).
 
@@ -333,10 +335,10 @@ Many fields save on every keystroke (DATA-8, SRV-9).
 | `POST /api/projects` | Body must have `id` (400 otherwise) | Sets `updatedAt`, upserts the whole object, writes the file | `io.emit('sync_data', db)` to **all** clients, including the sender |
 | `DELETE /api/projects/:id` | None. An unknown id still returns success | Hard delete, writes the file | All clients |
 | `POST /api/folders`, `DELETE /api/folders/:id` | `id` required on POST | Upsert, or delete and unset `folderId` on its projects | All clients |
-| `POST /api/reset-sample` | None, body ignored | Replaces **all** projects and folders with the samples | All clients |
+| `POST /api/reset-sample` | JSON body `{"confirm": true}`, otherwise 400 and no change | Copies `data.json` aside first (500 and no change if that fails), then replaces **all** projects and folders with new sample objects | All clients |
 | socket `update_project` / `update_folder` | **None** (DATA-7) | Upsert the whole object (no `updatedAt`), write the file | `socket.broadcast.emit` to all **other** clients |
 | socket `delete_project` / `delete_folder` | None | Delete (folder delete unsets `folderId`), write the file | Other clients |
-| MCP write tools in process A | Per-tool zod schemas, skipped on `POST /api/mcp` (MCP-5) | `mcpContext.saveProject` sets `updatedAt`, upserts, writes the file (`server.ts:207-228`) | All clients, twice per write (MCP-23) |
+| MCP write tools in process A | Per-tool zod schemas, skipped on `POST /api/mcp` (MCP-5) | `mcpContext.saveProject` sets `updatedAt`, upserts, writes the file (`server.ts:222-243`) | All clients, twice per write (MCP-23) |
 | MCP write tools in process B | Per-tool zod schemas | Own memory copy, file rewritten | None (DATA-3) |
 
 Consistency model: every write replaces the whole project object (last writer wins). There is no revision check (DATA-4), no shape validation (DATA-7), no change history (DATA-16) and no backup. Every write rewrites the whole file and broadcasts the whole database (SRV-9).
@@ -347,7 +349,8 @@ Consistency model: every write replaces the whole project object (last writer wi
 - New storage keys, file formats, REST routes or socket events MUST be added to §5 and §6 before or in the PR that introduces them.
 - Browser code writes only through `ProjectContext` (later `src/web/state/`). Server code writes only through the store context (`McpDatabaseContext` today, `src/server/store/` later). Do not add another writer to `data.json`.
 - New code MUST NOT mutate shared objects in place, such as sample constants or a project received as an argument. Work on a copy (DATA-14).
-- Any new destructive action (reset, regenerate, import-replace, delete) MUST ask for confirmation in the UI and MUST NOT run unasked from MCP (DATA-1, DES-1, UI-2, MCP-10).
+- Any new destructive action (reset, regenerate, import-replace, delete) MUST ask for confirmation in the UI, with `src/web/shared/ConfirmDialog.tsx`, and MUST NOT run unasked from MCP (DATA-1, DES-1, UI-2, MCP-10).
+- A REST endpoint that deletes data for every user MUST refuse a request without an explicit JSON confirmation and MUST copy `data.json` aside before it writes, as `POST /api/reset-sample` does (P0.1).
 
 ## 6. External interfaces
 
@@ -365,13 +368,13 @@ All routes are unauthenticated, CORS allows every origin, and the server listens
 | `GET /api/folders` | — | `Folder[]` | `:162-164` |
 | `POST /api/folders` | `Folder` with `id` | `{success:true, folder}` or 400 `{error}` | `:166-180` |
 | `DELETE /api/folders/:id` | — | `{success:true}` | `:182-192` |
-| `POST /api/reset-sample` | — | `{success:true, data}`. **Destructive for all users** | `:194-202` |
-| `GET /mcp/sse`, `GET /api/mcp/sse` | — | MCP SSE stream. Each connection gets its own MCP server and session, and is told to POST to `/api/mcp/messages` | `:233-257` |
-| `POST /mcp/messages`, `POST /api/mcp/messages` | JSON-RPC, with `?sessionId=` or an `x-session-id` header | SDK transport response; 400 without a session id, 404 for an unknown one | `:259-282` |
-| `POST /mcp`, `POST /api/mcp` | One JSON-RPC request: `initialize`, `tools/list`, `tools/call`, `resources/list`, `prompts/list`, `ping` | JSON-RPC response from `handleDirectJsonRpc` (`doeMcpServer.ts:1319`). Non-conformant and unvalidated (MCP-5, MCP-17) | `:284-299` |
-| `GET /mcp/info`, `GET /api/mcp/info` | — | `{status, name, version, protocolVersion, activeSessions, endpoints, toolsCount, tools, resources, prompts}`, built from private SDK fields (MCP-17) | `:301-343` |
-| `GET /api/mcp/logs` | — | In-memory activity log, newest first, at most 100 entries (MCP-21) | `:345-348` |
-| `GET *` (production only) | — | `dist/index.html`, also for unknown `/api/*` paths (SRV-7) | `:369-371` |
+| `POST /api/reset-sample` | JSON `{"confirm": true}` | `{success:true, data, backup}`, where `backup` is the backup file name or `null` when no `data.json` existed; 400 `{error}` without the confirm body; 500 `{error}` if the backup fails. **Destructive for all users** | `:194-217` |
+| `GET /mcp/sse`, `GET /api/mcp/sse` | — | MCP SSE stream. Each connection gets its own MCP server and session, and is told to POST to `/api/mcp/messages` | `:248-272` |
+| `POST /mcp/messages`, `POST /api/mcp/messages` | JSON-RPC, with `?sessionId=` or an `x-session-id` header | SDK transport response; 400 without a session id, 404 for an unknown one | `:274-297` |
+| `POST /mcp`, `POST /api/mcp` | One JSON-RPC request: `initialize`, `tools/list`, `tools/call`, `resources/list`, `prompts/list`, `ping` | JSON-RPC response from `handleDirectJsonRpc` (`doeMcpServer.ts:1319`). Non-conformant and unvalidated (MCP-5, MCP-17) | `:299-314` |
+| `GET /mcp/info`, `GET /api/mcp/info` | — | `{status, name, version, protocolVersion, activeSessions, endpoints, toolsCount, tools, resources, prompts}`, built from private SDK fields (MCP-17) | `:316-358` |
+| `GET /api/mcp/logs` | — | In-memory activity log, newest first, at most 100 entries (MCP-21) | `:360-363` |
+| `GET *` (production only) | — | `dist/index.html`, also for unknown `/api/*` paths (SRV-7) | `:384-386` |
 
 ### 6.2 socket.io
 
@@ -403,7 +406,7 @@ Changing a tool's name, inputs, defaults or output fields is a contract change (
 | File | Direction | Format | Where |
 |---|---|---|---|
 | Project JSON | Export | The raw `Project`, with no format or version marker (DATA-10) | `ProjectView.tsx:44-52` |
-| Project JSON | Import | Requires array `factors`, `responses` and `runs`. Assigns a new `id`, `createdAt` and `updatedAt`, and keeps every other field | `Dashboard.tsx:73-105` |
+| Project JSON | Import | Requires array `factors`, `responses` and `runs`. Assigns a new `id`, `createdAt` and `updatedAt`, and keeps every other field | `Dashboard.tsx:76-108` |
 | Excel workbook | Export | `xlsx-js-style`, English labels (UI-8, STAT-17, I18N-2) | `ProjectView.tsx:54-353` |
 | Excel run matrix | Import | SheetJS `xlsx`, matched by factor and response name, **replaces all runs** (DATA-6, UI-12, BLD-3) | `ProjectDesign.tsx:200` (`handleImportExcel`) |
 | HTML report | Export | Single HTML file with the project and analysis results embedded as JSON (`htmlExport.ts:318-319`). Loads Plotly and Tailwind from CDNs (UI-21) and opens in English (I18N-2) | `src/web/features/export/htmlExport.ts:6`, called at `ProjectView.tsx:356` |
@@ -422,18 +425,19 @@ Changing a tool's name, inputs, defaults or output fields is a contract change (
 | `npm run mcp` | `tsx src/server/mcp/stdio.ts` | Process B. npm prints a banner on stdout before the JSON-RPC stream; the client snippet in the MCP panel lacks a working directory (MCP-18) |
 | `npm run lint` | `tsc --noEmit` | Type check only |
 | `npm run check` | `tsc --noEmit && node scripts/check-boundaries.mjs` | Type check and layer rules (§3.2). Required before every commit |
+| `npm test` | `vitest run` | Runs `tests/**/*.test.ts` in Node with `vitest.config.ts` (it does not load `vite.config.ts` and its React and Tailwind plugins). Expected failures of known bugs (`it.fails`) count as passing. Required before every commit (§9.4) |
 
 ### 7.2 Development vs production (process A)
 
 | | Development (`NODE_ENV` ≠ `production`) | Production (`NODE_ENV=production`) |
 |---|---|---|
-| Front end | `createViteServer({server: {middlewareMode: true, hmr: DISABLE_HMR === 'true' ? false : {server: httpServer, clientPort}}, appType: 'spa'})`, which merges `vite.config.ts` (`server.ts:351-365`; the `DISABLE_HMR` test since cc41f15) | `express.static(<cwd>/dist)` and an `index.html` fallback for every other GET (`server.ts:366-371`) |
-| Listening port | `Number(process.env.PORT) \|\| 3000` on `0.0.0.0` (`server.ts:8`, `:374`; since cc41f15). An unset, empty, non-numeric or 0 `PORT` gives 3000 | Same |
-| HMR client port | 443 if `K_SERVICE` or `APP_URL` is set (Cloud Run / AI Studio), otherwise 3000 (`server.ts:353-354`), even when `PORT` is different: the client then dials the wrong port (SRV-14, confirmed by running) | — |
+| Front end | `createViteServer({server: {middlewareMode: true, hmr: DISABLE_HMR === 'true' ? false : {server: httpServer, clientPort}}, appType: 'spa'})`, which merges `vite.config.ts` (`server.ts:366-380`; the `DISABLE_HMR` test since cc41f15) | `express.static(<cwd>/dist)` and an `index.html` fallback for every other GET (`server.ts:381-386`) |
+| Listening port | `Number(process.env.PORT) \|\| 3000` on `0.0.0.0` (`server.ts:8`, `:389`; since cc41f15). An unset, empty, non-numeric or 0 `PORT` gives 3000 | Same |
+| HMR client port | 443 if `K_SERVICE` or `APP_URL` is set (Cloud Run / AI Studio), otherwise 3000 (`server.ts:368-369`), even when `PORT` is different: the client then dials the wrong port (SRV-14, confirmed by running) | — |
 | `DISABLE_HMR=true` | `hmr: false`, plus `watch: null` from `vite.config.ts`. No HMR socket on the server port, but in middleware mode Vite opens its own WebSocket server on port 24678 and points the client at it (SRV-10, confirmed by running 2026-10-21) | — |
 | Runtime needs | `vite` and dev tooling installed | `node_modules` (packages are external to the bundle). A Node version with `require(esm)` on by default (≥ 22.12, or ≥ 20.19 on the 20.x line), because the CJS bundle `require()`s ESM-only `uuid` (SRV-6, BLD-13). Confirmed by running: `node --no-experimental-require-module dist/server.cjs` fails with `ERR_REQUIRE_ESM` on `node_modules/uuid/dist-node/index.js`. The README asks for 22.12 |
 
-Environment variables actually read by code: `PORT` (`server.ts:8`, since cc41f15), `NODE_ENV` (`server.ts:351`), `K_SERVICE` and `APP_URL` (`server.ts:353`), and `DISABLE_HMR` (`vite.config.ts:18-20` and, since cc41f15, `server.ts:358`; SRV-10). `.env` is never loaded (SRV-8), so the `PORT=3000` line that cc41f15 added to `.env.example` only documents the default; set `PORT` in the environment. `GEMINI_API_KEY` (`.env.example`) is not read by any code (BLD-10).
+Environment variables actually read by code: `PORT` (`server.ts:8`, since cc41f15), `NODE_ENV` (`server.ts:366`), `K_SERVICE` and `APP_URL` (`server.ts:368`), and `DISABLE_HMR` (`vite.config.ts:18-20` and, since cc41f15, `server.ts:373`; SRV-10). `.env` is never loaded (SRV-8), so the `PORT=3000` line that cc41f15 added to `.env.example` only documents the default; set `PORT` in the environment. `GEMINI_API_KEY` (`.env.example`) is not read by any code (BLD-10).
 
 ### 7.3 Deploy
 
@@ -444,10 +448,10 @@ The code expects to run in Google AI Studio and on Cloud Run (the `K_SERVICE`/`A
 The owner keeps AI Studio compatibility. These hold until the owner decides otherwise:
 
 1. **Root files stay where they are:** `server.ts`, `index.html`, `vite.config.ts`, `tsconfig.json`, `package.json`, `metadata.json`, `.env.example`, `public/` (`logo.png`, `plotly.min.js`), and `src/main.tsx` (the template's Vite entry). `assets/.aistudio/` belonged on this list, but cc41f15 deleted its only file, `assets/.aistudio/.gitignore`; whether it comes back is the owner's call. Keep the npm script names `dev`, `build` and `start`. How AI Studio invokes them is unverified.
-2. **Default port 3000.** Since cc41f15 the port is `Number(process.env.PORT) || 3000` (`server.ts:8`), listening on `0.0.0.0` (`server.ts:374`). Changing the default is not allowed. Cloud Run sets `PORT` to the service's container port, so a deployed instance follows the platform; what AI Studio's preview sets is unverified. The HMR `clientPort` does not follow `PORT` yet (SRV-14).
-3. **Paths resolve from `process.cwd()`**, which must be the repo root: `data.json` (`server.ts:9`, `stdio.ts:8`) and `dist` (`server.ts:367`). Start every process from the repo root.
-4. **The `DISABLE_HMR` block in `vite.config.ts:15-21` is marked "Do not modify".** Leave it unchanged. The garbled dash in the comment at `:17` is BLD-14. Since cc41f15, `server.ts:358` reads `DISABLE_HMR` too.
-5. **HMR `clientPort` 443 on Cloud Run** (`server.ts:353-354`): AI Studio's preview is proxied over HTTPS.
+2. **Default port 3000.** Since cc41f15 the port is `Number(process.env.PORT) || 3000` (`server.ts:8`), listening on `0.0.0.0` (`server.ts:389`). Changing the default is not allowed. Cloud Run sets `PORT` to the service's container port, so a deployed instance follows the platform; what AI Studio's preview sets is unverified. The HMR `clientPort` does not follow `PORT` yet (SRV-14).
+3. **Paths resolve from `process.cwd()`**, which must be the repo root: `data.json` (`server.ts:9`, `stdio.ts:8`) and `dist` (`server.ts:382`). Start every process from the repo root.
+4. **The `DISABLE_HMR` block in `vite.config.ts:15-21` is marked "Do not modify".** Leave it unchanged. The garbled dash in the comment at `:17` is BLD-14. Since cc41f15, `server.ts:373` reads `DISABLE_HMR` too.
+5. **HMR `clientPort` 443 on Cloud Run** (`server.ts:368-369`): AI Studio's preview is proxied over HTTPS.
 6. **`base: "./"`** in `vite.config.ts:8` stays. Root-absolute paths still exist (`/plotly.min.js`, `/logo.png`, `/api`, `/socket.io`), so the app only works at a domain root (SRV-12).
 7. **The inline script in `index.html:12-32`** suppresses Vite HMR WebSocket errors in the AI Studio proxy. Keep it.
 8. **Tailwind scans only `src/`:** `@import "tailwindcss" source("..");` in `src/web/index.css:2` (relative to the CSS file, so `..` is `src/`). A class that appears only outside `src/` is not generated. Keep the `source("..")`. See [the lesson](../../memory/DOE-Magic/tailwind-scans-whole-repo.md).
@@ -461,7 +465,7 @@ As-is mechanism (`src/web/i18n/`):
 - `useTranslation()` returns `{locale, setLocale, t, supportedLanguages, currentLanguage}` (`LanguageContext.tsx:4-10, 62-68`).
 - `t(key, fallback?, params?)` looks up `translations[locale][key]`, then `translations.en[key]`, then `fallback`, then `key` itself. It chains these with `||`, so an empty string falls through (`LanguageContext.tsx:40-53`, I18N-6).
 - `params` replaces `{name}` placeholders. No caller uses it yet.
-- Dictionaries: `translations.en` (`translations.ts:17`) and `translations.zh` (`:226`). Keys are snake_case. The selector offers only `en` and `zh` (`:11-14`); `de`, `es`, `fr` and `it` are empty stubs (`:436-439`).
+- Dictionaries: `translations.en` (`translations.ts:17`) and `translations.zh` (`:232`). Keys are snake_case. The selector offers only `en` and `zh` (`:11-14`); `de`, `es`, `fr` and `it` are empty stubs (`:448-451`).
 - The locale is stored in localStorage `app_language`. On first visit it comes from `navigator.language` (`zh*` → `zh`, otherwise `en`). It sets `<html lang>` to `zh-CN` or the locale code.
 - Only 6 files call `t()`. About 600 inline `locale === 'zh' ? … : …` branches bypass the dictionary (I18N-1). The HTML export has its own dictionary (`htmlExport.ts:321-408`, I18N-3).
 
@@ -483,8 +487,11 @@ Rules for new and changed code:
    - statistical semantics (model terms, term IDs, score or statistic definitions, p-values, effect scales, desirability, Lenth, Monte Carlo): the [statistics engine](../../context/DOE-Magic/statistics-engine.md) or [design generation](../../context/DOE-Magic/design-generation.md) doc;
    - MCP tool names, inputs, defaults and outputs: [mcp-server.md](../../context/DOE-Magic/mcp-server.md).
 3. **Issue IDs.** Reference the registry ID in the commit message and PR (for example `fix(stats): STAT-2 Lenth pseudo-error scale`). Never renumber IDs. A newly found problem goes into the [backlog](roadmap-backlog.md) as a new entry before or with its fix.
-4. **Checks.** Before finishing, run `npm run check` and `npm run build`. For UI changes, also run `npm run dev` and exercise the affected tab at http://localhost:3000. For MCP changes, call the tool over `POST /api/mcp` **and** over SSE or stdio, because the direct path skips zod (MCP-5).
-5. **Statistics changes need a reference.** A change to a computed number MUST be checked against an independent reference: JMP, R, or a published worked example with its source cited. Until a test runner exists (BLD-4), put the reference comparison in the PR description (input data, reference tool and version, expected and actual values). Once tests exist, the comparison MUST be a committed test. Never "fix" a number without a test that pins the correct value.
+4. **Checks.** Before finishing, run `npm run check`, `npm test` and `npm run build` (and `node scripts/check-boundaries.test.mjs` after changing the checker). For UI changes, also run `npm run dev` and exercise the affected tab at http://localhost:3000. For MCP changes, call the tool over `POST /api/mcp` **and** over SSE or stdio, because the direct path skips zod (MCP-5).
+5. **Statistics changes need a reference.** A change to a computed number MUST be checked against an independent reference: JMP, R, or a published worked example with its source cited. The comparison MUST be a committed test in `tests/` whose reference values sit in a fixture in `tests/fixtures/`, with their provenance: published values transcribed with the example they come from, computed values from `tests/fixtures/compute_reference.py` (statsmodels OLS until open decision 5 picks the reference tool). Never "fix" a number without a test that pins the correct value.
+   - A known bug is pinned by an `it.fails('<ID> (<backlog item>): …')` test that fails today. The PR that fixes the bug changes exactly the tests named after its IDs to `it(...)`; vitest reports an `it.fails` test that starts passing as a failure, so none can be forgotten.
+   - The demo-project characterization snapshot (`tests/core/analysis/__snapshots__/`) changes only on purpose: update it with `npx vitest run -u` and explain every changed number in the PR.
+   - How to run: `npm test` runs the whole suite; `npx vitest run tests/core/analysis/saturated.test.ts` runs one file; `npx vitest` re-runs on save. `python tests/fixtures/compute_reference.py` recomputes every fixture's `reference` block (Python 3 with numpy, scipy and statsmodels).
 6. **One implementation per calculation**, in `src/core` (§3.3). When you fix one copy of a duplicated calculation, replace the other copies with calls to it rather than patching each one.
 7. **No scratch files in the repo.** Never commit one-off patch, debug or dump scripts, or test outputs. Use a scratch directory outside the repo. `scripts/` holds only maintained tools that a `package.json` script references. R9 rejects any new tracked entry at the repo root (§3.2). See [the lesson](../../memory/DOE-Magic/patch-scripts-in-repo-root.md).
 8. **Dependencies.** No lockfile is tracked (decision 1, settled 2026-10-21): neither `package-lock.json` nor `bun.lock` is committed, and both are in `.gitignore`. Change dependencies with `npm install <pkg>` or `npm uninstall <pkg>`, never by editing `package.json` alone, and commit `package.json` only. Installs are not reproducible, so when a check fails after a fresh install and the code did not change, compare the installed versions (`npm ls <pkg>`) before suspecting the code. CI installs with `npm install`. Reopening decision 1 means committing one lockfile and switching CI to `npm ci`. See [the lesson](../../memory/DOE-Magic/lockfile-drift.md).
