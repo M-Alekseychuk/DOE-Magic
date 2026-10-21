@@ -13,3 +13,7 @@ data.json
 
 # AI Studio agent plans (removed by hand in 0d05f8c; keep them out of git)
 /.aistudio/
+
+# No lockfile is tracked for now (decision 1, settled 2026-10-21; docs/memory/DOE-Magic/lockfile-drift.md)
+/package-lock.json
+/bun.lock
