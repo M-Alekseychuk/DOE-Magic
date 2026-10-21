@@ -57,7 +57,7 @@ The owner's commit cc41f15 ("build: configure server port and HMR settings", 202
 - rewrites `.env.example` (empty `GEMINI_API_KEY` and `APP_URL`, a new `PORT=3000`, shorter comments) and adds a duplicate `node_modules` line to `.gitignore`;
 - deletes `package-lock.json`, `bun.lock` and `assets/.aistudio/.gitignore`; the commit message mentions none of these deletions.
 
-Decision 1 was settled on 2026-10-21: **no lockfile for now.** A restored lockfile would be deleted again by the next AI Studio push, and early development accepts floating versions. Both lockfiles are in `.gitignore`. Install with `npm install`; `npm ci` needs a lockfile. Why, the cost, and when to revisit: [lockfile lesson](../../memory/DOE-Magic/lockfile-drift.md). Whether `assets/.aistudio/.gitignore` comes back is the owner's call.
+Decision 1 was settled on 2026-10-21 (PR #4): **no lockfile for now.** A restored lockfile would be deleted again by the next AI Studio push, and early development accepts floating versions. Both lockfiles are in `.gitignore`. Install with `npm install`; `npm ci` needs a lockfile. Why, the cost, and when to revisit: [lockfile lesson](../../memory/DOE-Magic/lockfile-drift.md). Whether `assets/.aistudio/.gitignore` comes back is the owner's call.
 
 Running the dev server (2026-10-21, Node 24.13.0, Vite 6.4.5) showed:
 

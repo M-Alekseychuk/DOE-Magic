@@ -39,7 +39,7 @@ The lockfile also still listed `pptxgenjs`, which `package.json` no longer had. 
 
 **Root cause.** AI Studio's sync makes the repo match its workspace ([lesson](ai-studio-sync-overwrites-repo.md)). The workspace otherwise matched `main` (the commit touches only 6 files), so either the refresh from `main` did not bring these files over, or AI Studio removed them; which of the two is unverified. Its first export, ef15736, did contain both lockfiles, so AI Studio does not always drop them.
 
-**Decision.** Decision 1 was settled on 2026-10-21 by the developer: **npm with no lockfile for now.** A restored lockfile would be deleted by the next AI Studio push, the owner is still learning and keeps pushing from AI Studio, and early development accepts floating versions. Both files are in `.gitignore`. R9 still allows them, so a sync that brings one back does not fail `npm run check`.
+**Decision.** Decision 1 was settled on 2026-10-21 by the developer (PR #4): **npm with no lockfile for now.** A restored lockfile would be deleted by the next AI Studio push, the owner is still learning and keeps pushing from AI Studio, and early development accepts floating versions. Both files are in `.gitignore`. R9 still allows them, so a sync that brings one back does not fail `npm run check`.
 
 **The cost, accepted for now.** Two installs on different days can resolve different versions. A test or a computed number can change after `npm install` with no code change. `npm ci` cannot run, and `npm audit` reports on whatever was installed that day.
 
