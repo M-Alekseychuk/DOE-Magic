@@ -3,6 +3,7 @@ import { Project, Factor, Response } from '../../../core/types';
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts';
 import { predictModelResponse } from '../../../core/analysis/analysisCore';
 import { useTranslation } from '../../i18n/LanguageContext';
+import { useIsDarkMode } from '../../shared/chartTheme';
 
 interface Props {
   project: Project;
@@ -41,6 +42,7 @@ function calculateDesirability(y: number, response: Response, results: any) {
 
 export function PredictionProfiler({ project, allAnalysisResults }: Props) {
   const { t, locale } = useTranslation();
+  const isDark = useIsDarkMode();
   const [settings, setSettings] = useState<Record<string, string | number>>({});
 
   useEffect(() => {
@@ -195,7 +197,7 @@ export function PredictionProfiler({ project, allAnalysisResults }: Props) {
                             <XAxis 
                               type="category" 
                               dataKey="x" 
-                              tick={{ fontSize: 9, fill: '#64748b' }} 
+                              tick={{ fontSize: 9, fill: isDark ? '#ffffff' : '#64748b' }} 
                               axisLine={false} 
                               tickLine={false} 
                               padding={{ left: 16, right: 16 }}
@@ -203,13 +205,13 @@ export function PredictionProfiler({ project, allAnalysisResults }: Props) {
                             <YAxis 
                               type="number" 
                               domain={safeYDomain} 
-                              tick={{ fontSize: 9, fill: '#94a3b8' }} 
+                              tick={{ fontSize: 9, fill: isDark ? '#ffffff' : '#64748b' }} 
                               tickFormatter={(v) => Number.isInteger(v) ? v.toString() : v.toFixed(1)} 
                               axisLine={false} 
                               tickLine={false} 
                             />
                             <Tooltip 
-                              contentStyle={{ fontSize: '11px', borderRadius: '6px', padding: '6px 10px', border: '1px solid #e2e8f0', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} 
+                              contentStyle={{ fontSize: '11px', borderRadius: '6px', padding: '6px 10px', backgroundColor: isDark ? '#0f172a' : '#ffffff', border: isDark ? '1px solid #334155' : '1px solid #e2e8f0', color: isDark ? '#ffffff' : '#0f172a', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} 
                               labelFormatter={(l) => `${factor.name}: ${l}`} 
                               formatter={(val: number) => [val.toFixed(3), locale === 'zh' ? '预测值' : 'Prediction']}
                             />
@@ -249,7 +251,7 @@ export function PredictionProfiler({ project, allAnalysisResults }: Props) {
                           <YAxis 
                             type="number" 
                             domain={safeYDomain} 
-                            tick={{ fontSize: 9, fill: '#94a3b8' }} 
+                            tick={{ fontSize: 9, fill: isDark ? '#ffffff' : '#64748b' }} 
                             tickFormatter={(v) => Number.isInteger(v) ? v.toString() : v.toFixed(1)} 
                             axisLine={false} 
                             tickLine={false} 
@@ -321,11 +323,11 @@ export function PredictionProfiler({ project, allAnalysisResults }: Props) {
                   className="w-full accent-brand-600 h-1.5 bg-slate-200 dark:bg-slate-700 rounded-lg appearance-none cursor-pointer hover:accent-brand-500"
                 />
                 <div className="mt-3 flex justify-between items-center font-mono">
-                  <span className="text-[10px] text-slate-400">{factor.min}</span>
+                  <span className="text-[10px] text-slate-400 dark:text-slate-100">{factor.min}</span>
                   <span className="text-[11px] text-red-600 dark:text-red-400 font-bold bg-red-50 dark:bg-red-900/20 px-2.5 py-1 rounded border border-red-100 dark:border-red-900/30">
                     {currentVal?.toFixed(3)}
                   </span>
-                  <span className="text-[10px] text-slate-400">{factor.max}</span>
+                  <span className="text-[10px] text-slate-400 dark:text-slate-100">{factor.max}</span>
                 </div>
               </div>
             );

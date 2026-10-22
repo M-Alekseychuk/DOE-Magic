@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { 
   BookOpen, Plus, Pencil, X, Check, Trash2, Download, Upload, 
-  ChevronUp, ChevronDown, AlertTriangle, RotateCcw, BookmarkCheck 
+  ChevronUp, ChevronDown, AlertTriangle, RotateCcw 
 } from 'lucide-react';
 import { useTranslation } from '../i18n/LanguageContext';
 
@@ -136,23 +136,6 @@ export default function GuideView() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ steps: updated })
     }).catch(() => {});
-  };
-
-  const handleSaveAsDefault = async () => {
-    try {
-      const res = await fetch('/api/guide/default', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ steps })
-      });
-      if (res.ok) {
-        showToast(locale === 'zh' ? '当前指南已成功保存为系统软件默认！' : 'Current guide saved as software default!');
-      } else {
-        showToast(locale === 'zh' ? '保存失败，请稍后重试。' : 'Failed to save software default.');
-      }
-    } catch {
-      showToast(locale === 'zh' ? '保存失败，请稍后重试。' : 'Failed to save software default.');
-    }
   };
 
   const handleResetToDefault = () => {
@@ -490,17 +473,6 @@ export default function GuideView() {
           >
             <Download size={13} />
             <span>{locale === 'zh' ? '下载 JSON' : 'Download'}</span>
-          </button>
-
-          {/* Save as Software Default */}
-          <button
-            type="button"
-            onClick={handleSaveAsDefault}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 dark:bg-emerald-950/40 hover:bg-emerald-100 dark:hover:bg-emerald-900/50 text-emerald-700 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-700 rounded-md font-medium text-xs transition-colors shadow-xs cursor-pointer"
-            title={locale === 'zh' ? '将当前指南保存为系统软件默认模板' : 'Save current Step-by-Step guide as software default'}
-          >
-            <BookmarkCheck size={13} />
-            <span>{locale === 'zh' ? '设为软件默认' : 'Save as Default'}</span>
           </button>
 
           {/* Clear Button */}

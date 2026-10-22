@@ -9,6 +9,7 @@ import { toPng } from 'html-to-image';
 import createPlotlyComponent from 'react-plotly.js/factory';
 import { PlotlyErrorBoundary } from '../../shared/PlotlyErrorBoundary';
 import { useTranslation } from '../../i18n/LanguageContext';
+import { useIsDarkMode, getChartAxisProps, getGridStroke, getAxisLabelProps } from '../../shared/chartTheme';
 const Plot = createPlotlyComponent((window as any).Plotly);
 
 function TableHelpTooltip({ title, children }: { title: string; children: React.ReactNode }) {
@@ -102,6 +103,7 @@ interface Props {
 
 export default function CompareResponses({ project }: Props) {
   const { t, locale } = useTranslation();
+  const isDark = useIsDarkMode();
   const [selectedPlot, setSelectedPlot] = useState<'main-effects' | 'actual-vs-predicted' | 'studentized-residuals' | 'effects-plot' | 'effect-summary' | 'parameter-estimates' | 'effect-tests' | 'lack-of-fit' | 'interaction-plot' | 'doe-mean-plot' | 'contour-surface'>('effects-plot');
 
   const [effectsPlotType, setEffectsPlotType] = useState<'pareto' | 'half-normal'>('pareto');
@@ -544,9 +546,9 @@ export default function CompareResponses({ project }: Props) {
                      analysis.paretoData && analysis.paretoData.length > 0 ? (
                        <ResponsiveContainer width="100%" height="100%">
                          <BarChart data={analysis.paretoData} layout="vertical" margin={{ top: 25, right: 30, left: 40, bottom: 10 }}>
-                           <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} stroke="#e2e8f0" />
-                           <XAxis type="number" dataKey="tRatio" tick={{fontSize: 10}} />
-                           <YAxis type="category" dataKey="factor.name" width={100} interval={0} tick={{fontSize: 10}} />
+                           <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} stroke={getGridStroke(isDark)} />
+                           <XAxis type="number" dataKey="tRatio" {...getChartAxisProps(isDark)} />
+                           <YAxis type="category" dataKey="factor.name" width={100} interval={0} {...getChartAxisProps(isDark)} />
                            <ReferenceLine x={analysis.tLimitPareto} stroke="#16a34a" strokeWidth={2} strokeDasharray="4 4" label={{ position: 'top', value: 't-Limit', fill: '#16a34a', fontSize: 10, fontWeight: 600 }} />
                            <ReferenceLine x={analysis.bonferroniLimitPareto} stroke="#9333ea" strokeWidth={2} strokeDasharray="4 4" label={{ position: 'bottom', value: 'Bonferroni', fill: '#9333ea', fontSize: 10, fontWeight: 600 }} />
                            <Tooltip cursor={{ fill: '#f8fafc' }} contentStyle={{fontSize: '11px'}} formatter={(value: number, name: string, props: any) => [`${value.toFixed(3)} (${props.payload.direction})`, 'Effect Size']} />
@@ -566,9 +568,9 @@ export default function CompareResponses({ project }: Props) {
                      analysis.halfNormalData && analysis.halfNormalData.length > 0 ? (
                        <ResponsiveContainer width="100%" height="100%">
                          <ScatterChart margin={{ top: 10, right: 30, left: 40, bottom: 20 }}>
-                           <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                           <XAxis type="number" dataKey="tRatio" tick={{fontSize: 10}} />
-                           <YAxis type="number" dataKey="expected" width={45} tick={{fontSize: 10}} domain={[-0.1, 2.7]} ticks={[0, 0.253, 0.385, 0.674, 1.036, 1.282, 1.645, 1.96, 2.576]} tickFormatter={(val) => {
+                           <CartesianGrid strokeDasharray="3 3" stroke={getGridStroke(isDark)} />
+                           <XAxis type="number" dataKey="tRatio" {...getChartAxisProps(isDark)} />
+                           <YAxis type="number" dataKey="expected" width={45} {...getChartAxisProps(isDark)} domain={[-0.1, 2.7]} ticks={[0, 0.253, 0.385, 0.674, 1.036, 1.282, 1.645, 1.96, 2.576]} tickFormatter={(val) => {
                              if (Math.abs(val - 0) < 0.05) return '0';
                              if (Math.abs(val - 0.253) < 0.05) return '20';
                              if (Math.abs(val - 0.385) < 0.05) return '30';
@@ -962,7 +964,7 @@ export default function CompareResponses({ project }: Props) {
                         return (
                           <div id={`compare-main-effect-${response.id}-${effect.factor.id}`} key={effect.factor.id} className="h-48 border border-slate-100 rounded bg-slate-50 dark:bg-slate-800 p-2 relative group">
                             <div className="flex justify-between items-start mb-2">
-                              <p className="text-[10px] font-bold text-slate-600 truncate flex-1">{effect.factor.name}</p>
+                              <p className="text-[10px] font-bold text-slate-600 dark:text-slate-200 truncate flex-1">{effect.factor.name}</p>
                               <button
                                 data-export-hide="true"
                                 onClick={() => handleDownloadSvg(`compare-main-effect-${response.id}-${effect.factor.id}`, `${project.name}_${response.name}_Main_Effect_${effect.factor.name}`)}
@@ -979,9 +981,9 @@ export default function CompareResponses({ project }: Props) {
                                   ...(effect.centerAvg != null ? [{ x: midX, value: effect.centerAvg }] : []),
                                   { x: effect.factor.max, value: effect.highAvg }
                                 ]} margin={{ top: 15, right: 15, left: 5, bottom: 20 }}>
-                                  <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                                  <XAxis type="number" dataKey="x" domain={xDomain} ticks={[effect.factor.min, midX, effect.factor.max]} tick={{fontSize: 10}} tickFormatter={(val) => val.toString()} />
-                                  <YAxis domain={[yMin, yMax]} ticks={yTicks} tick={{fontSize: 10}} tickFormatter={(val) => val.toFixed(2)} width={45} allowDataOverflow={true} type="number" />
+                                  <CartesianGrid strokeDasharray="3 3" stroke={getGridStroke(isDark)} />
+                                  <XAxis type="number" dataKey="x" domain={xDomain} ticks={[effect.factor.min, midX, effect.factor.max]} {...getChartAxisProps(isDark)} tickFormatter={(val) => val.toString()} />
+                                  <YAxis domain={[yMin, yMax]} ticks={yTicks} {...getChartAxisProps(isDark)} tickFormatter={(val) => val.toFixed(2)} width={45} allowDataOverflow={true} type="number" />
                                   <Tooltip contentStyle={{fontSize: '10px'}} labelFormatter={(val) => `${effect.factor.name}: ${val}`} />
                                   <ReferenceLine x={midX} stroke="#94a3b8" strokeDasharray="3 3" />
                                   <Line type="linear" dataKey="value" stroke="#82ca9d" strokeWidth={2.5} dot={{ r: 4.5, fill: "white", stroke: "#82ca9d", strokeWidth: 2 }} activeDot={{ r: 6, fill: "#82ca9d" }} isAnimationActive={false} />
@@ -1015,9 +1017,9 @@ export default function CompareResponses({ project }: Props) {
                   <div className="w-full">
                     <ResponsiveContainer width="100%" height="100%">
                       <LineChart data={interactionData.data} margin={{ top: 10, right: 30, left: 10, bottom: 20 }}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                        <XAxis type="number" dataKey="x" domain={[interactionData.f1.min, interactionData.f1.max]} ticks={[interactionData.f1.min, (interactionData.f1.min + interactionData.f1.max) / 2, interactionData.f1.max]} tick={{fontSize: 10}} tickFormatter={(val) => val.toString()} height={40} label={{ value: interactionData.f1.name, position: 'insideBottom', offset: -5, fontSize: 10 }} />
-                        <YAxis domain={['auto', 'auto']} tick={{fontSize: 10}} tickFormatter={(val) => val.toFixed(2)} width={45} />
+                        <CartesianGrid strokeDasharray="3 3" stroke={getGridStroke(isDark)} />
+                        <XAxis type="number" dataKey="x" domain={[interactionData.f1.min, interactionData.f1.max]} ticks={[interactionData.f1.min, (interactionData.f1.min + interactionData.f1.max) / 2, interactionData.f1.max]} {...getChartAxisProps(isDark)} tickFormatter={(val) => val.toString()} height={40} label={getAxisLabelProps(isDark, interactionData.f1.name, { position: 'insideBottom', offset: -5 })} />
+                        <YAxis domain={['auto', 'auto']} {...getChartAxisProps(isDark)} tickFormatter={(val) => val.toFixed(2)} width={45} />
                         <Tooltip contentStyle={{fontSize: '11px'}} labelFormatter={(val) => `${interactionData.f1.name}: ${val}`} />
                         <ReferenceLine x={(interactionData.f1.min + interactionData.f1.max) / 2} stroke="#cbd5e1" strokeDasharray="3 3" />
                         <Legend verticalAlign="top" wrapperStyle={{fontSize: '11px', paddingBottom: '15px'}} />
@@ -1049,9 +1051,9 @@ export default function CompareResponses({ project }: Props) {
                   {doeMeanData && doeMeanData.length > 0 ? (
                     <ResponsiveContainer width="100%" height="100%">
                       <LineChart data={doeMeanData} margin={{ top: 10, right: 30, left: 65, bottom: 20 }}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                        <XAxis dataKey="run" tick={{fontSize: 10}} angle={-45} textAnchor="end" />
-                        <YAxis domain={['auto', 'auto']} tick={{fontSize: 10}} width={65} label={{ value: 'Mean Response', angle: -90, position: 'center', dx: -15, fontSize: 10 }} />
+                        <CartesianGrid strokeDasharray="3 3" stroke={getGridStroke(isDark)} />
+                        <XAxis dataKey="run" {...getChartAxisProps(isDark, { angle: -45, textAnchor: 'end' })} />
+                        <YAxis domain={['auto', 'auto']} {...getChartAxisProps(isDark)} width={65} label={getAxisLabelProps(isDark, 'Mean Response', { angle: -90, position: 'center', dx: -15 })} />
                         <Tooltip contentStyle={{fontSize: '11px'}} />
                         <Line type="monotone" dataKey="value" name="Response Value" stroke="#3ab9a0" strokeWidth={2} dot={{ r: 4 }} />
                       </LineChart>
@@ -1090,8 +1092,11 @@ export default function CompareResponses({ project }: Props) {
                         margin: plot3dType === 'contour' ? { l: 60, r: 30, b: 60, t: 30 } : { l: 0, r: 0, b: 0, t: 0 },
                         ...(plot3dType === 'contour' ? {
                           xaxis: {
-                            title: { text: plotData.xFactor.name, font: { size: 12, color: '#64748b' } },
-                            tickfont: { size: 10, color: '#94a3b8' },
+                            title: { text: plotData.xFactor.name, font: { size: 12, color: isDark ? '#ffffff' : '#1e293b' } },
+                            tickfont: { size: 10, color: isDark ? '#ffffff' : '#334155' },
+                            color: isDark ? '#ffffff' : '#94a3b8',
+                            linecolor: isDark ? '#ffffff' : '#cbd5e1',
+                            gridcolor: isDark ? '#334155' : '#e2e8f0',
                             range: [plotData.xBounds.min, plotData.xBounds.max],
                             ...(plotData.xFactor.type === 'categorical' && plotData.xFactor.levels ? {
                               tickmode: 'array',
@@ -1100,8 +1105,11 @@ export default function CompareResponses({ project }: Props) {
                             } : {})
                           },
                           yaxis: {
-                            title: { text: plotData.yFactor.name, font: { size: 12, color: '#64748b' } },
-                            tickfont: { size: 10, color: '#94a3b8' },
+                            title: { text: plotData.yFactor.name, font: { size: 12, color: isDark ? '#ffffff' : '#1e293b' } },
+                            tickfont: { size: 10, color: isDark ? '#ffffff' : '#334155' },
+                            color: isDark ? '#ffffff' : '#94a3b8',
+                            linecolor: isDark ? '#ffffff' : '#cbd5e1',
+                            gridcolor: isDark ? '#334155' : '#e2e8f0',
                             range: [plotData.yBounds.min, plotData.yBounds.max],
                             ...(plotData.yFactor.type === 'categorical' && plotData.yFactor.levels ? {
                               tickmode: 'array',
@@ -1112,7 +1120,11 @@ export default function CompareResponses({ project }: Props) {
                         } : {
                           scene: {
                             xaxis: {
-                              title: { text: `${plotData.xFactor.name}${plotData.xFactor.unit ? ` (${plotData.xFactor.unit})` : ''}` },
+                              title: { text: `${plotData.xFactor.name}${plotData.xFactor.unit ? ` (${plotData.xFactor.unit})` : ''}`, font: { color: isDark ? '#ffffff' : '#1e293b', size: 11 } },
+                              tickfont: { color: isDark ? '#ffffff' : '#334155', size: 10 },
+                              color: isDark ? '#ffffff' : '#64748b',
+                              gridcolor: isDark ? '#334155' : '#e2e8f0',
+                              zerolinecolor: isDark ? '#475569' : '#cbd5e1',
                               range: [plotData.xBounds.min, plotData.xBounds.max],
                               ...(plotData.xFactor.type === 'categorical' && plotData.xFactor.levels ? {
                                 tickmode: 'array',
@@ -1121,7 +1133,11 @@ export default function CompareResponses({ project }: Props) {
                               } : {})
                             },
                             yaxis: {
-                              title: { text: `${plotData.yFactor.name}${plotData.yFactor.unit ? ` (${plotData.yFactor.unit})` : ''}` },
+                              title: { text: `${plotData.yFactor.name}${plotData.yFactor.unit ? ` (${plotData.yFactor.unit})` : ''}`, font: { color: isDark ? '#ffffff' : '#1e293b', size: 11 } },
+                              tickfont: { color: isDark ? '#ffffff' : '#334155', size: 10 },
+                              color: isDark ? '#ffffff' : '#64748b',
+                              gridcolor: isDark ? '#334155' : '#e2e8f0',
+                              zerolinecolor: isDark ? '#475569' : '#cbd5e1',
                               range: [plotData.yBounds.min, plotData.yBounds.max],
                               ...(plotData.yFactor.type === 'categorical' && plotData.yFactor.levels ? {
                                 tickmode: 'array',
@@ -1130,7 +1146,11 @@ export default function CompareResponses({ project }: Props) {
                               } : {})
                             },
                             zaxis: {
-                              title: { text: `${plotData.activeResponse?.name}${plotData.activeResponse?.unit ? ` (${plotData.activeResponse.unit})` : ''}` },
+                              title: { text: `${plotData.activeResponse?.name}${plotData.activeResponse?.unit ? ` (${plotData.activeResponse.unit})` : ''}`, font: { color: isDark ? '#ffffff' : '#1e293b', size: 11 } },
+                              tickfont: { color: isDark ? '#ffffff' : '#334155', size: 10 },
+                              color: isDark ? '#ffffff' : '#64748b',
+                              gridcolor: isDark ? '#334155' : '#e2e8f0',
+                              zerolinecolor: isDark ? '#475569' : '#cbd5e1',
                               range: [plotData.zBounds.min, plotData.zBounds.max]
                             },
                             camera: (syncCamera && cameraState) ? cameraState : undefined

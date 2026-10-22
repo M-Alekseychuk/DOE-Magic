@@ -1,11 +1,14 @@
-import React from 'react';
-import { ScatterChart, Scatter, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts';
+import React, { useState, useEffect } from 'react';
+import { ScatterChart, Scatter, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts';
 import { Download } from 'lucide-react';
 import { toPng } from 'html-to-image';
 import { useTranslation } from '../i18n/LanguageContext';
 
+import { useIsDarkMode, getChartAxisProps, getAxisLabelProps } from './chartTheme';
+
 export function ActualByPredictedPlot({ actualByPredicted, projectName }: { actualByPredicted: any[], projectName: string }) {
   const { t, locale } = useTranslation();
+  const isDark = useIsDarkMode();
   const handleDownload = () => {
     const el = document.getElementById('actual-by-predicted');
     if (!el) return;
@@ -13,7 +16,7 @@ export function ActualByPredictedPlot({ actualByPredicted, projectName }: { actu
     buttons.forEach(b => (b as HTMLElement).style.display = 'none');
 
     toPng(el, { 
-      backgroundColor: '#ffffff', 
+      backgroundColor: isDark ? '#0f172a' : '#ffffff', 
       pixelRatio: 2,
       filter: (node) => {
         if (node instanceof Element) {
@@ -64,11 +67,28 @@ export function ActualByPredictedPlot({ actualByPredicted, projectName }: { actu
       <div className="h-[250px] w-full">
         <ResponsiveContainer width="100%" height="100%">
           <ScatterChart margin={{ top: 20, right: 20, bottom: 20, left: 65 }}>
-            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
-            <XAxis type="number" dataKey="predicted" name="Predicted" domain={domain} tick={{fontSize: 10}} tickFormatter={(val) => val.toFixed(2)} label={{ value: locale === 'zh' ? '预测值 (Predicted)' : 'Predicted', position: 'insideBottom', offset: -10, fontSize: 10 }} />
-            <YAxis type="number" dataKey="actual" name="Actual" domain={domain} tick={{fontSize: 10}} tickFormatter={(val) => val.toFixed(2)} width={65} label={{ value: locale === 'zh' ? '实际测量值 (Actual)' : 'Actual', angle: -90, position: 'center', dx: -15, fontSize: 10 }} />
-            <Tooltip cursor={{strokeDasharray: '3 3'}} contentStyle={{fontSize: '11px'}} formatter={(value: number) => value.toFixed(3)} />
-            <Scatter name="Runs" data={actualByPredicted} fill="#3b82f6" />
+            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={isDark ? '#334155' : '#e2e8f0'} />
+            <XAxis 
+              type="number" 
+              dataKey="predicted" 
+              name="Predicted" 
+              domain={domain} 
+              {...getChartAxisProps(isDark)}
+              tickFormatter={(val) => val.toFixed(2)} 
+              label={getAxisLabelProps(isDark, locale === 'zh' ? '预测值 (Predicted)' : 'Predicted', { position: 'insideBottom', offset: -10 })} 
+            />
+            <YAxis 
+              type="number" 
+              dataKey="actual" 
+              name="Actual" 
+              domain={domain} 
+              {...getChartAxisProps(isDark)}
+              tickFormatter={(val) => val.toFixed(2)} 
+              width={65} 
+              label={getAxisLabelProps(isDark, locale === 'zh' ? '实际测量值 (Actual)' : 'Actual', { angle: -90, position: 'center', dx: -15 })} 
+            />
+            <Tooltip cursor={{strokeDasharray: '3 3'}} contentStyle={{fontSize: '11px', backgroundColor: isDark ? '#0f172a' : '#ffffff', borderColor: isDark ? '#334155' : '#e2e8f0', color: isDark ? '#f8fafc' : '#0f172a'}} formatter={(value: number) => value.toFixed(3)} />
+            <Scatter name="Runs" data={actualByPredicted} fill={isDark ? "#38bdf8" : "#2563eb"} stroke={isDark ? '#0f172a' : '#ffffff'} strokeWidth={1.2} />
             <ReferenceLine segment={[{ x: domain[0], y: domain[0] }, { x: domain[1], y: domain[1] }]} stroke="#3ab9a0" strokeWidth={2} />
           </ScatterChart>
         </ResponsiveContainer>
@@ -79,6 +99,7 @@ export function ActualByPredictedPlot({ actualByPredicted, projectName }: { actu
 
 export function StudentizedResidualsPlot({ studentizedResiduals, projectName }: { studentizedResiduals: any[], projectName: string }) {
   const { t, locale } = useTranslation();
+  const isDark = useIsDarkMode();
   const handleDownload = () => {
     const el = document.getElementById('studentized-residuals');
     if (!el) return;
@@ -86,7 +107,7 @@ export function StudentizedResidualsPlot({ studentizedResiduals, projectName }: 
     buttons.forEach(b => (b as HTMLElement).style.display = 'none');
 
     toPng(el, { 
-      backgroundColor: '#ffffff', 
+      backgroundColor: isDark ? '#0f172a' : '#ffffff', 
       pixelRatio: 2,
       filter: (node) => {
         if (node instanceof Element) {
@@ -119,6 +140,39 @@ export function StudentizedResidualsPlot({ studentizedResiduals, projectName }: 
   const maxAbsResid = Math.max(...studentizedResiduals.map(d => Math.abs(d.studentized || 0)));
   const yMax = Math.max(bonferroniLimit + 0.5, maxAbsResid + 0.5, 4);
 
+  const getPointColors = (entry: any) => {
+    const val = Math.abs(entry.studentized ?? 0);
+    const bLimit = entry.bonferroniLimit || bonferroniLimit;
+    const indLimit = entry.limit || limit;
+
+    // Outlier beyond Bonferroni simultaneous limits (Red)
+    if (val >= bLimit) {
+      return {
+        fill: isDark ? '#f87171' : '#ef4444',
+        stroke: isDark ? '#0f172a' : '#ffffff'
+      };
+    }
+    // Warning beyond individual 95% limit (Amber)
+    if (val >= indLimit) {
+      return {
+        fill: isDark ? '#fbbf24' : '#f59e0b',
+        stroke: isDark ? '#0f172a' : '#ffffff'
+      };
+    }
+    // Influential point (Purple)
+    if (entry.isInfluential) {
+      return {
+        fill: isDark ? '#c084fc' : '#a855f7',
+        stroke: isDark ? '#0f172a' : '#ffffff'
+      };
+    }
+    // Normal in-control run point (Vibrant Sky Blue - high contrast against dark navy and white)
+    return {
+      fill: isDark ? '#38bdf8' : '#0284c7',
+      stroke: isDark ? '#0f172a' : '#ffffff'
+    };
+  };
+
   return (
     <div id="studentized-residuals" className="bg-white dark:bg-slate-900 p-4 rounded-lg shadow-sm border border-slate-200 dark:border-slate-600 relative group flex flex-col">
       <div className="flex justify-between items-start mb-4">
@@ -137,9 +191,25 @@ export function StudentizedResidualsPlot({ studentizedResiduals, projectName }: 
       <div className="h-[250px] w-full">
         <ResponsiveContainer width="100%" height="100%">
           <ScatterChart margin={{ top: 10, right: 20, bottom: 20, left: 65 }}>
-            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
-            <XAxis type="number" dataKey="run" name="Run" tick={{fontSize: 10}} tickFormatter={(val) => val.toFixed(0)} label={{ value: locale === 'zh' ? '实验序号 (Run)' : 'Run Number', position: 'insideBottom', offset: -10, fontSize: 10 }} />
-            <YAxis type="number" dataKey="studentized" name="Studentized Residual" domain={[-yMax, yMax]} tick={{fontSize: 10}} tickFormatter={(val) => val.toFixed(2)} width={65} label={{ value: locale === 'zh' ? '学生化残差' : 'Studentized Residual', angle: -90, position: 'center', dx: -15, fontSize: 10 }} />
+            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={isDark ? '#334155' : '#e2e8f0'} />
+            <XAxis 
+              type="number" 
+              dataKey="run" 
+              name="Run" 
+              {...getChartAxisProps(isDark)}
+              tickFormatter={(val) => val.toFixed(0)} 
+              label={getAxisLabelProps(isDark, locale === 'zh' ? '实验序号 (Run)' : 'Run Number', { position: 'insideBottom', offset: -10 })} 
+            />
+            <YAxis 
+              type="number" 
+              dataKey="studentized" 
+              name="Studentized Residual" 
+              domain={[-yMax, yMax]} 
+              {...getChartAxisProps(isDark)}
+              tickFormatter={(val) => val.toFixed(2)} 
+              width={65} 
+              label={getAxisLabelProps(isDark, locale === 'zh' ? '学生化残差' : 'Studentized Residual', { angle: -90, position: 'center', dx: -15 })} 
+            />
             <Tooltip 
               cursor={{strokeDasharray: '3 3'}} 
               content={({ active, payload }) => {
@@ -179,7 +249,19 @@ export function StudentizedResidualsPlot({ studentizedResiduals, projectName }: 
                 return null;
               }}
             />
-            <Scatter name="Runs" data={studentizedResiduals} fill="#1e293b" />
+            <Scatter name="Runs" data={studentizedResiduals} fill={isDark ? '#38bdf8' : '#0284c7'}>
+              {studentizedResiduals.map((entry: any, index: number) => {
+                const { fill: pFill, stroke: pStroke } = getPointColors(entry);
+                return (
+                  <Cell 
+                    key={`resid-point-${index}`} 
+                    fill={pFill} 
+                    stroke={pStroke} 
+                    strokeWidth={1.5} 
+                  />
+                );
+              })}
+            </Scatter>
             <ReferenceLine y={0} stroke="#3b82f6" />
             <ReferenceLine y={limit} stroke="#22c55e" />
             <ReferenceLine y={-limit} stroke="#22c55e" />
@@ -188,9 +270,26 @@ export function StudentizedResidualsPlot({ studentizedResiduals, projectName }: 
           </ScatterChart>
         </ResponsiveContainer>
       </div>
-      <div className="mt-2 text-[9px] text-slate-500 flex items-center justify-between">
-        <span>{locale === 'zh' ? '带 95% 显著性限的外学生化残差（红色为 Bonferroni 联合控制限，绿色为单检验限）' : 'Externally studentized residuals with 95% simultaneous limits (Bonferroni in red, individual in green).'}</span>
-        <span className="text-slate-400 font-mono">{locale === 'zh' ? '悬停查看 Cook\'s D 与杠杆值' : 'Hover points for Cook\'s D & Leverage'}</span>
+      <div className="mt-2.5 pt-2 border-t border-slate-100 dark:border-slate-800 flex flex-wrap items-center justify-between gap-2 text-[10px]">
+        <div className="flex flex-wrap items-center gap-3">
+          <span className="flex items-center gap-1.5 text-slate-600 dark:text-slate-300">
+            <span className="w-2.5 h-2.5 rounded-full bg-sky-500 dark:bg-sky-400 border border-slate-900/40 dark:border-slate-900 shrink-0"></span>
+            {locale === 'zh' ? '正常点' : 'In-Control'}
+          </span>
+          <span className="flex items-center gap-1.5 text-slate-600 dark:text-slate-300">
+            <span className="w-2.5 h-2.5 rounded-full bg-amber-500 dark:bg-amber-400 border border-slate-900/40 dark:border-slate-900 shrink-0"></span>
+            {locale === 'zh' ? '单检验限' : 'Warning (±t)'}
+          </span>
+          <span className="flex items-center gap-1.5 text-slate-600 dark:text-slate-300">
+            <span className="w-2.5 h-2.5 rounded-full bg-red-500 dark:bg-red-400 border border-slate-900/40 dark:border-slate-900 shrink-0"></span>
+            {locale === 'zh' ? '离群值 (联合限)' : 'Outlier (±Bonf)'}
+          </span>
+          <span className="flex items-center gap-1.5 text-slate-600 dark:text-slate-300">
+            <span className="w-2.5 h-2.5 rounded-full bg-purple-500 dark:bg-purple-400 border border-slate-900/40 dark:border-slate-900 shrink-0"></span>
+            {locale === 'zh' ? '高影响点' : 'Influential'}
+          </span>
+        </div>
+        <span className="text-slate-400 dark:text-slate-500 font-mono text-[9px]">{locale === 'zh' ? '悬停查看 Cook\'s D 与杠杆值' : 'Hover points for Cook\'s D & Leverage'}</span>
       </div>
     </div>
   );

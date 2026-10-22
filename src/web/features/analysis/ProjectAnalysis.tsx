@@ -28,6 +28,7 @@ interface Props {
 import { computeAnalysis, predictModelResponse } from "../../../core/analysis/analysisCore";
 import { PlotlyErrorBoundary } from "../../shared/PlotlyErrorBoundary";
 import { useTranslation } from '../../i18n/LanguageContext';
+import { useIsDarkMode, getChartAxisProps, getGridStroke, getAxisLabelProps } from '../../shared/chartTheme';
 
 function TableHelpTooltip({ title, children }: { title: string; children: React.ReactNode }) {
   const [isOpen, setIsOpen] = useState(false);
@@ -116,6 +117,7 @@ function TableHelpTooltip({ title, children }: { title: string; children: React.
 
 export default function ProjectAnalysis({ project, selectedResponseId, onResponseChange, onUpdateProject, onNavigateTab }: Props) {
   const { t, locale } = useTranslation();
+  const isDark = useIsDarkMode();
   const handleDownloadSvg = (containerId: string, filename: string) => {
     const container = document.getElementById(containerId);
     if (!container) return;
@@ -1267,9 +1269,9 @@ export default function ProjectAnalysis({ project, selectedResponseId, onRespons
                 return (
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart data={analysisResults.paretoData} layout="vertical" margin={{ top: 35, right: 35, left: 40, bottom: 10 }}>
-                      <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} stroke="#e2e8f0" />
-                      <XAxis type="number" dataKey="tRatio" name="t-Ratio" domain={paretoDomain} tick={{fontSize: 10}} />
-                      <YAxis type="category" dataKey="factor.name" width={100} interval={0} tick={{fontSize: 10}} />
+                      <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} stroke={getGridStroke(isDark)} />
+                      <XAxis type="number" dataKey="tRatio" name="t-Ratio" domain={paretoDomain} {...getChartAxisProps(isDark)} />
+                      <YAxis type="category" dataKey="factor.name" width={100} interval={0} {...getChartAxisProps(isDark)} />
                       <ReferenceLine 
                         x={analysisResults.tLimitPareto} 
                         stroke="#16a34a" 
@@ -1327,19 +1329,17 @@ export default function ProjectAnalysis({ project, selectedResponseId, onRespons
                 
                 <ResponsiveContainer width="100%" height="100%">
                   <ScatterChart margin={{ top: 10, right: 30, left: 65, bottom: 20 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                    <CartesianGrid strokeDasharray="3 3" stroke={getGridStroke(isDark)} />
                     <XAxis 
                       type="number" 
                       dataKey="tRatio" 
                       name="|Standardized Effect|" 
-                      tick={{fontSize: 10}} 
-                      label={{ 
-                        value: locale === 'zh' ? '|标准化效应值|' : '|Standardized Effect|', 
+                      {...getChartAxisProps(isDark)} 
+                      label={getAxisLabelProps(isDark, locale === 'zh' ? '|标准化效应值|' : '|Standardized Effect|', { 
                         position: 'insideBottom', 
                         offset: -15, 
-                        fontSize: 11, 
-                        fill: '#334155' 
-                      }} 
+                        fontSize: 11
+                      })} 
                     />
                     
                     <YAxis 
@@ -1347,16 +1347,14 @@ export default function ProjectAnalysis({ project, selectedResponseId, onRespons
                       dataKey="expected" 
                       name="Half-Normal % Probability" 
                       width={65}
-                      tick={{fontSize: 10}} 
+                      {...getChartAxisProps(isDark)}
                       domain={[-0.1, 2.7]}
-                      label={{ 
-                        value: locale === 'zh' ? '半正态累计概率 (%)' : 'Half-Normal % Probability', 
+                      label={getAxisLabelProps(isDark, locale === 'zh' ? '半正态累计概率 (%)' : 'Half-Normal % Probability', { 
                         angle: -90, 
                         position: 'center', 
                         dx: -15, 
-                        fontSize: 11, 
-                        fill: '#334155' 
-                      }}
+                        fontSize: 11
+                      })}
                       ticks={[0, 0.253, 0.385, 0.674, 1.036, 1.282, 1.645, 1.96, 2.576]}
                       tickFormatter={(val) => {
                           if (Math.abs(val - 0) < 0.05) return '0';
@@ -2139,9 +2137,9 @@ export default function ProjectAnalysis({ project, selectedResponseId, onRespons
                       <div className="h-[calc(100%-1.5rem)] w-full">
                         <ResponsiveContainer width="100%" height="100%">
                           <LineChart data={chartData} margin={{ top: 15, right: 15, left: 5, bottom: 20 }}>
-                            <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                            <XAxis type="category" dataKey="x" tick={{fontSize: 9}} interval={0} />
-                            <YAxis domain={[yMin, yMax]} ticks={yTicks} tick={{fontSize: 10}} tickFormatter={(val) => val.toFixed(2)} width={45} allowDataOverflow={true} type="number" />
+                            <CartesianGrid strokeDasharray="3 3" stroke={getGridStroke(isDark)} />
+                            <XAxis type="category" dataKey="x" {...getChartAxisProps(isDark, { fontSize: 9 })} interval={0} />
+                            <YAxis domain={[yMin, yMax]} ticks={yTicks} {...getChartAxisProps(isDark)} tickFormatter={(val) => val.toFixed(2)} width={45} allowDataOverflow={true} type="number" />
                             <Tooltip contentStyle={{fontSize: '10px'}} labelFormatter={(val) => `${effect.factor.name}: ${val}`} />
                             <Line 
                               type="linear" 
@@ -2183,9 +2181,9 @@ export default function ProjectAnalysis({ project, selectedResponseId, onRespons
                 const xDomain = [effect.factor.min - xPadding, effect.factor.max + xPadding];
 
                 return (
-                  <div id={`main-effect-${effect.factor.id}`} key={effect.factor.id} className="h-48 border border-slate-100 rounded bg-slate-50 dark:bg-slate-800 p-2 relative group">
+                  <div id={`main-effect-${effect.factor.id}`} key={effect.factor.id} className="h-48 border border-slate-200/70 dark:border-slate-700/50 rounded bg-slate-50/60 dark:bg-slate-800/60 p-2 relative group">
                     <div className="flex justify-between items-start mb-2">
-                      <p className="text-[10px] font-bold text-slate-600 truncate flex-1">
+                      <p className="text-[10px] font-bold text-slate-600 dark:text-slate-200 truncate flex-1">
                         {effect.factor.name}
                         {selectedMainEffectCatFilter && (
                           <span className="text-[9px] text-purple-600 dark:text-purple-400 font-normal ml-1">
@@ -2209,9 +2207,9 @@ export default function ProjectAnalysis({ project, selectedResponseId, onRespons
                           ...(effect.centerAvg != null ? [{ x: midX, value: effect.centerAvg }] : []),
                           ...(effect.highAvg != null ? [{ x: effect.factor.max, value: effect.highAvg }] : [])
                         ]} margin={{ top: 15, right: 15, left: 5, bottom: 20 }}>
-                          <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                          <XAxis type="number" dataKey="x" domain={xDomain} ticks={[effect.factor.min, midX, effect.factor.max]} tick={{fontSize: 10}} tickFormatter={(val) => val.toString()} />
-                          <YAxis domain={[yMin, yMax]} ticks={yTicks} tick={{fontSize: 10}} tickFormatter={(val) => val.toFixed(2)} width={45} allowDataOverflow={true} type="number" />
+                          <CartesianGrid strokeDasharray="3 3" stroke={getGridStroke(isDark)} />
+                          <XAxis type="number" dataKey="x" domain={xDomain} ticks={[effect.factor.min, midX, effect.factor.max]} {...getChartAxisProps(isDark)} tickFormatter={(val) => val.toString()} />
+                          <YAxis domain={[yMin, yMax]} ticks={yTicks} {...getChartAxisProps(isDark)} tickFormatter={(val) => val.toFixed(2)} width={45} allowDataOverflow={true} type="number" />
                           <Tooltip contentStyle={{fontSize: '10px'}} labelFormatter={(val) => `${effect.factor.name}: ${val}`} />
                           <ReferenceLine x={midX} stroke="#94a3b8" strokeDasharray="3 3" />
                           <Line type="linear" dataKey="value" stroke="#82ca9d" strokeWidth={2.5} dot={{ r: 4.5, fill: "white", stroke: "#82ca9d", strokeWidth: 2 }} activeDot={{ r: 6, fill: "#82ca9d" }} isAnimationActive={false} connectNulls />
@@ -2278,13 +2276,13 @@ export default function ProjectAnalysis({ project, selectedResponseId, onRespons
               <div className="w-full max-w-lg">
                 <ResponsiveContainer width="100%" height="100%">
                   <LineChart data={interactionData.data} margin={{ top: 10, right: 30, left: 10, bottom: 20 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                    <CartesianGrid strokeDasharray="3 3" stroke={getGridStroke(isDark)} />
                     {interactionData.isF1Categorical ? (
-                      <XAxis type="category" dataKey="x" tick={{fontSize: 10}} height={40} label={{ value: interactionData.f1.name, position: 'insideBottom', offset: -5, fontSize: 10 }} />
+                      <XAxis type="category" dataKey="x" {...getChartAxisProps(isDark)} height={40} label={getAxisLabelProps(isDark, interactionData.f1.name, { position: 'insideBottom', offset: -5 })} />
                     ) : (
-                      <XAxis type="number" dataKey="x" domain={[interactionData.f1.min, interactionData.f1.max]} ticks={[interactionData.f1.min, (interactionData.f1.min + interactionData.f1.max) / 2, interactionData.f1.max]} tick={{fontSize: 10}} tickFormatter={(val) => val.toString()} height={40} label={{ value: interactionData.f1.name, position: 'insideBottom', offset: -5, fontSize: 10 }} />
+                      <XAxis type="number" dataKey="x" domain={[interactionData.f1.min, interactionData.f1.max]} ticks={[interactionData.f1.min, (interactionData.f1.min + interactionData.f1.max) / 2, interactionData.f1.max]} {...getChartAxisProps(isDark)} tickFormatter={(val) => val.toString()} height={40} label={getAxisLabelProps(isDark, interactionData.f1.name, { position: 'insideBottom', offset: -5 })} />
                     )}
-                    <YAxis domain={['auto', 'auto']} tick={{fontSize: 10}} tickFormatter={(val) => val.toFixed(2)} width={45} />
+                    <YAxis domain={['auto', 'auto']} {...getChartAxisProps(isDark)} tickFormatter={(val) => val.toFixed(2)} width={45} />
                     <Tooltip contentStyle={{fontSize: '11px'}} labelFormatter={(val) => `${interactionData.f1.name}: ${val}`} />
                     {!interactionData.isF1Categorical && (
                       <ReferenceLine x={(interactionData.f1.min + interactionData.f1.max) / 2} stroke="#cbd5e1" strokeDasharray="3 3" />
@@ -2343,19 +2341,17 @@ export default function ProjectAnalysis({ project, selectedResponseId, onRespons
             {doeMeanData && doeMeanData.length > 0 ? (
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={doeMeanData} margin={{ top: 10, right: 30, left: 65, bottom: 20 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                  <XAxis dataKey="run" tick={{fontSize: 10}} angle={-45} textAnchor="end" />
+                  <CartesianGrid strokeDasharray="3 3" stroke={getGridStroke(isDark)} />
+                  <XAxis dataKey="run" {...getChartAxisProps(isDark, { angle: -45, textAnchor: 'end' })} />
                   <YAxis 
                     domain={['auto', 'auto']} 
-                    tick={{fontSize: 10}} 
+                    {...getChartAxisProps(isDark)} 
                     width={65} 
-                    label={{ 
-                      value: locale === 'zh' ? '平均响应值' : 'Mean Response', 
+                    label={getAxisLabelProps(isDark, locale === 'zh' ? '平均响应值' : 'Mean Response', { 
                       angle: -90, 
                       position: 'center', 
-                      dx: -15, 
-                      fontSize: 10 
-                    }} 
+                      dx: -15 
+                    })} 
                   />
                   <Tooltip contentStyle={{fontSize: '11px'}} />
                   <Line type="monotone" dataKey="value" name={locale === 'zh' ? '平均响应' : 'Response Value'} stroke="#3ab9a0" strokeWidth={2} dot={{ r: 4 }} />
@@ -2440,7 +2436,7 @@ export default function ProjectAnalysis({ project, selectedResponseId, onRespons
                </div>
             </div>
             
-            <div className="h-[400px] w-full border border-slate-100 rounded bg-slate-50 dark:bg-slate-800 flex items-center justify-center overflow-hidden">
+            <div className="h-[400px] w-full border border-slate-200/70 dark:border-slate-700/50 rounded bg-slate-50/60 dark:bg-slate-800/60 flex items-center justify-center overflow-hidden">
                <PlotlyErrorBoundary
                  resetKey={`${plot3dType}-${plotData.xFactor.id}-${plotData.yFactor.id}-${activeResponse?.id}`}
                  onResetTo2D={() => setPlot3dType('contour')}
@@ -2452,8 +2448,11 @@ export default function ProjectAnalysis({ project, selectedResponseId, onRespons
                     margin: plot3dType === 'contour' ? { l: 60, r: 30, b: 60, t: 30 } : { l: 0, r: 0, b: 0, t: 0 },
                     ...(plot3dType === 'contour' ? {
                       xaxis: {
-                        title: { text: plotData.xFactor.name, font: { size: 12, color: '#64748b' } },
-                        tickfont: { size: 10, color: '#94a3b8' },
+                        title: { text: plotData.xFactor.name, font: { size: 12, color: isDark ? '#ffffff' : '#1e293b' } },
+                        tickfont: { size: 10, color: isDark ? '#ffffff' : '#334155' },
+                        color: isDark ? '#ffffff' : '#94a3b8',
+                        linecolor: isDark ? '#ffffff' : '#cbd5e1',
+                        gridcolor: isDark ? '#334155' : '#e2e8f0',
                         range: [plotData.xBounds.min, plotData.xBounds.max],
                         ...(plotData.xFactor.type === 'categorical' && plotData.xFactor.levels ? {
                           tickmode: 'array',
@@ -2462,8 +2461,11 @@ export default function ProjectAnalysis({ project, selectedResponseId, onRespons
                         } : {})
                       },
                       yaxis: {
-                        title: { text: plotData.yFactor.name, font: { size: 12, color: '#64748b' } },
-                        tickfont: { size: 10, color: '#94a3b8' },
+                        title: { text: plotData.yFactor.name, font: { size: 12, color: isDark ? '#ffffff' : '#1e293b' } },
+                        tickfont: { size: 10, color: isDark ? '#ffffff' : '#334155' },
+                        color: isDark ? '#ffffff' : '#94a3b8',
+                        linecolor: isDark ? '#ffffff' : '#cbd5e1',
+                        gridcolor: isDark ? '#334155' : '#e2e8f0',
                         range: [plotData.yBounds.min, plotData.yBounds.max],
                         ...(plotData.yFactor.type === 'categorical' && plotData.yFactor.levels ? {
                           tickmode: 'array',
@@ -2474,7 +2476,11 @@ export default function ProjectAnalysis({ project, selectedResponseId, onRespons
                     } : {
                       scene: {
                         xaxis: {
-                          title: { text: `${plotData.xFactor.name}${plotData.xFactor.unit ? ` (${plotData.xFactor.unit})` : ''}` },
+                          title: { text: `${plotData.xFactor.name}${plotData.xFactor.unit ? ` (${plotData.xFactor.unit})` : ''}`, font: { color: isDark ? '#ffffff' : '#1e293b', size: 11 } },
+                          tickfont: { color: isDark ? '#ffffff' : '#334155', size: 10 },
+                          color: isDark ? '#ffffff' : '#64748b',
+                          gridcolor: isDark ? '#334155' : '#e2e8f0',
+                          zerolinecolor: isDark ? '#475569' : '#cbd5e1',
                           range: [plotData.xBounds.min, plotData.xBounds.max],
                           ...(plotData.xFactor.type === 'categorical' && plotData.xFactor.levels ? {
                             tickmode: 'array',
@@ -2483,7 +2489,11 @@ export default function ProjectAnalysis({ project, selectedResponseId, onRespons
                           } : {})
                         },
                         yaxis: {
-                          title: { text: `${plotData.yFactor.name}${plotData.yFactor.unit ? ` (${plotData.yFactor.unit})` : ''}` },
+                          title: { text: `${plotData.yFactor.name}${plotData.yFactor.unit ? ` (${plotData.yFactor.unit})` : ''}`, font: { color: isDark ? '#ffffff' : '#1e293b', size: 11 } },
+                          tickfont: { color: isDark ? '#ffffff' : '#334155', size: 10 },
+                          color: isDark ? '#ffffff' : '#64748b',
+                          gridcolor: isDark ? '#334155' : '#e2e8f0',
+                          zerolinecolor: isDark ? '#475569' : '#cbd5e1',
                           range: [plotData.yBounds.min, plotData.yBounds.max],
                           ...(plotData.yFactor.type === 'categorical' && plotData.yFactor.levels ? {
                             tickmode: 'array',
@@ -2492,7 +2502,11 @@ export default function ProjectAnalysis({ project, selectedResponseId, onRespons
                           } : {})
                         },
                         zaxis: {
-                          title: { text: `${plotData.activeResponse?.name}${plotData.activeResponse?.unit ? ` (${plotData.activeResponse.unit})` : ''}` },
+                          title: { text: `${plotData.activeResponse?.name}${plotData.activeResponse?.unit ? ` (${plotData.activeResponse.unit})` : ''}`, font: { color: isDark ? '#ffffff' : '#1e293b', size: 11 } },
+                          tickfont: { color: isDark ? '#ffffff' : '#334155', size: 10 },
+                          color: isDark ? '#ffffff' : '#64748b',
+                          gridcolor: isDark ? '#334155' : '#e2e8f0',
+                          zerolinecolor: isDark ? '#475569' : '#cbd5e1',
                           range: [plotData.zBounds.min, plotData.zBounds.max]
                         }
                       }

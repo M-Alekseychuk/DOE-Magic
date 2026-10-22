@@ -4,6 +4,7 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContaine
 import { Activity, Play, Info, AlertTriangle } from 'lucide-react';
 import { computeAnalysis, predictModelResponse } from '../../../core/analysis/analysisCore';
 import { useTranslation } from '../../i18n/LanguageContext';
+import { useIsDarkMode, getChartAxisProps, getGridStroke } from '../../shared/chartTheme';
 
 interface RobustnessSimulationProps {
   project: Project;
@@ -12,6 +13,7 @@ interface RobustnessSimulationProps {
 
 export default function RobustnessSimulation({ project, updateProject }: RobustnessSimulationProps) {
   const { t, locale } = useTranslation();
+  const isDark = useIsDarkMode();
   const defaultState = project.robustnessState || {};
 
   const [selectedResponseId, setSelectedResponseId] = useState<string>(
@@ -692,17 +694,23 @@ export default function RobustnessSimulation({ project, updateProject }: Robustn
               <div className="h-64 w-full">
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={simulationResults.histogram} margin={{ top: 20, right: 30, left: 20, bottom: 20 }}>
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={getGridStroke(isDark)} />
                     <XAxis 
                       dataKey="mid" 
                       tickFormatter={(val) => val.toFixed(2)} 
-                      tick={{ fontSize: 11 }} 
+                      {...getChartAxisProps(isDark, { fontSize: 11 })} 
                       type="number"
                       domain={['dataMin', 'dataMax']}
                     />
-                    <YAxis tick={{ fontSize: 11 }} />
+                    <YAxis {...getChartAxisProps(isDark, { fontSize: 11 })} />
                     <Tooltip 
-                      contentStyle={{ fontSize: '11px', borderRadius: '4px', border: '1px solid #e2e8f0' }}
+                      contentStyle={{ 
+                        fontSize: '11px', 
+                        borderRadius: '4px', 
+                        backgroundColor: isDark ? '#1e293b' : '#ffffff',
+                        borderColor: isDark ? '#475569' : '#e2e8f0',
+                        color: isDark ? '#f8fafc' : '#0f172a'
+                      }}
                       labelFormatter={(val) => `${locale === 'zh' ? '响应值' : 'Response'}: ~${Number(val).toFixed(2)}`}
                     />
                     <Bar dataKey="count" fill="#0c75b3" radius={[2, 2, 0, 0]} />
