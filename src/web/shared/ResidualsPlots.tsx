@@ -50,7 +50,7 @@ export function ActualByPredictedPlot({ actualByPredicted, projectName }: { actu
   const domain = [minVal - padding, maxVal + padding];
 
   return (
-    <div id="actual-by-predicted" className="bg-white dark:bg-slate-900 p-4 rounded-lg shadow-sm border border-slate-200 dark:border-slate-600 relative group">
+    <div id="actual-by-predicted" className="bg-white dark:bg-slate-900 p-4 rounded-lg shadow-sm border border-slate-200 dark:border-slate-700/60 relative group">
       <div className="flex justify-between items-start mb-4">
         <div>
           <h3 className="text-[11px] uppercase tracking-widest font-bold text-brand-700 dark:text-blue-400 mb-1">
@@ -174,7 +174,7 @@ export function StudentizedResidualsPlot({ studentizedResiduals, projectName }: 
   };
 
   return (
-    <div id="studentized-residuals" className="bg-white dark:bg-slate-900 p-4 rounded-lg shadow-sm border border-slate-200 dark:border-slate-600 relative group flex flex-col">
+    <div id="studentized-residuals" className="bg-white dark:bg-slate-900 p-4 rounded-lg shadow-sm border border-slate-200 dark:border-slate-700/60 relative group flex flex-col">
       <div className="flex justify-between items-start mb-4">
         <div>
           <h3 className="text-[11px] uppercase tracking-widest font-bold text-brand-700 dark:text-blue-400 mb-1">

@@ -962,7 +962,7 @@ export default function CompareResponses({ project }: Props) {
                         const xDomain = [effect.factor.min - xPadding, effect.factor.max + xPadding];
 
                         return (
-                          <div id={`compare-main-effect-${response.id}-${effect.factor.id}`} key={effect.factor.id} className="h-48 border border-slate-100 rounded bg-slate-50 dark:bg-slate-800 p-2 relative group">
+                          <div id={`compare-main-effect-${response.id}-${effect.factor.id}`} key={effect.factor.id} className="h-48 border border-slate-200/70 dark:border-slate-700/50 rounded bg-slate-50/60 dark:bg-slate-800/60 p-2 relative group">
                             <div className="flex justify-between items-start mb-2">
                               <p className="text-[10px] font-bold text-slate-600 dark:text-slate-200 truncate flex-1">{effect.factor.name}</p>
                               <button
@@ -1080,7 +1080,7 @@ export default function CompareResponses({ project }: Props) {
                     <Download size={14} />
                   </button>
                 </div>
-                <div className="h-[400px] w-full border border-slate-100 rounded bg-slate-50 dark:bg-slate-800 flex items-center justify-center overflow-hidden">
+                <div className="h-[400px] w-full border border-slate-200/70 dark:border-slate-700/50 rounded bg-slate-50/60 dark:bg-slate-800/60 flex items-center justify-center overflow-hidden">
                   <PlotlyErrorBoundary
                     resetKey={`${plot3dType}-${plotData.xFactor.id}-${plotData.yFactor.id}-${response.id}`}
                     onResetTo2D={() => setPlot3dType('contour')}

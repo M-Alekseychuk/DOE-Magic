@@ -98,7 +98,7 @@ export function PredictionProfiler({ project, allAnalysisResults }: Props) {
   };
 
   return (
-    <div className="bg-white dark:bg-slate-900 p-5 rounded-lg shadow-sm border border-slate-200 dark:border-slate-600">
+    <div className="bg-white dark:bg-slate-900 p-5 rounded-lg shadow-sm border border-slate-200 dark:border-slate-700/60">
       <div className="mb-6 flex flex-wrap justify-between items-start gap-4 border-b border-slate-100 dark:border-slate-800 pb-4">
         <div>
           <h3 className="text-sm uppercase tracking-widest font-bold text-brand-700 dark:text-blue-400 mb-1">

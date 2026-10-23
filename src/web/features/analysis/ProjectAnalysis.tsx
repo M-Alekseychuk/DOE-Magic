@@ -1224,7 +1224,7 @@ export default function ProjectAnalysis({ project, selectedResponseId, onRespons
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         
         {/* Effects Plot (Merged Pareto & Half-Normal) */}
-        <div id="effects-plot" className="bg-white dark:bg-slate-900 p-4 rounded-lg shadow-sm border border-slate-200 dark:border-slate-600 flex flex-col">
+        <div id="effects-plot" className="bg-white dark:bg-slate-900 p-4 rounded-lg shadow-sm border border-slate-200 dark:border-slate-700/60 flex flex-col">
           <div className="flex justify-between items-start mb-4">
             <div>
               <div className="flex items-center gap-3 mb-1">
@@ -1964,7 +1964,7 @@ export default function ProjectAnalysis({ project, selectedResponseId, onRespons
         </div>
 
         {/* Main Effects Plot */}
-        <div className="lg:col-span-2 bg-white dark:bg-slate-900 p-4 rounded-lg shadow-sm border border-slate-200 dark:border-slate-600">
+        <div className="lg:col-span-2 bg-white dark:bg-slate-900 p-4 rounded-lg shadow-sm border border-slate-200 dark:border-slate-700/60">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-4 gap-3">
             <div>
               <h3 className="text-[11px] uppercase tracking-widest font-bold text-brand-700 dark:text-blue-400 mb-1">
@@ -2227,7 +2227,7 @@ export default function ProjectAnalysis({ project, selectedResponseId, onRespons
 
         {/* Interaction Plot */}
         {interactionData && (
-          <div id="interaction-plot" className="lg:col-span-2 bg-white dark:bg-slate-900 p-4 rounded-lg shadow-sm border border-slate-200 dark:border-slate-600">
+          <div id="interaction-plot" className="lg:col-span-2 bg-white dark:bg-slate-900 p-4 rounded-lg shadow-sm border border-slate-200 dark:border-slate-700/60">
             <div className="flex flex-col md:flex-row md:items-center justify-between mb-4 gap-4">
               <div>
                 <h3 className="text-[11px] uppercase tracking-widest font-bold text-brand-700 dark:text-blue-400 mb-1">
@@ -2316,7 +2316,7 @@ export default function ProjectAnalysis({ project, selectedResponseId, onRespons
         )}
 
         {/* DOE Mean Plot */}
-        <div id="doe-mean-plot" className="lg:col-span-2 bg-white dark:bg-slate-900 p-4 rounded-lg shadow-sm border border-slate-200 dark:border-slate-600">
+        <div id="doe-mean-plot" className="lg:col-span-2 bg-white dark:bg-slate-900 p-4 rounded-lg shadow-sm border border-slate-200 dark:border-slate-700/60">
           <div className="flex justify-between items-start mb-4">
             <div>
               <h3 className="text-[11px] uppercase tracking-widest font-bold text-brand-700 dark:text-blue-400 mb-1">
@@ -2367,7 +2367,7 @@ export default function ProjectAnalysis({ project, selectedResponseId, onRespons
 
         {/* Contour & Response Surface Plots */}
         {plotData && project.factors.length >= 2 && (
-          <div id="surface-plot-container" className="lg:col-span-2 bg-white dark:bg-slate-900 p-4 rounded-lg shadow-sm border border-slate-200 dark:border-slate-600">
+          <div id="surface-plot-container" className="lg:col-span-2 bg-white dark:bg-slate-900 p-4 rounded-lg shadow-sm border border-slate-200 dark:border-slate-700/60">
             <div className="flex flex-wrap items-center justify-between mb-4 gap-4">
                <div>
                  <h3 className="text-[11px] uppercase tracking-widest font-bold text-brand-700 dark:text-blue-400 mb-1">
