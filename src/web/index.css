@@ -27,3 +27,42 @@ html {
 html.dark {
   color-scheme: dark;
 }
+
+/* Dark mode styles for native form controls */
+.dark select,
+.dark input[type="text"],
+.dark input[type="number"],
+.dark textarea {
+  color-scheme: dark;
+}
+
+.dark select,
+.dark select option,
+.dark select optgroup {
+  background-color: #1e293b;
+  color: #f1f5f9;
+}
+
+/* Recharts Tooltip dark mode styling */
+.dark .recharts-default-tooltip {
+  background-color: #1e293b !important;
+  border-color: #475569 !important;
+  color: #f8fafc !important;
+  border-radius: 6px !important;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.5), 0 2px 4px -2px rgba(0, 0, 0, 0.5) !important;
+}
+
+.dark .recharts-tooltip-label {
+  color: #f8fafc !important;
+  font-weight: 600 !important;
+}
+
+.dark .recharts-tooltip-item,
+.dark .recharts-tooltip-item-name,
+.dark .recharts-tooltip-item-value {
+  color: #e2e8f0 !important;
+}
+
+.dark .recharts-tooltip-cursor {
+  fill: rgba(255, 255, 255, 0.05) !important;
+}

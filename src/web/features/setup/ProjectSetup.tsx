@@ -441,7 +441,7 @@ export default function ProjectSetup({ project, updateProject }: Props) {
                     <select value={editResponseData.goal || 'maximize'} onChange={e => {
                       const newGoal = e.target.value as any;
                       setEditResponseData({...editResponseData, goal: newGoal, ...(newGoal !== 'target' ? { targetValue: undefined } : {})});
-                    }} className="w-full rounded border border-slate-300 dark:border-slate-600 px-2 py-1 text-[11px] font-mono bg-white dark:bg-slate-900">
+                    }} className="w-full rounded border border-slate-300 dark:border-slate-600 px-2 py-1 text-[11px] font-mono bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100">
                       <option value="maximize">{t('goal_maximize', 'Maximize')}</option>
                       <option value="minimize">{t('goal_minimize', 'Minimize')}</option>
                       <option value="target">{t('goal_target', 'Target')}</option>
@@ -502,7 +502,7 @@ export default function ProjectSetup({ project, updateProject }: Props) {
                 const newGoal = e.target.value as any;
                 setNewResponseGoal(newGoal);
                 if (newGoal !== 'target') setNewResponseTargetValue('');
-              }} className="w-full rounded border border-slate-300 dark:border-slate-600 px-2 py-1 text-[11px] focus:outline-none focus:ring-1 focus:ring-brand-500 focus:border-brand-500 font-mono bg-white dark:bg-slate-900">
+              }} className="w-full rounded border border-slate-300 dark:border-slate-600 px-2 py-1 text-[11px] focus:outline-none focus:ring-1 focus:ring-brand-500 focus:border-brand-500 font-mono bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100">
                 <option value="maximize">{t('goal_maximize', 'Maximize')}</option>
                 <option value="minimize">{t('goal_minimize', 'Minimize')}</option>
                 <option value="target">{t('goal_target', 'Target')}</option>

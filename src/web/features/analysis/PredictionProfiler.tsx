@@ -3,7 +3,7 @@ import { Project, Factor, Response } from '../../../core/types';
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts';
 import { predictModelResponse } from '../../../core/analysis/analysisCore';
 import { useTranslation } from '../../i18n/LanguageContext';
-import { useIsDarkMode } from '../../shared/chartTheme';
+import { useIsDarkMode, getChartTooltipProps } from '../../shared/chartTheme';
 
 interface Props {
   project: Project;
@@ -211,7 +211,7 @@ export function PredictionProfiler({ project, allAnalysisResults }: Props) {
                               tickLine={false} 
                             />
                             <Tooltip 
-                              contentStyle={{ fontSize: '11px', borderRadius: '6px', padding: '6px 10px', backgroundColor: isDark ? '#0f172a' : '#ffffff', border: isDark ? '1px solid #334155' : '1px solid #e2e8f0', color: isDark ? '#ffffff' : '#0f172a', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} 
+                              {...getChartTooltipProps(isDark)}
                               labelFormatter={(l) => `${factor.name}: ${l}`} 
                               formatter={(val: number) => [val.toFixed(3), locale === 'zh' ? '预测值' : 'Prediction']}
                             />
@@ -257,7 +257,7 @@ export function PredictionProfiler({ project, allAnalysisResults }: Props) {
                             tickLine={false} 
                           />
                           <Tooltip 
-                            contentStyle={{ fontSize: '11px', borderRadius: '6px', padding: '6px 10px', border: '1px solid #e2e8f0', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} 
+                            {...getChartTooltipProps(isDark)}
                             labelFormatter={(l) => `${factor.name}: ${Number(l).toFixed(2)}`} 
                             formatter={(val: number) => [val.toFixed(3), locale === 'zh' ? '预测值' : 'Prediction']}
                           />

@@ -28,7 +28,7 @@ interface Props {
 import { computeAnalysis, predictModelResponse } from "../../../core/analysis/analysisCore";
 import { PlotlyErrorBoundary } from "../../shared/PlotlyErrorBoundary";
 import { useTranslation } from '../../i18n/LanguageContext';
-import { useIsDarkMode, getChartAxisProps, getGridStroke, getAxisLabelProps } from '../../shared/chartTheme';
+import { useIsDarkMode, getChartAxisProps, getGridStroke, getAxisLabelProps, getChartTooltipProps } from '../../shared/chartTheme';
 
 function TableHelpTooltip({ title, children }: { title: string; children: React.ReactNode }) {
   const [isOpen, setIsOpen] = useState(false);
@@ -1074,7 +1074,7 @@ export default function ProjectAnalysis({ project, selectedResponseId, onRespons
             <select 
               value={activeResponseId} 
               onChange={e => onResponseChange(e.target.value)}
-              className="rounded border border-slate-300 dark:border-slate-600 px-2 py-1 text-[11px] focus:outline-none focus:ring-1 focus:ring-brand-500"
+              className="rounded border border-slate-300 dark:border-slate-600 px-2 py-1 text-[11px] focus:outline-none focus:ring-1 focus:ring-brand-500 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100"
             >
               {project.responses.map(r => (
                 <option key={r.id} value={r.id}>
@@ -1234,7 +1234,7 @@ export default function ProjectAnalysis({ project, selectedResponseId, onRespons
                 <select 
                   value={effectsPlotType}
                   onChange={e => setEffectsPlotType(e.target.value as 'pareto' | 'half-normal')}
-                  className="rounded border border-slate-300 dark:border-slate-600 px-1 py-0.5 text-[10px] focus:outline-none focus:ring-1 focus:ring-brand-500 bg-slate-50 dark:bg-slate-800"
+                  className="rounded border border-slate-300 dark:border-slate-600 px-1 py-0.5 text-[10px] focus:outline-none focus:ring-1 focus:ring-brand-500 bg-slate-50 dark:bg-slate-800 text-slate-800 dark:text-slate-100"
                 >
                   <option value="pareto">{locale === 'zh' ? 'Pareto 图: 标准化效应' : 'Pareto: Standardized'}</option>
                   <option value="half-normal">{locale === 'zh' ? '半正态概率图 (Half-Normal)' : 'Half-Normal'}</option>
@@ -1301,8 +1301,7 @@ export default function ProjectAnalysis({ project, selectedResponseId, onRespons
                         }} 
                       />
                       <Tooltip 
-                        cursor={{ fill: '#f8fafc' }} 
-                        contentStyle={{fontSize: '11px', borderRadius: '4px'}}
+                        {...getChartTooltipProps(isDark)}
                         formatter={(value: number, name: string, props: any) => [
                           `${value.toFixed(3)} (${props.payload.direction === 'Positive' ? (locale === 'zh' ? '正向' : 'Positive') : (locale === 'zh' ? '负向' : 'Negative')})`, 
                           locale === 'zh' ? '效应大小' : 'Effect Size'
@@ -1372,8 +1371,8 @@ export default function ProjectAnalysis({ project, selectedResponseId, onRespons
                     
                     <ZAxis type="category" dataKey="factor.name" name="Factor" />
                     <Tooltip 
-                      cursor={{ strokeDasharray: '3 3' }} 
-                      contentStyle={{fontSize: '11px', borderRadius: '4px'}}
+                      {...getChartTooltipProps(isDark)}
+                      cursor={{ strokeDasharray: '3 3', stroke: isDark ? 'rgba(255, 255, 255, 0.3)' : '#cbd5e1' }}
                       formatter={(value: number, name: string, props: any) => [
                         name === 'Factor' || name === 'factor.name' ? props.payload.name : value.toFixed(3),
                         name === 'Factor' || name === 'factor.name' ? (locale === 'zh' ? '因素' : 'Factor') : (props.payload.direction ? (props.payload.direction === 'Positive' ? (locale === 'zh' ? '正向效应' : 'Positive Effect') : (locale === 'zh' ? '负向效应' : 'Negative Effect')) : (locale === 'zh' ? '数值' : 'Value'))
@@ -2140,7 +2139,7 @@ export default function ProjectAnalysis({ project, selectedResponseId, onRespons
                             <CartesianGrid strokeDasharray="3 3" stroke={getGridStroke(isDark)} />
                             <XAxis type="category" dataKey="x" {...getChartAxisProps(isDark, { fontSize: 9 })} interval={0} />
                             <YAxis domain={[yMin, yMax]} ticks={yTicks} {...getChartAxisProps(isDark)} tickFormatter={(val) => val.toFixed(2)} width={45} allowDataOverflow={true} type="number" />
-                            <Tooltip contentStyle={{fontSize: '10px'}} labelFormatter={(val) => `${effect.factor.name}: ${val}`} />
+                            <Tooltip {...getChartTooltipProps(isDark, { fontSize: '10px' })} labelFormatter={(val) => `${effect.factor.name}: ${val}`} />
                             <Line 
                               type="linear" 
                               dataKey="value" 
@@ -2210,7 +2209,7 @@ export default function ProjectAnalysis({ project, selectedResponseId, onRespons
                           <CartesianGrid strokeDasharray="3 3" stroke={getGridStroke(isDark)} />
                           <XAxis type="number" dataKey="x" domain={xDomain} ticks={[effect.factor.min, midX, effect.factor.max]} {...getChartAxisProps(isDark)} tickFormatter={(val) => val.toString()} />
                           <YAxis domain={[yMin, yMax]} ticks={yTicks} {...getChartAxisProps(isDark)} tickFormatter={(val) => val.toFixed(2)} width={45} allowDataOverflow={true} type="number" />
-                          <Tooltip contentStyle={{fontSize: '10px'}} labelFormatter={(val) => `${effect.factor.name}: ${val}`} />
+                          <Tooltip {...getChartTooltipProps(isDark, { fontSize: '10px' })} labelFormatter={(val) => `${effect.factor.name}: ${val}`} />
                           <ReferenceLine x={midX} stroke="#94a3b8" strokeDasharray="3 3" />
                           <Line type="linear" dataKey="value" stroke="#82ca9d" strokeWidth={2.5} dot={{ r: 4.5, fill: "white", stroke: "#82ca9d", strokeWidth: 2 }} activeDot={{ r: 6, fill: "#82ca9d" }} isAnimationActive={false} connectNulls />
                         </LineChart>
@@ -2245,7 +2244,7 @@ export default function ProjectAnalysis({ project, selectedResponseId, onRespons
                   <select 
                     value={interactionData.f1.id} 
                     onChange={e => setInteractionF1Id(e.target.value)}
-                    className="rounded border border-slate-300 px-2 py-1 text-[11px] focus:outline-none"
+                    className="rounded border border-slate-300 dark:border-slate-600 px-2 py-1 text-[11px] focus:outline-none focus:ring-1 focus:ring-brand-500 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100"
                   >
                     {project.factors.map(f => <option key={f.id} value={f.id}>{f.name}</option>)}
                   </select>
@@ -2257,7 +2256,7 @@ export default function ProjectAnalysis({ project, selectedResponseId, onRespons
                   <select 
                     value={interactionData.f2.id} 
                     onChange={e => setInteractionF2Id(e.target.value)}
-                    className="rounded border border-slate-300 px-2 py-1 text-[11px] focus:outline-none"
+                    className="rounded border border-slate-300 dark:border-slate-600 px-2 py-1 text-[11px] focus:outline-none focus:ring-1 focus:ring-brand-500 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100"
                   >
                     {project.factors.filter(f => f.id !== interactionData.f1.id).map(f => <option key={f.id} value={f.id}>{f.name}</option>)}
                   </select>
@@ -2283,7 +2282,7 @@ export default function ProjectAnalysis({ project, selectedResponseId, onRespons
                       <XAxis type="number" dataKey="x" domain={[interactionData.f1.min, interactionData.f1.max]} ticks={[interactionData.f1.min, (interactionData.f1.min + interactionData.f1.max) / 2, interactionData.f1.max]} {...getChartAxisProps(isDark)} tickFormatter={(val) => val.toString()} height={40} label={getAxisLabelProps(isDark, interactionData.f1.name, { position: 'insideBottom', offset: -5 })} />
                     )}
                     <YAxis domain={['auto', 'auto']} {...getChartAxisProps(isDark)} tickFormatter={(val) => val.toFixed(2)} width={45} />
-                    <Tooltip contentStyle={{fontSize: '11px'}} labelFormatter={(val) => `${interactionData.f1.name}: ${val}`} />
+                    <Tooltip {...getChartTooltipProps(isDark)} labelFormatter={(val) => `${interactionData.f1.name}: ${val}`} />
                     {!interactionData.isF1Categorical && (
                       <ReferenceLine x={(interactionData.f1.min + interactionData.f1.max) / 2} stroke="#cbd5e1" strokeDasharray="3 3" />
                     )}
@@ -2353,7 +2352,7 @@ export default function ProjectAnalysis({ project, selectedResponseId, onRespons
                       dx: -15 
                     })} 
                   />
-                  <Tooltip contentStyle={{fontSize: '11px'}} />
+                  <Tooltip {...getChartTooltipProps(isDark)} />
                   <Line type="monotone" dataKey="value" name={locale === 'zh' ? '平均响应' : 'Response Value'} stroke="#3ab9a0" strokeWidth={2} dot={{ r: 4 }} />
                 </LineChart>
               </ResponsiveContainer>
@@ -2383,7 +2382,7 @@ export default function ProjectAnalysis({ project, selectedResponseId, onRespons
                    <select 
                      value={plot3dType} 
                      onChange={e => setPlot3dType(e.target.value as any)}
-                     className="rounded border border-slate-300 px-2 py-1 text-[11px] focus:outline-none"
+                     className="rounded border border-slate-300 dark:border-slate-600 px-2 py-1 text-[11px] focus:outline-none focus:ring-1 focus:ring-brand-500 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100"
                    >
                      <option value="scatter3d">{locale === 'zh' ? '3D 散点图' : 'Scatter 3D'}</option>
                      <option value="mesh3d">{locale === 'zh' ? '3D 响应曲面 (网格)' : 'Surface 3D (Mesh)'}</option>
@@ -2406,7 +2405,7 @@ export default function ProjectAnalysis({ project, selectedResponseId, onRespons
                    <select 
                      value={plotData.xFactor.id} 
                      onChange={e => setXAxisFactorId(e.target.value)}
-                     className="rounded border border-slate-300 dark:border-slate-600 px-2 py-1 text-[11px] focus:outline-none focus:ring-1 focus:ring-brand-500"
+                     className="rounded border border-slate-300 dark:border-slate-600 px-2 py-1 text-[11px] focus:outline-none focus:ring-1 focus:ring-brand-500 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100"
                    >
                      {project.factors.map(f => (
                        <option key={f.id} value={f.id}>{f.name}</option>
@@ -2418,7 +2417,7 @@ export default function ProjectAnalysis({ project, selectedResponseId, onRespons
                    <select 
                      value={plotData.yFactor.id} 
                      onChange={e => setYAxisFactorId(e.target.value)}
-                     className="rounded border border-slate-300 dark:border-slate-600 px-2 py-1 text-[11px] focus:outline-none focus:ring-1 focus:ring-brand-500"
+                     className="rounded border border-slate-300 dark:border-slate-600 px-2 py-1 text-[11px] focus:outline-none focus:ring-1 focus:ring-brand-500 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100"
                    >
                      {project.factors.map(f => (
                        <option key={f.id} value={f.id}>{f.name}</option>

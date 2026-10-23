@@ -65,3 +65,32 @@ export function getAxisLabelProps(isDark: boolean, text: string, options: Record
     ...options
   };
 }
+
+/**
+ * Standard dark/light mode props for Recharts Tooltip
+ */
+export function getChartTooltipProps(isDark: boolean, customContentStyle: Record<string, any> = {}) {
+  return {
+    contentStyle: {
+      backgroundColor: isDark ? '#1e293b' : '#ffffff',
+      borderColor: isDark ? '#475569' : '#e2e8f0',
+      borderRadius: '6px',
+      color: isDark ? '#f8fafc' : '#0f172a',
+      fontSize: '11px',
+      boxShadow: isDark
+        ? '0 4px 6px -1px rgba(0, 0, 0, 0.5), 0 2px 4px -2px rgba(0, 0, 0, 0.5)'
+        : '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1)',
+      ...customContentStyle
+    },
+    itemStyle: {
+      color: isDark ? '#e2e8f0' : '#334155'
+    },
+    labelStyle: {
+      color: isDark ? '#f8fafc' : '#0f172a',
+      fontWeight: 600
+    },
+    cursor: {
+      fill: isDark ? 'rgba(255, 255, 255, 0.05)' : '#f8fafc'
+    }
+  };
+}

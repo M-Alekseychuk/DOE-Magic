@@ -308,7 +308,7 @@ export default function RobustnessSimulation({ project, updateProject }: Robustn
             <select
               value={selectedResponseId}
               onChange={(e) => setSelectedResponseId(e.target.value)}
-              className="w-full rounded border border-slate-300 dark:border-slate-600 px-2 py-1.5 text-sm bg-slate-50 dark:bg-slate-800 focus:outline-none focus:ring-1 focus:ring-brand-500"
+              className="w-full rounded border border-slate-300 dark:border-slate-600 px-2 py-1.5 text-sm bg-slate-50 dark:bg-slate-800 text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-brand-500"
             >
               {project.responses.map(r => (
                 <option key={r.id} value={r.id}>{r.name}</option>
@@ -704,6 +704,7 @@ export default function RobustnessSimulation({ project, updateProject }: Robustn
                     />
                     <YAxis {...getChartAxisProps(isDark, { fontSize: 11 })} />
                     <Tooltip 
+                      cursor={{ fill: isDark ? 'rgba(255, 255, 255, 0.05)' : '#f8fafc' }}
                       contentStyle={{ 
                         fontSize: '11px', 
                         borderRadius: '4px', 
