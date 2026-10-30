@@ -26,6 +26,8 @@ interface Props {
 
 
 import { computeAnalysis, predictModelResponse } from "../../../core/analysis/analysisCore";
+import { fitProjectModels, countEmptyResponseCells, countMeasuredValues, simulateSampleDataForResponse } from "../../../core/analysis/projectModels";
+import ConfirmDialog from "../../shared/ConfirmDialog";
 import { PlotlyErrorBoundary } from "../../shared/PlotlyErrorBoundary";
 import { useTranslation } from '../../i18n/LanguageContext';
 import { useIsDarkMode, getChartAxisProps, getGridStroke, getAxisLabelProps, getChartTooltipProps } from '../../shared/chartTheme';
@@ -188,51 +190,23 @@ export default function ProjectAnalysis({ project, selectedResponseId, onRespons
     ? project.runs.filter(r => r.responses[activeResponse.id] !== null && r.responses[activeResponse.id] !== undefined && String(r.responses[activeResponse.id]).trim() !== '').length
     : 0;
 
+  const [showSimulateConfirm, setShowSimulateConfirm] = useState(false);
+
   const handleSimulateSampleData = () => {
     if (!activeResponse) return;
-    
-    const updatedRuns = project.runs.map((run, idx) => {
-      let baseVal = 72.5;
-      
-      project.factors.forEach((f, fIdx) => {
-        const factorVal = run.factors[f.id];
-        if (f.type === 'categorical') {
-          const levels = f.levels && f.levels.length > 0 ? f.levels : ['Level 1', 'Level 2'];
-          const lvlIdx = levels.indexOf(String(factorVal));
-          const contrast = (lvlIdx === 0 ? -1 : (lvlIdx === 1 ? 1 : 0));
-          baseVal += (fIdx % 2 === 0 ? 8.4 : -6.2) * contrast;
-        } else {
-          const mid = (f.min + f.max) / 2;
-          const range = (f.max - f.min) || 1;
-          const coded = (Number(factorVal) - mid) / (range / 2);
-          baseVal += (fIdx % 2 === 0 ? 11.5 : -8.3) * Math.max(-2, Math.min(2, coded));
-        }
-      });
-      
-      if (project.factors.length >= 2) {
-        const f1 = project.factors[0];
-        const f2 = project.factors[1];
-        const c1 = f1.type === 'categorical' ? (run.factors[f1.id] === (f1.levels?.[0] ?? '') ? -1 : 1) : (Number(run.factors[f1.id]) - (f1.min + f1.max) / 2) / (((f1.max - f1.min) / 2) || 1);
-        const c2 = f2.type === 'categorical' ? (run.factors[f2.id] === (f2.levels?.[0] ?? '') ? -1 : 1) : (Number(run.factors[f2.id]) - (f2.min + f2.max) / 2) / (((f2.max - f2.min) / 2) || 1);
-        baseVal += 4.5 * c1 * c2;
-      }
-      
-      const pseudoNoise = ((idx * 13 + 5) % 17 - 8) * 0.4;
-      let finalVal = Number((baseVal + pseudoNoise).toFixed(2));
-      if (finalVal < 0) finalVal = Math.abs(finalVal);
+    const emptyCount = countEmptyResponseCells(project, activeResponse.id);
+    if (emptyCount === 0) return;
+    setShowSimulateConfirm(true);
+  };
 
-      return {
-        ...run,
-        responses: {
-          ...run.responses,
-          [activeResponse.id]: finalVal
-        }
-      };
-    });
-
+  const executeSimulateSampleData = () => {
+    if (!activeResponse) return;
+    const { runs: updatedRuns, filledCount } = simulateSampleDataForResponse(project, activeResponse.id);
+    setShowSimulateConfirm(false);
+    if (filledCount === 0) return;
     onUpdateProject({
       ...project,
-      runs: updatedRuns
+      runs: updatedRuns,
     });
   };
 
@@ -255,17 +229,16 @@ export default function ProjectAnalysis({ project, selectedResponseId, onRespons
     onUpdateProject({ ...project, runs: updatedRuns });
   };
 
-  // Compute effects and predictive model (Robust OLS Matrix Inversion with Aliasing Detection)
+  // Compute effects and predictive model for each response using its own saved excludedTerms (STAT-7 / UI-3 / P0.6)
   const allAnalysisResults = useMemo(() => {
     if (!hasData) return [];
     try {
-      return project.responses.map(resp => {
-        const isAct = resp.id === activeResponseId;
-        const ex = isAct ? excludedTerms : [];
-        const goal = isAct && customOptConfig.goal ? customOptConfig.goal : resp.goal;
-        const target = isAct && customOptConfig.targetValue !== '' ? Number(customOptConfig.targetValue) : resp.targetValue;
-        return computeAnalysis(project, resp, ex, goal, target);
-      }).filter(r => r !== null);
+      return fitProjectModels(project, {
+        responseId: activeResponseId,
+        excludedTerms,
+        goal: customOptConfig.responseId === activeResponseId && customOptConfig.goal ? customOptConfig.goal : undefined,
+        targetValue: customOptConfig.responseId === activeResponseId && customOptConfig.targetValue !== '' ? Number(customOptConfig.targetValue) : undefined,
+      });
     } catch (e) {
       console.error("Error computing all analysis results:", e);
       return [];
@@ -597,6 +570,30 @@ export default function ProjectAnalysis({ project, selectedResponseId, onRespons
 
     const insights = [];
 
+    // 0. Excluded Runs & Data/Extrapolation Warnings (P1.11 / STAT-11, STAT-14, STAT-26)
+    const excludedRunsList = analysisResults.excludedRuns || [];
+    if (excludedRunsList.length > 0) {
+      const summary = excludedRunsList
+        .slice(0, 6)
+        .map(er => `Run #${er.runOrder} (${er.reason})`)
+        .join('; ');
+      const moreCount = excludedRunsList.length > 6 ? ` (+${excludedRunsList.length - 6} more)` : '';
+      insights.push({
+        type: 'warning',
+        title: t('excluded_runs_banner_title').replace('{count}', String(excludedRunsList.length)),
+        text: `${summary}${moreCount}`,
+      });
+    }
+
+    const analysisWarnings = analysisResults.warnings || [];
+    if (analysisWarnings.length > 0) {
+      insights.push({
+        type: 'warning',
+        title: t('analysis_warnings_title'),
+        text: analysisWarnings.join(' '),
+      });
+    }
+
     // 1. Saturated Model / Overfitting
     if (dfError === 0) {
       insights.push({
@@ -744,7 +741,7 @@ export default function ProjectAnalysis({ project, selectedResponseId, onRespons
     // 6. Directional Guidance / Strongest Drivers
     const significantEffects = effectSummary.filter((ef: any) => !ef.isExcluded && ef.pVal <= 0.05 && !ef.isAliased);
     if (significantEffects.length > 0) {
-      const sortedEffects = [...significantEffects].sort((a, b) => Math.abs(b.tRatio) - Math.abs(a.tRatio));
+      const sortedEffects = [...significantEffects].sort((a, b) => (b.logworth ?? 0) - (a.logworth ?? 0));
       
       const mainEffects = sortedEffects.filter(ef => !ef.name.includes('*'));
       const intEffects = sortedEffects.filter(ef => ef.name.includes('*'));
@@ -2590,10 +2587,10 @@ export default function ProjectAnalysis({ project, selectedResponseId, onRespons
                   {locale === 'zh' ? '预测响应值 (Ŷ)' : 'Predicted Response (Ŷ)'}
                 </div>
                 <div className="text-xl font-bold font-mono text-emerald-600 dark:text-emerald-400">
-                  {analysisResults.optimalConditions.expectedY !== undefined ? analysisResults.optimalConditions.expectedY.toFixed(2) : '—'} <span className="text-xs font-normal text-slate-500 dark:text-slate-300">{activeResponse?.unit}</span>
+                  {analysisResults.optimalConditions.expectedY != null ? analysisResults.optimalConditions.expectedY.toFixed(2) : '—'} <span className="text-xs font-normal text-slate-500 dark:text-slate-300">{activeResponse?.unit}</span>
                 </div>
                 <div className="text-[10px] text-slate-500 dark:text-slate-400 mt-1">
-                  {locale === 'zh' ? '标准误 (SE): ±' : 'Standard Error: ±'}{analysisResults.optimalConditions.seFit !== undefined ? analysisResults.optimalConditions.seFit.toFixed(2) : '—'}
+                  {locale === 'zh' ? '标准误 (SE): ±' : 'Standard Error: ±'}{analysisResults.optimalConditions.seFit != null ? analysisResults.optimalConditions.seFit.toFixed(2) : '—'}
                 </div>
               </div>
 
@@ -2602,12 +2599,12 @@ export default function ProjectAnalysis({ project, selectedResponseId, onRespons
                   {locale === 'zh' ? '95% 置信区间 (均值 CI)' : '95% Confidence Interval (Mean CI)'}
                 </div>
                 <div className="text-sm font-bold font-mono text-blue-600 dark:text-blue-300 mt-0.5">
-                  [{analysisResults.optimalConditions.ciLower !== undefined ? analysisResults.optimalConditions.ciLower.toFixed(2) : '—'}, {analysisResults.optimalConditions.ciUpper !== undefined ? analysisResults.optimalConditions.ciUpper.toFixed(2) : '—'}]
+                  [{analysisResults.optimalConditions.ciLower != null ? analysisResults.optimalConditions.ciLower.toFixed(2) : '—'}, {analysisResults.optimalConditions.ciUpper != null ? analysisResults.optimalConditions.ciUpper.toFixed(2) : '—'}]
                 </div>
                 <div className="text-[10px] text-slate-500 dark:text-slate-400 mt-1.5">
                   {locale === 'zh' 
-                    ? `最优点重复试验均值的置信区间 (t = ±${analysisResults.optimalConditions.tCrit !== undefined ? analysisResults.optimalConditions.tCrit.toFixed(2) : '1.96'})`
-                    : `Expected mean of repeated runs at optimum (t = ±${analysisResults.optimalConditions.tCrit !== undefined ? analysisResults.optimalConditions.tCrit.toFixed(2) : '1.96'})`}
+                    ? `最优点重复试验均值的置信区间 (t = ±${analysisResults.optimalConditions.tCrit != null ? analysisResults.optimalConditions.tCrit.toFixed(2) : '—'})`
+                    : `Expected mean of repeated runs at optimum (t = ±${analysisResults.optimalConditions.tCrit != null ? analysisResults.optimalConditions.tCrit.toFixed(2) : '—'})`}
                 </div>
               </div>
 
@@ -2616,7 +2613,7 @@ export default function ProjectAnalysis({ project, selectedResponseId, onRespons
                   {locale === 'zh' ? '95% 预测区间 (单次 PI)' : '95% Prediction Interval (Single PI)'}
                 </div>
                 <div className="text-sm font-bold font-mono text-fuchsia-600 dark:text-fuchsia-300 mt-0.5">
-                  [{analysisResults.optimalConditions.piLower !== undefined ? analysisResults.optimalConditions.piLower.toFixed(2) : '—'}, {analysisResults.optimalConditions.piUpper !== undefined ? analysisResults.optimalConditions.piUpper.toFixed(2) : '—'}]
+                  [{analysisResults.optimalConditions.piLower != null ? analysisResults.optimalConditions.piLower.toFixed(2) : '—'}, {analysisResults.optimalConditions.piUpper != null ? analysisResults.optimalConditions.piUpper.toFixed(2) : '—'}]
                 </div>
                 <div className="text-[10px] text-slate-500 dark:text-slate-400 mt-1.5">
                   {locale === 'zh' ? '未来单次验证试验的预期波动范围' : 'Expected range for a single future confirmation run'}
@@ -2705,6 +2702,18 @@ export default function ProjectAnalysis({ project, selectedResponseId, onRespons
       </div>
     </>
   )}
+  <ConfirmDialog
+    open={showSimulateConfirm}
+    title={t('confirm_simulate_title')}
+    message={t('confirm_simulate_msg')
+      .replace('{emptyCount}', String(activeResponse ? countEmptyResponseCells(project, activeResponse.id) : 0))
+      .replace('{response}', activeResponse?.name || '')
+      .replace('{preservedCount}', String(activeResponse ? countMeasuredValues(project, activeResponse.id) : 0))}
+    confirmLabel={t('confirm_simulate_button')}
+    cancelLabel={t('cancel')}
+    onConfirm={executeSimulateSampleData}
+    onCancel={() => setShowSimulateConfirm(false)}
+  />
 </div>
   );
 }

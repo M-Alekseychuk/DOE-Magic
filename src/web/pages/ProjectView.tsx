@@ -13,6 +13,7 @@ import RobustnessSimulation from '../features/robustness/RobustnessSimulation';
 import CompareResponses from '../features/compare/CompareResponses';
 import { getRunPattern } from '../../core/design/doePatterns';
 import { computeAnalysis } from '../../core/analysis/analysisCore';
+import { fitProjectModelsById } from '../../core/analysis/projectModels';
 
 export default function ProjectView() {
   const { id } = useParams<{ id: string }>();
@@ -221,8 +222,9 @@ export default function ProjectView() {
       utils.book_append_sheet(wb, runWs, "Design Matrix");
       
       // Add Analysis sheets for each response
+      const fittedById = fitProjectModelsById(project);
       project.responses.forEach(res => {
-        const analysis = computeAnalysis(project, res, res.excludedTerms || [], res.goal, res.targetValue);
+        const analysis = fittedById[res.id] ?? null;
         if (!analysis || !analysis.effectSummary) return;
         
         let wsData: any[][] = [];

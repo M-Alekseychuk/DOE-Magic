@@ -4,6 +4,7 @@ import { Cpu, Sparkles, Loader2, Target, TrendingUp, Compass, Sliders, Info, Arr
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { useTranslation } from '../../i18n/LanguageContext';
+import { buildOptimizationOptions } from '../../../core/optimization/optimize';
 
 interface Props {
   project: Project;
@@ -602,7 +603,11 @@ export default function ProjectOptimization({ project, updateProject }: Props) {
   const activeResponse = project.responses.find(r => r.id === targetResponseId) || project.responses[0];
   
   const [goal, setGoal] = useState<'maximize' | 'minimize' | 'target'>((activeResponse?.goal as any) || 'maximize');
-  const [targetValue, setTargetValue] = useState<number>(activeResponse?.targetValue ?? 70);
+  const [targetValueInput, setTargetValueInput] = useState<string>(
+    activeResponse?.targetValue !== undefined && Number.isFinite(activeResponse.targetValue)
+      ? String(activeResponse.targetValue)
+      : '70'
+  );
   const [extrapolationMargin, setExtrapolationMargin] = useState<number>(0.30); // Default to 30% extrapolation
   const [customMarginInput, setCustomMarginInput] = useState<string>('30');
   const [surrogateType, setSurrogateType] = useState<'trend_gp' | 'stationary_gp'>('trend_gp');
@@ -619,6 +624,18 @@ export default function ProjectOptimization({ project, updateProject }: Props) {
       return;
     }
 
+    let validatedTarget: number;
+    try {
+      const validated = buildOptimizationOptions({
+        goal,
+        targetValue: targetValueInput,
+      });
+      validatedTarget = validated.targetValue;
+    } catch {
+      setError(t('target_required_error'));
+      return;
+    }
+
     setLoading(true);
     setError('');
     
@@ -628,7 +645,7 @@ export default function ProjectOptimization({ project, updateProject }: Props) {
           numSuggestions,
           targetResponseId: activeResponse?.id || '',
           goal,
-          targetValue: Number(targetValue) || 70,
+          targetValue: validatedTarget,
           extrapolationMargin,
           surrogateType,
         };
@@ -740,7 +757,9 @@ export default function ProjectOptimization({ project, updateProject }: Props) {
               const resp = project.responses.find(r => r.id === e.target.value);
               if (resp) {
                 setGoal((resp.goal as any) || 'maximize');
-                if (resp.targetValue !== undefined) setTargetValue(resp.targetValue);
+                if (resp.targetValue !== undefined && Number.isFinite(resp.targetValue)) {
+                  setTargetValueInput(String(resp.targetValue));
+                }
               }
             }}
             className="w-full bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-800 dark:text-slate-200 text-[11px] rounded px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-500"
@@ -794,9 +813,12 @@ export default function ProjectOptimization({ project, updateProject }: Props) {
               <input 
                 type="number"
                 step="any"
-                value={targetValue}
-                onChange={e => setTargetValue(Number(e.target.value))}
-                placeholder="e.g. 70"
+                value={targetValueInput}
+                onChange={e => {
+                  setTargetValueInput(e.target.value);
+                  if (error) setError('');
+                }}
+                placeholder="e.g. 0 or 70"
                 className="w-24 px-2 py-1 rounded bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-[11px] font-mono text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-blue-500 [color-scheme:light] dark:[color-scheme:dark]"
               />
               <span className="text-[10px] text-slate-500">{activeResponse?.unit || '%'}</span>

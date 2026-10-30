@@ -7,6 +7,12 @@ import DesignCube from './DesignCube';
 import { read, utils } from 'xlsx';
 import { getRunPattern } from '../../../core/design/doePatterns';
 import { generateDOptimalSubset } from '../../../core/design/dOptimal';
+import { buildDSD } from '../../../core/design/dsd';
+import { buildRegularFraction } from '../../../core/design/fractions';
+import { buildCenterPointRuns, buildAxialPointRuns, getSafeCategoricalLevels } from '../../../core/design/centerPoints';
+import { randomize, generateRandomSeed } from '../../../core/design/randomize';
+import { countMeasuredValues } from '../../../core/analysis/projectModels';
+import ConfirmDialog from '../../shared/ConfirmDialog';
 import { useTranslation } from '../../i18n/LanguageContext';
 
 interface Props {
@@ -186,7 +192,8 @@ export default function ProjectDesign({ project, updateProject }: Props) {
   const [lastGeneratedInfo, setLastGeneratedInfo] = useState<{
     designName: string;
     runsCount: number;
-    dEfficiency?: number;
+    dEfficiency?: number | null;
+    randomSeed?: number;
     notes?: string;
   } | null>(null);
   const [showAugmentMenu, setShowAugmentMenu] = useState(false);
@@ -196,6 +203,31 @@ export default function ProjectDesign({ project, updateProject }: Props) {
     type: 'success' | 'error' | 'warning';
     message: string;
   } | null>(null);
+  const [pendingOverwrite, setPendingOverwrite] = useState<
+    | { type: 'generate'; measuredCount: number }
+    | { type: 'import'; measuredCount: number; runs: Run[]; sheetName: string; warnings: string[] }
+    | null
+  >(null);
+
+  const commitImportedRuns = (newRuns: Run[], sheetName: string, warningMessages: string[]) => {
+    updateProject({
+      ...project,
+      runs: newRuns,
+      updatedAt: Date.now(),
+    });
+
+    if (warningMessages.length > 0) {
+      setImportStatus({
+        type: 'warning',
+        message: `Loaded ${newRuns.length} runs. Warning: ${warningMessages.join(' ')}`,
+      });
+    } else {
+      setImportStatus({
+        type: 'success',
+        message: `Successfully loaded ${newRuns.length} runs from worksheet "${sheetName}"!`,
+      });
+    }
+  };
 
   const handleImportExcel = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -400,24 +432,17 @@ export default function ProjectDesign({ project, updateProject }: Props) {
         // Sort runs by runOrder to maintain order
         newRuns.sort((a, b) => a.runOrder - b.runOrder);
 
-        // Update the project
-        updateProject({
-          ...project,
-          runs: newRuns,
-          updatedAt: Date.now()
-        });
-
-        // Set status feedback
-        if (warningMessages.length > 0) {
-          setImportStatus({
-            type: 'warning',
-            message: `Loaded ${newRuns.length} runs. Warning: ${warningMessages.join(' ')}`
+        const existingMeasuredCount = countMeasuredValues(project);
+        if (existingMeasuredCount > 0) {
+          setPendingOverwrite({
+            type: 'import',
+            measuredCount: existingMeasuredCount,
+            runs: newRuns,
+            sheetName,
+            warnings: warningMessages,
           });
         } else {
-          setImportStatus({
-            type: 'success',
-            message: `Successfully loaded ${newRuns.length} runs from worksheet "${sheetName}"!`
-          });
+          commitImportedRuns(newRuns, sheetName, warningMessages);
         }
 
       } catch (err: any) {
@@ -448,7 +473,7 @@ export default function ProjectDesign({ project, updateProject }: Props) {
     setTargetRuns(recommendedRuns);
   }, [recommendedRuns]);
 
-  const generateRuns = () => {
+  const executeGenerateRuns = () => {
     if (project.factors.length === 0) return;
     
     let newRuns: Run[] = [];
@@ -565,15 +590,18 @@ export default function ProjectDesign({ project, updateProject }: Props) {
             ccdContinuousRuns.push(runFactorsHi);
           });
 
-          // 3. Continuous Center point
-          const runFactorsCenter: Record<string, number> = {};
-          continuousFactors.forEach(f => {
-            runFactorsCenter[f.id] = (f.min + f.max) / 2;
-          });
-          ccdContinuousRuns.push(runFactorsCenter);
+          // 3. Continuous Center points (honouring project.centerPoints including 0, P1.20 / DES-6)
+          const ccdCenterCount = project.centerPoints !== undefined ? Math.max(0, project.centerPoints) : 1;
+          for (let cpIdx = 0; cpIdx < ccdCenterCount; cpIdx++) {
+            const runFactorsCenter: Record<string, number> = {};
+            continuousFactors.forEach(f => {
+              runFactorsCenter[f.id] = (f.min + f.max) / 2;
+            });
+            ccdContinuousRuns.push(runFactorsCenter);
+          }
 
           // Categorical combinations
-          const catLevelsList = categoricalFactors.map(f => f.levels && f.levels.length > 0 ? f.levels : ['Level 1', 'Level 2']);
+          const catLevelsList = categoricalFactors.map(f => getSafeCategoricalLevels(f));
           let catCombs: (string | number)[][] = [[]];
           for (const levels of catLevelsList) {
             const nextComb: (string | number)[][] = [];
@@ -610,7 +638,7 @@ export default function ProjectDesign({ project, updateProject }: Props) {
           setLastGeneratedInfo({
             designName: 'Stratified Central Composite Design (CCD)',
             runsCount: newRuns.length,
-            notes: `${ccdContinuousRuns.length} continuous RSM points (cube, axial, center) replicated across ${catCombs.length} categorical level combination(s)`
+            notes: `${ccdContinuousRuns.length} continuous RSM points (cube, axial${ccdCenterCount > 0 ? `, ${ccdCenterCount} center` : ''}) replicated across ${catCombs.length} categorical level combination(s)`
           });
         }
       } else {
@@ -644,19 +672,15 @@ export default function ProjectDesign({ project, updateProject }: Props) {
           project.responses.forEach(r => runResponsesHi[r.id] = null);
           ccdRuns.push({ id: uuidv4(), runOrder: 0, stdOrder: 0, factors: runFactorsHi, responses: runResponsesHi });
         });
-        const runFactorsCp: Record<string, number> = {};
-        project.factors.forEach(f => {
-          runFactorsCp[f.id] = (f.min + f.max) / 2;
-        });
-        const runResponsesCp: Record<string, null> = {};
-        project.responses.forEach(r => runResponsesCp[r.id] = null);
-        ccdRuns.push({ id: uuidv4(), runOrder: 0, stdOrder: 0, factors: runFactorsCp, responses: runResponsesCp });
+        const ccdCenterCount = project.centerPoints !== undefined ? Math.max(0, project.centerPoints) : 1;
+        const cpResult = buildCenterPointRuns(project.factors, project.responses, ccdCenterCount, ccdRuns.length + 1);
+        ccdRuns.push(...cpResult.runs);
 
         newRuns = ccdRuns;
         setLastGeneratedInfo({
           designName: 'Central Composite Design (CCD)',
           runsCount: newRuns.length,
-          notes: 'Full response surface: factorial cube, axial star points (alpha = 1), and center points'
+          notes: `Full response surface: factorial cube, axial star points (alpha = 1)${ccdCenterCount > 0 ? `, and ${ccdCenterCount} center point(s)` : ''}`
         });
       }
     } else if (currentDesignType === 'bbd') {
@@ -703,11 +727,14 @@ export default function ProjectDesign({ project, updateProject }: Props) {
               });
             }
           }
-          const cpContinuous: Record<string, number> = {};
-          continuousFactors.forEach(f => cpContinuous[f.id] = (f.min + f.max) / 2);
-          bbdContinuousRuns.push(cpContinuous);
+          const bbdCenterCount = project.centerPoints !== undefined ? Math.max(0, project.centerPoints) : 1;
+          for (let cpIdx = 0; cpIdx < bbdCenterCount; cpIdx++) {
+            const cpContinuous: Record<string, number> = {};
+            continuousFactors.forEach(f => cpContinuous[f.id] = (f.min + f.max) / 2);
+            bbdContinuousRuns.push(cpContinuous);
+          }
 
-          const catLevelsList = categoricalFactors.map(f => f.levels && f.levels.length > 0 ? f.levels : ['Level 1', 'Level 2']);
+          const catLevelsList = categoricalFactors.map(f => getSafeCategoricalLevels(f));
           let catCombs: (string | number)[][] = [[]];
           for (const levels of catLevelsList) {
             const nextComb: (string | number)[][] = [];
@@ -766,17 +793,15 @@ export default function ProjectDesign({ project, updateProject }: Props) {
             });
           }
         }
-        const cpFactors: Record<string, number> = {};
-        project.factors.forEach(f => cpFactors[f.id] = (f.min + f.max) / 2);
-        const cpResponses: Record<string, null> = {};
-        project.responses.forEach(r => cpResponses[r.id] = null);
-        bbdRuns.push({ id: uuidv4(), runOrder: 0, stdOrder: 0, factors: cpFactors, responses: cpResponses });
+        const bbdCenterCount = project.centerPoints !== undefined ? Math.max(0, project.centerPoints) : 1;
+        const cpResult = buildCenterPointRuns(project.factors, project.responses, bbdCenterCount, bbdRuns.length + 1);
+        bbdRuns.push(...cpResult.runs);
 
         newRuns = bbdRuns;
         setLastGeneratedInfo({
           designName: 'Box-Behnken Design (BBD)',
           runsCount: newRuns.length,
-          notes: 'Spherical 3-level response surface design avoiding extreme corners'
+          notes: `Spherical 3-level response surface design avoiding extreme corners${bbdCenterCount > 0 ? ` (${bbdCenterCount} center pts)` : ''}`
         });
       }
     } else if (currentDesignType === 'plackett_burman') {
@@ -846,70 +871,24 @@ export default function ProjectDesign({ project, updateProject }: Props) {
         });
       }
     } else if (currentDesignType === 'dsd') {
-      // Definitive Screening Design (DSD)
-      if (hasCategorical) {
-        const candidateLevelsList = project.factors.map(f => {
-          if (f.type === 'categorical') return f.levels && f.levels.length > 0 ? f.levels : ['Level 1', 'Level 2'];
-          return [f.min, (f.min + f.max) / 2, f.max];
-        });
-        const allCandidateRuns = getCartesianRuns(candidateLevelsList);
-        const targetDSDRuns = 2 * continuousFactors.length + 1 + 2 * categoricalFactors.length;
-        const runsToGen = Math.max(targetDSDRuns, pMain + 2);
-        const { selectedIndices, dEfficiency } = generateDOptimalSubset(allCandidateRuns, project.factors, runsToGen);
-        selectedIndices.forEach((idx, i) => {
-          const runResponses: Record<string, null> = {};
-          project.responses.forEach(r => runResponses[r.id] = null);
-          newRuns.push({ id: uuidv4(), runOrder: i + 1, stdOrder: i + 1, factors: { ...allCandidateRuns[idx] }, responses: runResponses });
-        });
-        setLastGeneratedInfo({
-          designName: 'Definitive Screening Design (DSD)',
-          runsCount: newRuns.length,
-          dEfficiency,
-          notes: '3-level screening for continuous factors with balanced categorical assignments'
-        });
-      } else {
-        const m = fCount;
-        const dsdRuns: Run[] = [];
-        for (let i = 0; i < m; i++) {
-          const runFactors1: Record<string, number> = {};
-          const runFactors2: Record<string, number> = {};
-          project.factors.forEach((f, fIdx) => {
-            if (fIdx === i) {
-              runFactors1[f.id] = (f.min + f.max) / 2;
-              runFactors2[f.id] = (f.min + f.max) / 2;
-            } else {
-              const isHi = ((i + fIdx) % 2) === 0;
-              runFactors1[f.id] = isHi ? f.max : f.min;
-              runFactors2[f.id] = isHi ? f.min : f.max;
-            }
-          });
-          const runResponses1: Record<string, null> = {};
-          const runResponses2: Record<string, null> = {};
-          project.responses.forEach(r => {
-            runResponses1[r.id] = null;
-            runResponses2[r.id] = null;
-          });
-          dsdRuns.push({ id: uuidv4(), runOrder: 0, stdOrder: 0, factors: runFactors1, responses: runResponses1 });
-          dsdRuns.push({ id: uuidv4(), runOrder: 0, stdOrder: 0, factors: runFactors2, responses: runResponses2 });
-        }
-        const cpFactors: Record<string, number> = {};
-        project.factors.forEach((f) => cpFactors[f.id] = (f.min + f.max) / 2);
-        const cpResponses: Record<string, null> = {};
-        project.responses.forEach(r => cpResponses[r.id] = null);
-        dsdRuns.push({ id: uuidv4(), runOrder: 0, stdOrder: 0, factors: cpFactors, responses: cpResponses });
-        newRuns = dsdRuns;
-
-        setLastGeneratedInfo({
-          designName: 'Definitive Screening Design (DSD)',
-          runsCount: newRuns.length,
-          notes: `${2 * m + 1} runs with foldover pairs and center points`
-        });
+      // Definitive Screening Design (DSD) from conference matrices (P0.12 / DES-3, P1.20 / DES-6)
+      const dsdCp = project.centerPoints !== undefined ? Math.max(0, project.centerPoints) : 1;
+      const dsdResult = buildDSD(project.factors, project.responses, dsdCp);
+      newRuns = dsdResult.runs;
+      if (dsdResult.warning) {
+        setImportStatus({ type: 'warning', message: dsdResult.warning });
       }
+      setLastGeneratedInfo({
+        designName: dsdResult.designName,
+        runsCount: newRuns.length,
+        dEfficiency: dsdResult.dEfficiency,
+        notes: dsdResult.notes
+      });
     } else {
-      // Two-Level / General Factorial Design (supporting 2-level, multi-level categorical, and fractional selection)
+      // Two-Level / General Factorial Design (supporting regular 2^(k-p) fractions and mixed-level D-optimal subsets)
       const factorLevelsList: (string | number)[][] = project.factors.map(f => {
-        if (f.type === 'categorical' && f.levels && f.levels.length > 0) {
-          return f.levels;
+        if (f.type === 'categorical') {
+          return getSafeCategoricalLevels(f);
         } else {
           return [f.min, f.max];
         }
@@ -919,25 +898,38 @@ export default function ProjectDesign({ project, updateProject }: Props) {
       const runsToGen = targetRuns === '' ? numRuns : Number(targetRuns);
 
       if (runsToGen > 0 && runsToGen < numRuns) {
-        // Fractional Factorial: Use D-Optimal subset selection for optimal statistical resolution
-        const { selectedIndices, dEfficiency } = generateDOptimalSubset(allCandidateRuns, project.factors, runsToGen);
-        selectedIndices.forEach((idx, i) => {
-          const runResponses: Record<string, null> = {};
-          project.responses.forEach(r => runResponses[r.id] = null);
-          newRuns.push({
-            id: uuidv4(),
-            runOrder: i + 1,
-            stdOrder: i + 1,
-            factors: { ...allCandidateRuns[idx] },
-            responses: runResponses
+        const regular = buildRegularFraction(project.factors, project.responses, runsToGen, 0);
+        if (regular) {
+          newRuns = regular.runs;
+          setLastGeneratedInfo({
+            designName: regular.designName,
+            runsCount: newRuns.length,
+            notes: regular.notes
           });
-        });
-        setLastGeneratedInfo({
-          designName: 'Fractional Factorial Design',
-          runsCount: newRuns.length,
-          dEfficiency,
-          notes: `Resolution-optimized fractional subset of ${runsToGen} runs from ${numRuns} full factorial treatments`
-        });
+        } else {
+          // Mixed-level or irregular run count: use D-Optimal subset selection
+          const { selectedIndices, dEfficiency, warning } = generateDOptimalSubset(allCandidateRuns, project.factors, runsToGen);
+          if (warning) {
+            setImportStatus({ type: 'warning', message: warning });
+          }
+          selectedIndices.forEach((idx, i) => {
+            const runResponses: Record<string, null> = {};
+            project.responses.forEach(r => runResponses[r.id] = null);
+            newRuns.push({
+              id: uuidv4(),
+              runOrder: i + 1,
+              stdOrder: i + 1,
+              factors: { ...allCandidateRuns[idx] },
+              responses: runResponses
+            });
+          });
+          setLastGeneratedInfo({
+            designName: 'D-Optimal Subset Design',
+            runsCount: newRuns.length,
+            dEfficiency,
+            notes: `D-optimal subset of ${runsToGen} runs from ${numRuns} candidate treatments`
+          });
+        }
       } else {
         // Full Factorial
         allCandidateRuns.forEach((settings, i) => {
@@ -959,94 +951,68 @@ export default function ProjectDesign({ project, updateProject }: Props) {
       }
     }
 
-    // Add Center points (only for factorial_2level or custom_d_optimal when requested)
+    // Add Center points for factorial_2level, custom_d_optimal, or plackett_burman using buildCenterPointRuns (P1.20 / DES-6, DES-19, DES-21)
     const cpCount = project.centerPoints || 0;
-    if (cpCount > 0 && (currentDesignType === 'factorial_2level' || currentDesignType === 'custom_d_optimal')) {
-      for (let i = 0; i < cpCount; i++) {
-        const runFactors: Record<string, string | number> = {};
-        project.factors.forEach((f) => {
-          if (f.type === 'categorical') {
-            runFactors[f.id] = f.levels && f.levels.length > 0 ? f.levels[0] : 'Level 1';
-          } else {
-            runFactors[f.id] = (f.min + f.max) / 2;
-          }
-        });
-        const runResponses: Record<string, null> = {};
-        project.responses.forEach(r => runResponses[r.id] = null);
-        newRuns.push({
-          id: uuidv4(),
-          runOrder: 0,
-          stdOrder: 0,
-          factors: runFactors,
-          responses: runResponses
-        });
+    if (
+      cpCount > 0 &&
+      (currentDesignType === 'factorial_2level' ||
+        currentDesignType === 'custom_d_optimal' ||
+        currentDesignType === 'plackett_burman')
+    ) {
+      const cpResult = buildCenterPointRuns(project.factors, project.responses, cpCount, newRuns.length + 1);
+      if (cpResult.warning) {
+        setImportStatus({ type: 'warning', message: cpResult.warning });
       }
+      newRuns.push(...cpResult.runs);
     }
 
-    // Randomize run order
-    newRuns.sort(() => Math.random() - 0.5);
-    newRuns.forEach((r, idx) => r.runOrder = idx + 1);
+    // Assign unique sequential stdOrder = 1..N before Fisher-Yates randomisation (P1.19 / DES-7)
+    const stdOrderedRuns = newRuns.map((r, idx) => ({
+      ...r,
+      stdOrder: idx + 1,
+      runOrder: idx + 1,
+    }));
+    const seed = generateRandomSeed();
+    const randomizedRuns = randomize(stdOrderedRuns, seed);
 
-    updateProject({ ...project, runs: newRuns });
+    setLastGeneratedInfo(prev =>
+      prev ? { ...prev, runsCount: randomizedRuns.length, randomSeed: seed } : null
+    );
+    updateProject({ ...project, runs: randomizedRuns, randomSeed: seed });
+  };
+
+  const generateRuns = () => {
+    if (project.factors.length === 0) return;
+    const existingMeasuredCount = countMeasuredValues(project);
+    if (existingMeasuredCount > 0) {
+      setPendingOverwrite({ type: 'generate', measuredCount: existingMeasuredCount });
+      return;
+    }
+    executeGenerateRuns();
   };
 
 
   const addCenterPoints = (count: number = 1) => {
-    const newRuns: Run[] = [];
     const maxOrder = Math.max(0, ...project.runs.map(r => r.runOrder));
-    for (let i = 0; i < count; i++) {
-      const f: Record<string, string | number> = {};
-      project.factors.forEach(fac => {
-        f[fac.id] = fac.type === 'categorical' ? (fac.levels ? fac.levels[0] : '') : (fac.min + fac.max) / 2;
-      });
-      const r: Record<string, null> = {};
-      project.responses.forEach(res => r[res.id] = null);
-      newRuns.push({
-        id: uuidv4(),
-        runOrder: maxOrder + i + 1,
-        stdOrder: maxOrder + i + 1,
-        factors: f,
-        responses: r
-      });
+    const cpResult = buildCenterPointRuns(project.factors, project.responses, count, maxOrder + 1);
+    if (cpResult.warning) {
+      setImportStatus({ type: 'warning', message: cpResult.warning });
     }
-    updateProject({ ...project, runs: [...project.runs, ...newRuns] });
+    if (cpResult.runs.length > 0) {
+      updateProject({ ...project, runs: [...project.runs, ...cpResult.runs] });
+    }
     setShowAugmentMenu(false);
   };
 
   const addAxialPoints = () => {
-    const newRuns: Run[] = [];
-    let currentOrder = Math.max(0, ...project.runs.map(r => r.runOrder));
-    
-    project.factors.forEach(axialFactor => {
-      if (axialFactor.type === 'categorical') return;
-      
-      const fLow: Record<string, string | number> = {};
-      project.factors.forEach(fac => {
-        if (fac.id === axialFactor.id) fLow[fac.id] = fac.min;
-        else fLow[fac.id] = fac.type === 'categorical' ? (fac.levels ? fac.levels[0] : '') : (fac.min + fac.max) / 2;
-      });
-      const rLow: Record<string, null> = {};
-      project.responses.forEach(res => rLow[res.id] = null);
-      currentOrder++;
-      newRuns.push({
-        id: uuidv4(), runOrder: currentOrder, stdOrder: currentOrder,
-        factors: fLow, responses: rLow
-      });
-
-      const fHigh: Record<string, string | number> = {};
-      project.factors.forEach(fac => {
-        if (fac.id === axialFactor.id) fHigh[fac.id] = fac.max;
-        else fHigh[fac.id] = fac.type === 'categorical' ? (fac.levels ? fac.levels[0] : '') : (fac.min + fac.max) / 2;
-      });
-      const rHigh: Record<string, null> = {};
-      project.responses.forEach(res => rHigh[res.id] = null);
-      currentOrder++;
-      newRuns.push({
-        id: uuidv4(), runOrder: currentOrder, stdOrder: currentOrder,
-        factors: fHigh, responses: rHigh
-      });
-    });
-    updateProject({ ...project, runs: [...project.runs, ...newRuns] });
+    const maxOrder = Math.max(0, ...project.runs.map(r => r.runOrder));
+    const axialResult = buildAxialPointRuns(project.factors, project.responses, maxOrder + 1);
+    if (axialResult.warning) {
+      setImportStatus({ type: 'warning', message: axialResult.warning });
+    }
+    if (axialResult.runs.length > 0) {
+      updateProject({ ...project, runs: [...project.runs, ...axialResult.runs] });
+    }
     setShowAugmentMenu(false);
   };
 
@@ -1069,7 +1035,7 @@ export default function ProjectDesign({ project, updateProject }: Props) {
   const addEmptyRun = () => {
     const f: Record<string, string | number> = {};
     project.factors.forEach(fac => {
-      f[fac.id] = fac.type === 'categorical' ? (fac.levels && fac.levels.length > 0 ? fac.levels[0] : 'Level 1') : fac.min;
+      f[fac.id] = fac.type === 'categorical' ? getSafeCategoricalLevels(fac)[0] : fac.min;
     });
     const r: Record<string, null> = {};
     project.responses.forEach(res => r[res.id] = null);
@@ -1432,9 +1398,19 @@ export default function ProjectDesign({ project, updateProject }: Props) {
 
       <div className="bg-white dark:bg-slate-900 rounded-lg shadow-sm border border-slate-200 dark:border-slate-600 flex flex-col flex-1">
         <div className="p-3 border-b border-slate-100 flex justify-between items-center bg-slate-50 dark:bg-slate-800 rounded-t-lg">
-          <span className="font-bold text-slate-700 dark:text-slate-200 text-[11px]">
-            {locale === 'zh' ? '实验矩阵与试验结果录入' : 'Design Matrix Results'}
-          </span>
+          <div className="flex items-center gap-2">
+            <span className="font-bold text-slate-700 dark:text-slate-200 text-[11px]">
+              {locale === 'zh' ? '实验矩阵与试验结果录入' : 'Design Matrix Results'}
+            </span>
+            {project.randomSeed !== undefined && (
+              <span
+                className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-mono bg-slate-200/70 dark:bg-slate-700 text-slate-600 dark:text-slate-300"
+                title={t('random_seed')}
+              >
+                {t('random_seed')}: {project.randomSeed}
+              </span>
+            )}
+          </div>
           <div className="flex items-center gap-2">
             <input 
               type="file" 
@@ -1511,7 +1487,14 @@ export default function ProjectDesign({ project, updateProject }: Props) {
                 </span>
                 {lastGeneratedInfo.dEfficiency !== undefined && (
                   <span className="ml-2 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-100 dark:bg-emerald-900/50 text-emerald-800 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-700">
-                    {lastGeneratedInfo.dEfficiency}% {locale === 'zh' ? 'D-效率' : 'D-Efficiency'}
+                    {lastGeneratedInfo.dEfficiency !== null
+                      ? `${lastGeneratedInfo.dEfficiency}% ${locale === 'zh' ? 'D-效率' : 'D-Efficiency'}`
+                      : `${locale === 'zh' ? 'D-效率' : 'D-Efficiency'}: ${t('not_estimable')}`}
+                  </span>
+                )}
+                {lastGeneratedInfo.randomSeed !== undefined && (
+                  <span className="ml-2 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-mono bg-slate-200/80 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-300 dark:border-slate-700">
+                    {t('random_seed')}: {lastGeneratedInfo.randomSeed}
                   </span>
                 )}
                 {lastGeneratedInfo.notes && (
@@ -1627,6 +1610,38 @@ export default function ProjectDesign({ project, updateProject }: Props) {
           </table>
         </div>
       </div>
+
+      <ConfirmDialog
+        open={pendingOverwrite !== null}
+        title={t('confirm_overwrite_runs_title')}
+        message={
+          pendingOverwrite?.type === 'import'
+            ? t('confirm_overwrite_import_msg')
+                .replace('{sheet}', pendingOverwrite.sheetName)
+                .replace('{count}', String(pendingOverwrite.measuredCount))
+            : t('confirm_overwrite_generate_msg').replace(
+                '{count}',
+                String(pendingOverwrite?.measuredCount ?? 0)
+              )
+        }
+        confirmLabel={t('confirm_overwrite_button')}
+        cancelLabel={t('cancel')}
+        destructive={true}
+        onConfirm={() => {
+          if (!pendingOverwrite) return;
+          if (pendingOverwrite.type === 'generate') {
+            executeGenerateRuns();
+          } else {
+            commitImportedRuns(
+              pendingOverwrite.runs,
+              pendingOverwrite.sheetName,
+              pendingOverwrite.warnings
+            );
+          }
+          setPendingOverwrite(null);
+        }}
+        onCancel={() => setPendingOverwrite(null)}
+      />
     </div>
   );
 }

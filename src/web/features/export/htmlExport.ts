@@ -2,6 +2,17 @@ import { getRunPattern } from '../../../core/design/doePatterns';
 import { logoBase64 } from './logoBase64';
 import { Project } from '../../../core/types';
 import { computeAnalysis } from '../../../core/analysis/analysisCore';
+import { buildProjectSurfaceGrids } from '../../../core/analysis/surfaceGrid';
+
+export function escapeHtml(value: unknown): string {
+  if (value === null || value === undefined) return '';
+  return String(value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
 
 export function generateExportHTML(
   project: Project, 
@@ -29,7 +40,10 @@ export function generateExportHTML(
         halfNormalLine: res.halfNormalLine,
         tLimitPareto: res.tLimitPareto,
         bonferroniLimitPareto: res.bonferroniLimitPareto,
-        p: res.p
+        p: res.p,
+        dfModel: res.dfModel,
+        modelPValue: res.modelPValue,
+        surfaceGrids: buildProjectSurfaceGrids(res, project, undefined, 25, 15)
       };
     }
   }
@@ -49,12 +63,14 @@ export function generateExportHTML(
   const d = new Date();
   const dateStr = d.getDate() + '. ' + months[d.getMonth()] + ' ' + d.getFullYear();
 
+  const safeLocale = initialLocale === 'zh' ? 'zh' : 'en';
+
   let html = `<!DOCTYPE html>
-<html lang="${initialLocale}">
+<html lang="${escapeHtml(safeLocale)}">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Experiment Export: ${project.name}</title>
+    <title>Experiment Export: ${escapeHtml(project.name)}</title>
     <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
@@ -91,13 +107,13 @@ export function generateExportHTML(
         <div class="card" style="display: flex; justify-content: space-between; align-items: stretch; min-height: 120px;">
             <div style="display: flex; flex-direction: column; justify-content: space-between;">
                 <div>
-                    <h1><strong data-i18n="experiment_label">Experiment:</strong> ${project.name}</h1>
-                    <p class="text-slate-600 mb-1">${project.description || 'Axiom DOE Export'}</p>
-                    <p class="text-sm text-slate-400 mb-4">${dateStr}</p>
+                    <h1><strong data-i18n="experiment_label">Experiment:</strong> ${escapeHtml(project.name)}</h1>
+                    <p class="text-slate-600 mb-1">${escapeHtml(project.description || 'Axiom DOE Export')}</p>
+                    <p class="text-sm text-slate-400 mb-4">${escapeHtml(dateStr)}</p>
                 </div>
                 <div>
                     <p class="text-sm" style="margin-bottom: 8px;">
-                        <strong data-i18n="design_used_label">Design Used:</strong> <span id="design-type-display">${designName}</span>
+                        <strong data-i18n="design_used_label">Design Used:</strong> <span id="design-type-display">${escapeHtml(designName)}</span>${project.randomSeed !== undefined ? ` <span class="text-xs text-slate-400" style="margin-left: 8px; font-family: monospace;">(Seed: ${escapeHtml(project.randomSeed)})</span>` : ''}
                     </p>
                     <div style="display: inline-flex; align-items: center; gap: 8px;">
                         <strong class="text-sm text-slate-700" data-i18n="language_label">Language:</strong>
@@ -108,7 +124,7 @@ export function generateExportHTML(
                     </div>
                 </div>
             </div>
-            ${reportLogo ? `<div style="display: flex; align-items: center; justify-content: center; padding: 4px;"><img src="${reportLogo}" alt="Logo" style="height: auto; max-height: 90px; width: auto; max-width: 280px; object-fit: contain; align-self: center;"></div>` : ''}
+            ${reportLogo ? `<div style="display: flex; align-items: center; justify-content: center; padding: 4px;"><img src="${escapeHtml(reportLogo)}" alt="Logo" style="height: auto; max-height: 90px; width: auto; max-width: 280px; object-fit: contain; align-self: center;"></div>` : ''}
         </div>
 
         <div class="grid-2">
@@ -132,9 +148,9 @@ export function generateExportHTML(
   project.factors.forEach(f => {
     if (f.type === 'categorical') {
       const levelsText = f.levels && f.levels.length > 0 ? f.levels.join(', ') : '-';
-      html += `<tr><td>${f.name}</td><td><span data-i18n-type="categorical">Categorical</span></td><td>-</td><td>-</td>${hasCatFactors ? `<td>${levelsText}</td>` : ''}<td>${f.unit || '-'}</td></tr>`;
+      html += `<tr><td>${escapeHtml(f.name)}</td><td><span data-i18n-type="categorical">Categorical</span></td><td>-</td><td>-</td>${hasCatFactors ? `<td>${escapeHtml(levelsText)}</td>` : ''}<td>${escapeHtml(f.unit || '-')}</td></tr>`;
     } else {
-      html += `<tr><td>${f.name}</td><td><span data-i18n-type="numeric">Numeric</span></td><td>${f.min}</td><td>${f.max}</td>${hasCatFactors ? '<td>-</td>' : ''}<td>${f.unit || '-'}</td></tr>`;
+      html += `<tr><td>${escapeHtml(f.name)}</td><td><span data-i18n-type="numeric">Numeric</span></td><td>${escapeHtml(f.min)}</td><td>${escapeHtml(f.max)}</td>${hasCatFactors ? '<td>-</td>' : ''}<td>${escapeHtml(f.unit || '-')}</td></tr>`;
     }
   });
 
@@ -157,7 +173,7 @@ export function generateExportHTML(
                     <tbody>`;
                     
   project.responses.forEach(r => {
-    html += `<tr><td>${r.name}</td><td><span data-i18n-goal="${r.goal}">${r.goal}</span></td><td>${r.targetValue ?? '-'}</td><td>${r.unit || '-'}</td></tr>`;
+    html += `<tr><td>${escapeHtml(r.name)}</td><td><span data-i18n-goal="${escapeHtml(r.goal)}">${escapeHtml(r.goal)}</span></td><td>${escapeHtml(r.targetValue ?? '-')}</td><td>${escapeHtml(r.unit || '-')}</td></tr>`;
   });
 
   html += `</tbody>
@@ -175,10 +191,10 @@ export function generateExportHTML(
                         <th data-i18n="th_pattern">Pattern</th>`;
                         
   project.factors.forEach(f => {
-    html += `<th>${f.name}</th>`;
+    html += `<th>${escapeHtml(f.name)}</th>`;
   });
   project.responses.forEach(r => {
-    html += `<th>${r.name}</th>`;
+    html += `<th>${escapeHtml(r.name)}</th>`;
   });
 
   html += `</tr>
@@ -195,12 +211,12 @@ export function generateExportHTML(
     });
     const centerIndicator = isCenter ? ' <span data-i18n-center style="color:#64748b; font-size:10px;">(Center)</span>' : '';
     const rowStyle = isCenter ? ' style="background-color: #f1f5f9;"' : '';
-    html += `<tr${rowStyle}><td>${i + 1}</td><td>${pattern}${centerIndicator}</td>`;
+    html += `<tr${rowStyle}><td>${i + 1}</td><td>${escapeHtml(pattern)}${centerIndicator}</td>`;
     project.factors.forEach(f => {
-      html += `<td>${r.factors[f.id]}</td>`;
+      html += `<td>${escapeHtml(r.factors[f.id])}</td>`;
     });
     project.responses.forEach(res => {
-      html += `<td>${r.responses[res.id] !== null ? r.responses[res.id] : '-'}</td>`;
+      html += `<td>${r.responses[res.id] !== null && r.responses[res.id] !== undefined ? escapeHtml(r.responses[res.id]) : '-'}</td>`;
     });
     html += `</tr>`;
   });
@@ -220,7 +236,7 @@ export function generateExportHTML(
                 <select id="response-select" onchange="updateView()" class="border border-blue-200 rounded-md py-1.5 px-3 bg-white text-blue-900 font-semibold shadow-sm hover:border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer transition-colors min-w-[150px]">`;
                 
   project.responses.forEach(r => {
-    html += `<option value="${r.id}">${r.name}</option>`;
+    html += `<option value="${escapeHtml(r.id)}">${escapeHtml(r.name)}</option>`;
   });
 
   html += `</select>
@@ -326,8 +342,18 @@ export function generateExportHTML(
     </div>
 
     <script>
-        const project = ${JSON.stringify(project).replace(/</g, '\\u003c')};
-        const analysisData = ${JSON.stringify(analysisData).replace(/</g, '\\u003c')};
+        const project = ${JSON.stringify(project).replace(/</g, '\\u003c').replace(/>/g, '\\u003e').replace(/&/g, '\\u0026')};
+        const analysisData = ${JSON.stringify(analysisData).replace(/</g, '\\u003c').replace(/>/g, '\\u003e').replace(/&/g, '\\u0026')};
+
+        function escapeHtmlJS(val) {
+            if (val === null || val === undefined) return '';
+            return String(val)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        }
 
         const I18N = {
             en: {
@@ -418,7 +444,7 @@ export function generateExportHTML(
             }
         };
 
-        let currentLang = '${initialLocale}';
+        let currentLang = '${safeLocale}';
 
         function setReportLanguage(lang) {
             currentLang = lang;
@@ -535,20 +561,39 @@ export function generateExportHTML(
             const catFactor = project.factors.find(f => f.type === 'categorical');
             const catFilterContainer = document.getElementById('main-effects-filter-container');
             if (!catFilterContainer) return;
+            catFilterContainer.textContent = '';
             if (catFactor && catFactor.levels && catFactor.levels.length > 0) {
                 const filterLabel = currentLang === 'zh' ? ('按 ' + catFactor.name + ' 筛选:') : ('Filter by ' + catFactor.name + ':');
                 const allLabel = currentLang === 'zh' ? ('全部 ' + catFactor.name) : ('All ' + catFactor.name + 's');
-                let btns = '<div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">' +
-                    '<span style="font-size: 10px; font-weight: 700; color: #475569; text-transform: uppercase;">' + filterLabel + '</span>' +
-                    '<button class="solvent-btn ' + (!window.activeCatFilter ? 'active' : '') + '" onclick="setCatFilterIndex(-1)">' + allLabel + '</button>';
+                const wrapper = document.createElement('div');
+                wrapper.style.display = 'flex';
+                wrapper.style.alignItems = 'center';
+                wrapper.style.gap = '6px';
+                wrapper.style.flexWrap = 'wrap';
+
+                const labelSpan = document.createElement('span');
+                labelSpan.style.fontSize = '10px';
+                labelSpan.style.fontWeight = '700';
+                labelSpan.style.color = '#475569';
+                labelSpan.style.textTransform = 'uppercase';
+                labelSpan.textContent = filterLabel;
+                wrapper.appendChild(labelSpan);
+
+                const allBtn = document.createElement('button');
+                allBtn.className = 'solvent-btn ' + (!window.activeCatFilter ? 'active' : '');
+                allBtn.textContent = allLabel;
+                allBtn.addEventListener('click', function() { setCatFilterIndex(-1); });
+                wrapper.appendChild(allBtn);
+
                 catFactor.levels.forEach((lvl, idx) => {
                     const isActive = window.activeCatFilter === lvl;
-                    btns += '<button class="solvent-btn ' + (isActive ? 'active' : '') + '" onclick="setCatFilterIndex(' + idx + ')">' + lvl + '</button>';
+                    const btn = document.createElement('button');
+                    btn.className = 'solvent-btn ' + (isActive ? 'active' : '');
+                    btn.textContent = lvl;
+                    btn.addEventListener('click', function() { setCatFilterIndex(idx); });
+                    wrapper.appendChild(btn);
                 });
-                btns += '</div>';
-                catFilterContainer.innerHTML = btns;
-            } else {
-                catFilterContainer.innerHTML = '';
+                catFilterContainer.appendChild(wrapper);
             }
         }
 
@@ -662,7 +707,7 @@ export function generateExportHTML(
                         line: { color: '#8b5cf6', width: 2.5 },
                         marker: { size: 9, color: '#8b5cf6' }
                     };
-                    const factorTitle = p.factor.name + ' ' + (currentLang === 'zh' ? '<span style="font-size:10px; color:#8b5cf6;">(分类变量)</span>' : '<span style="font-size:10px; color:#8b5cf6;">(Categorical)</span>');
+                    const factorTitle = escapeHtmlJS(p.factor.name) + ' ' + (currentLang === 'zh' ? '<span style="font-size:10px; color:#8b5cf6;">(分类变量)</span>' : '<span style="font-size:10px; color:#8b5cf6;">(Categorical)</span>');
                     Plotly.newPlot(p.id, [trace], {
                         title: { text: factorTitle, font: { size: 12, color: '#6b21a8' } },
                         margin: { t: 30, l: 45, r: 15, b: 35 },
@@ -687,7 +732,7 @@ export function generateExportHTML(
                         line: { color: '#82ca9d', width: 2.5 },
                         marker: { size: 8, color: 'white', line: { color: '#82ca9d', width: 2 } }
                     };
-                    const factorTitle = p.factor.name + (filterLvl ? ' (' + filterLvl + ')' : '');
+                    const factorTitle = escapeHtmlJS(p.factor.name) + (filterLvl ? ' (' + escapeHtmlJS(filterLvl) + ')' : '');
                     Plotly.newPlot(p.id, [trace], {
                         title: { text: factorTitle, font: { size: 12, color: '#334155' } },
                         margin: { t: 30, l: 45, r: 15, b: 35 },
@@ -711,24 +756,26 @@ export function generateExportHTML(
         }
 
         function populateSelects() {
-            const intF1 = document.getElementById('int-f1');
-            const intF2 = document.getElementById('int-f2');
-            const surfX = document.getElementById('surf-x');
-            const surfY = document.getElementById('surf-y');
-            
-            let options = '';
-            project.factors.forEach((f, i) => {
-                options += '<option value="' + i + '">' + f.name + '</option>';
+            const selects = [
+                document.getElementById('int-f1'),
+                document.getElementById('int-f2'),
+                document.getElementById('surf-x'),
+                document.getElementById('surf-y')
+            ];
+            selects.forEach(sel => {
+                if (!sel) return;
+                sel.textContent = '';
+                project.factors.forEach((f, i) => {
+                    const opt = document.createElement('option');
+                    opt.value = String(i);
+                    opt.textContent = f.name;
+                    sel.appendChild(opt);
+                });
             });
             
-            if (intF1) intF1.innerHTML = options;
-            if (intF2) intF2.innerHTML = options;
-            if (surfX) surfX.innerHTML = options;
-            if (surfY) surfY.innerHTML = options;
-            
             if (project.factors.length > 1) {
-                if (intF2) intF2.selectedIndex = 1;
-                if (surfY) surfY.selectedIndex = 1;
+                if (selects[1]) selects[1].selectedIndex = 1;
+                if (selects[3]) selects[3].selectedIndex = 1;
             }
         }
 
@@ -758,7 +805,7 @@ export function generateExportHTML(
                     '<div class="text-lg font-bold text-slate-800">' + (data.rmse != null ? data.rmse.toFixed(4) : '-') + '</div></div>' +
                     '<div class="bg-white border border-slate-200 p-3 rounded text-center shadow-sm">' +
                     '<div class="text-xs text-slate-500 uppercase tracking-widest font-bold">' + pLabel + '</div>' +
-                    '<div class="text-lg font-bold text-slate-800">' + (data.p != null ? (data.p < 0.0001 ? "<0.0001" : data.p.toFixed(4)) : '-') + '</div></div>';
+                    '<div class="text-lg font-bold text-slate-800">' + (data.modelPValue != null ? (data.modelPValue < 0.0001 ? "<0.0001" : data.modelPValue.toFixed(4)) : '—') + '</div></div>';
 
                 // Main Effects Plot with Interactive Categorical Filter
                 updateCatFilterButtons();
@@ -937,7 +984,7 @@ export function generateExportHTML(
                             : '';
 
                         effSumHtml += '<tr>' +
-                            '<td style="font-weight:500; white-space:nowrap;">' + ef.name + '</td>' +
+                            '<td style="font-weight:500; white-space:nowrap;">' + escapeHtmlJS(ef.name) + '</td>' +
                             '<td><div style="display:flex; align-items:center; gap:8px;"><span style="font-family:monospace; width:35px; text-align:right; font-size:10px; color:#475569;">' + (ef.logworth > 0 ? ef.logworth.toFixed(3) : '—') + '</span><div style="flex:1; background:#f1f5f9; height:8px; border-radius:3px; position:relative; overflow:hidden; border:1px solid #e2e8f0; display:flex;"><div style="height:100%; width:' + baseWidth + '%; background:#cbd5e1;"></div><div style="position:absolute; top:0; bottom:0; width:1px; background:#94a3b8; left:' + thresholdPct + '%; opacity:0.75;" title="' + (currentLang === 'zh' ? 'p = 0.05 阈值线' : 'p = 0.05 threshold') + '"></div>' + surplusBar + '</div></div></td>' +
                             '<td class="col-pval">' + pDisplay + '</td>' +
                             '</tr>';
@@ -965,7 +1012,7 @@ export function generateExportHTML(
                         let estStr = pe.estimate !== undefined && pe.estimate !== null ? (pe.estimate >= 0 ? '+' + pe.estimate.toFixed(5) : pe.estimate.toFixed(5)) : '—';
                         let seStr = pe.stdError !== undefined && pe.stdError !== null ? pe.stdError.toFixed(6) : '—';
                         let tStr = pe.tRatio !== undefined && pe.tRatio !== null ? pe.tRatio.toFixed(2) : '—';
-                        let termDisplay = isIntercept ? interceptLabel : pe.term;
+                        let termDisplay = isIntercept ? interceptLabel : escapeHtmlJS(pe.term);
                         parmEstHtml += '<tr>' +
                             '<td style="white-space:nowrap;">' + termDisplay + '</td>' +
                             '<td style="text-align:right; font-family:monospace; font-weight:500; white-space:nowrap;">' + estStr + '</td>' +
@@ -994,7 +1041,7 @@ export function generateExportHTML(
                             ? '<span class="badge-sig">' + pStr + '</span>'
                             : '<span class="badge-ns">' + pStr + '</span>';
                         effTestHtml += '<tr>' +
-                            '<td style="font-weight:500; white-space:nowrap;">' + ef.name + '</td>' +
+                            '<td style="font-weight:500; white-space:nowrap;">' + escapeHtmlJS(ef.name) + '</td>' +
                             '<td style="text-align:right; font-family:monospace; color:#64748b; white-space:nowrap;">' + (ef.nparm || ef.df || 1) + '</td>' +
                             '<td style="text-align:right; font-family:monospace; color:#64748b; white-space:nowrap;">' + (ef.df || 1) + '</td>' +
                             '<td style="text-align:right; font-family:monospace; white-space:nowrap;">' + ef.ss.toFixed(6) + '</td>' +
@@ -1265,91 +1312,38 @@ export function generateExportHTML(
                 const xBounds = getFactorBounds(f1);
                 const yBounds = getFactorBounds(f2);
 
-                const k = project.factors.length;
-                const X = validRuns.map(r => project.factors.map(f => getFactorNumeric(f, r.factors[f.id])));
-                const Y = validRuns.map(r => Number(r.responses[respId]));
-                
-                const meanX = Array(k).fill(0);
-                let meanY = 0;
-                for (let i = 0; i < X.length; i++) {
-                    meanY += Y[i];
-                    for (let j = 0; j < k; j++) meanX[j] += X[i][j];
-                }
-                meanY /= X.length;
-                for (let j = 0; j < k; j++) meanX[j] /= X.length;
-                
-                const beta = Array(k).fill(0);
-                for (let j = 0; j < k; j++) {
-                    let cov = 0;
-                    let varX = 0;
-                    for (let i = 0; i < X.length; i++) {
-                        cov += (X[i][j] - meanX[j]) * (Y[i] - meanY);
-                        varX += Math.pow(X[i][j] - meanX[j], 2);
-                    }
-                    beta[j] = varX > 1e-10 ? cov / varX : 0;
-                }
-                
-                const getTrend = (x_vec) => {
-                    let y = meanY;
-                    for (let j = 0; j < k; j++) y += beta[j] * (x_vec[j] - meanX[j]);
-                    return y;
-                };
+                const directKey = f1.id + '__' + f2.id;
+                const reverseKey = f2.id + '__' + f1.id;
+                const precomputed = data && data.surfaceGrids ? data.surfaceGrids[directKey] : null;
+                const reversedPrecomputed = !precomputed && data && data.surfaceGrids ? data.surfaceGrids[reverseKey] : null;
 
-                const predictSurrogate = (x_vec) => {
-                    if (data && data.parameterEstimates) {
-                        let y = 0;
-                        const intercept = data.parameterEstimates.find(p => p.term.toLowerCase().indexOf('intercept') !== -1);
-                        if (intercept) y += intercept.estimate;
+                let gridX = [];
+                let gridY = [];
+                let zGrid = [];
+                let minZ = Infinity;
+                let maxZ = -Infinity;
 
-                        project.factors.forEach((f, idx) => {
-                            const pe = data.parameterEstimates.find(p => p.term.toLowerCase() === f.name.toLowerCase());
-                            if (pe) {
-                                if (f.type === 'categorical') {
-                                    const levels = f.levels && f.levels.length > 0 ? f.levels : ['Level 1', 'Level 2'];
-                                    const code = x_vec[idx] === 0 ? -1 : 1;
-                                    y += pe.estimate * code;
-                                } else {
-                                    const mid = (f.min + f.max) / 2;
-                                    const half = (f.max - f.min) / 2 || 1;
-                                    const coded = (x_vec[idx] - mid) / half;
-                                    y += pe.estimate * coded;
-                                }
-                            }
-                        });
-                        if (isFinite(y)) return y;
-                    }
-                    return getTrend(x_vec);
-                };
-
-                const gridSteps = 30;
-                const gridX = [];
-                const gridY = [];
-                const zGrid = [];
-
-                for (let i = 0; i <= gridSteps; i++) {
-                    gridX.push(xBounds.min + (xBounds.max - xBounds.min) * i / gridSteps);
-                    gridY.push(yBounds.min + (yBounds.max - yBounds.min) * i / gridSteps);
-                }
-
-                let minZ = Infinity, maxZ = -Infinity;
-                for (let i = 0; i <= gridSteps; i++) {
-                    const row = [];
-                    const currentY = gridY[i];
-                    for (let j = 0; j <= gridSteps; j++) {
-                        const currentX = gridX[j];
-                        const x_vec = project.factors.map(f => {
-                            if (f.id === f1.id) return currentX;
-                            if (f.id === f2.id) return currentY;
-                            const fb = getFactorBounds(f);
-                            return (fb.min + fb.max) / 2;
-                        });
-                        const pred = predictSurrogate(x_vec);
-                        const safePred = isFinite(pred) ? pred : meanY;
-                        if (safePred < minZ) minZ = safePred;
-                        if (safePred > maxZ) maxZ = safePred;
-                        row.push(safePred);
-                    }
-                    zGrid.push(row);
+                if (precomputed) {
+                    gridX = precomputed.gridX;
+                    gridY = precomputed.gridY;
+                    zGrid = precomputed.zGrid;
+                    minZ = precomputed.minZ;
+                    maxZ = precomputed.maxZ;
+                } else if (reversedPrecomputed) {
+                    gridX = reversedPrecomputed.gridY;
+                    gridY = reversedPrecomputed.gridX;
+                    zGrid = reversedPrecomputed.gridY.map((_, rowIdx) =>
+                        reversedPrecomputed.gridX.map((__, colIdx) => reversedPrecomputed.zGrid[colIdx][rowIdx])
+                    );
+                    minZ = reversedPrecomputed.minZ;
+                    maxZ = reversedPrecomputed.maxZ;
+                } else {
+                    const meanY = validRuns.reduce((s, r) => s + Number(r.responses[respId]), 0) / validRuns.length;
+                    gridX = [xBounds.min, xBounds.max];
+                    gridY = [yBounds.min, yBounds.max];
+                    zGrid = [[meanY, meanY], [meanY, meanY]];
+                    minZ = meanY;
+                    maxZ = meanY;
                 }
 
                 if (!isFinite(minZ) || !isFinite(maxZ)) { minZ = 0; maxZ = 1; }
@@ -1474,7 +1468,7 @@ export function generateExportHTML(
         // Initialize
         try {
             populateSelects();
-            if ('${initialLocale}' === 'zh') {
+            if ('${safeLocale}' === 'zh') {
                 setReportLanguage('zh');
             } else {
                 updateView();

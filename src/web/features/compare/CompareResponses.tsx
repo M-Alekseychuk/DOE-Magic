@@ -2,6 +2,7 @@ import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { Project } from '../../../core/types';
 import { computeAnalysis, predictModelResponse } from '../../../core/analysis/analysisCore';
+import { fitProjectModelsById } from '../../../core/analysis/projectModels';
 import { ActualByPredictedPlot, StudentizedResidualsPlot } from '../../shared/ResidualsPlots';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine, BarChart, Bar, ScatterChart, Scatter, ZAxis, Legend, Cell } from 'recharts';
 import { Download, HelpCircle } from 'lucide-react';
@@ -119,8 +120,9 @@ export default function CompareResponses({ project }: Props) {
 
   const allAnalysis = useMemo(() => {
     if (!hasData) return [];
+    const fittedById = fitProjectModelsById(project);
     return project.responses.map(resp => {
-      const analysis = computeAnalysis(project, resp, resp.excludedTerms || [], resp.goal, resp.targetValue);
+      const analysis = fittedById[resp.id] ?? null;
       
       // Compute interactionData
       let interactionData = null;

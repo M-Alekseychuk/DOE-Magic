@@ -44,36 +44,36 @@ describe('Montgomery Ex. 8.1, saturated 2^(4-1) (reference fit)', () => {
     checkLackOfFit(result, ref);
   });
 
-  it.fails('STAT-2 (P0.4): Pareto and half-normal t ratios equal |effect| / PSE (Lenth 1989)', () => {
+  it('STAT-2 (P0.4): Pareto and half-normal t ratios equal |effect| / PSE (Lenth 1989)', () => {
     for (const p of result.paretoData as any[]) expectClose(p.tRatio, lenthT[p.name], `Pareto t ${p.name}`);
     for (const p of result.halfNormalData as any[]) expectClose(p.tRatio, lenthT[p.name], `half-normal t ${p.name}`);
   });
 
-  it.fails('STAT-2 (P0.4): the effect-test F of each 1-df term equals the Lenth t squared', () => {
+  it('STAT-2 (P0.4): the effect-test F of each 1-df term equals the Lenth t squared', () => {
     for (const e of (result.effectSummary as any[]).filter((x) => !x.isAliased)) {
       const name = e.name as string;
       expectClose(e.fRatio, lenthT[name] ** 2, `F ${name}`);
     }
   });
 
-  it.fails('STAT-2 (P0.4): excluding an already aliased term (C*D) leaves the Lenth t ratios unchanged', () => {
+  it('STAT-2 (P0.4): excluding an already aliased term (C*D) leaves the Lenth t ratios unchanged', () => {
     const excluded = analyse(project, 'y', ['C*D']);
     for (const p of excluded.paretoData as any[]) expectClose(p.tRatio, lenthT[p.name], `Pareto t ${p.name}`);
   });
 
-  it.fails('STAT-5 (P0.4): no parameter estimate reports a standard error of 0', () => {
+  it('STAT-5 (P0.4): no parameter estimate reports a standard error of 0', () => {
     for (const r of (result.parameterEstimates as any[]).filter((x) => !x.isAliased)) {
       expect(r.stdError === null || r.stdError > 0, `${r.term} stdError = ${r.stdError}`).toBe(true);
     }
   });
 
-  it.fails('STAT-5 (P0.4): the confidence and prediction intervals at the optimum are null or have positive width', () => {
+  it('STAT-5 (P0.4): the confidence and prediction intervals at the optimum are null or have positive width', () => {
     const o = result.optimalConditions;
     expect(o.ciLower === null || o.ciUpper > o.ciLower, `CI [${o.ciLower}, ${o.ciUpper}]`).toBe(true);
     expect(o.piLower === null || o.piUpper > o.piLower, `PI [${o.piLower}, ${o.piUpper}]`).toBe(true);
   });
 
-  it.fails('STAT-21 (P0.4): Box-Cox is null for an exact fit', () => {
+  it('STAT-21 (P0.4): Box-Cox is null for an exact fit', () => {
     expect(result.boxCox).toBeNull();
   });
 });
@@ -87,7 +87,7 @@ describe('2 × 3 factorial with a 3-level categorical, saturated', () => {
     checkFitted(sat.result, sat.ref);
   });
 
-  it.fails('STAT-5 (P0.4): the reference-level row (Catalyst[Cu]) uses null, never undefined', () => {
+  it('STAT-5 (P0.4): the reference-level row (Catalyst[Cu]) uses null, never undefined', () => {
     const refRow = (sat.result.parameterEstimates as any[]).find((r) => r.isReference);
     expect(refRow).toBeDefined();
     for (const key of ['stdError', 'tRatio', 'pVal']) expect(refRow[key], `${key}`).not.toBeUndefined();

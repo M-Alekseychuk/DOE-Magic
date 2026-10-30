@@ -101,17 +101,17 @@ Until these land, the README warns not to trust the affected outputs.
 | Item | Title | Covers | Phase | Type | Size | Status |
 |---|---|---|---|---|---|---|
 | P0.1 | Demo buttons stop wiping all data | DATA-1, UI-1 | 1 | logic | S | done |
-| P0.2 | Confirm before replacing measured runs | DES-1, UI-2, MCP-10 | 1 | logic | M | open |
-| P0.3 | Correct least squares for rank-deficient models | STAT-1 | 1 | logic | M | open |
-| P0.4 | Honest inference for saturated models | STAT-2, STAT-5, STAT-21 | 1 | logic | M | open |
-| P0.5 | Real model p-value and a correct MCP `run_analysis` | MCP-1, UI-31, STAT-12, MCP-6, MCP-7, MCP-8, MCP-9 | 1 | logic | M | open |
-| P0.6 | Profiler fits each response's saved model | STAT-7, UI-3 | 1 | logic | S | open |
-| P0.7 | Remove the MCP robustness clamp | MCP-2 | 1 | logic | S | open |
-| P0.8 | Optimum search without truncation | STAT-4 | 1 | logic | M | open |
-| P0.9 | Quadratic terms in analysis and D-optimal designs | STAT-3, DES-4 | 1 | logic | L | open |
-| P0.10 | HTML export surfaces from the fitted model | STAT-8, UI-4 | 1 | logic | M | open |
-| P0.11 | Regular fractional factorials with true resolution | DES-2, UI-14, DES-10, DES-17 | 1 | logic | L | open |
-| P0.12 | Real definitive screening designs | DES-3 | 1 | logic | M | open |
+| P0.2 | Confirm before replacing measured runs | DES-1, UI-2, MCP-10 | 1 | logic | M | done |
+| P0.3 | Correct least squares for rank-deficient models | STAT-1 | 1 | logic | M | done |
+| P0.4 | Honest inference for saturated models | STAT-2, STAT-5, STAT-21 | 1 | logic | M | done |
+| P0.5 | Real model p-value and a correct MCP `run_analysis` | MCP-1, UI-31, STAT-12, MCP-6, MCP-7, MCP-8, MCP-9 | 1 | logic | M | done |
+| P0.6 | Profiler fits each response's saved model | STAT-7, UI-3 | 1 | logic | S | done |
+| P0.7 | Remove the MCP robustness clamp | MCP-2 | 1 | logic | S | done |
+| P0.8 | Optimum search without truncation | STAT-4 | 1 | logic | M | done |
+| P0.9 | Quadratic terms in analysis and D-optimal designs | STAT-3, DES-4 | 1 | logic | L | done |
+| P0.10 | HTML export surfaces from the fitted model | STAT-8, UI-4 | 1 | logic | M | done |
+| P0.11 | Regular fractional factorials with true resolution | DES-2, UI-14, DES-10, DES-17 | 1 | logic | L | done |
+| P0.12 | Real definitive screening designs | DES-3 | 1 | logic | M | done |
 
 ### P0.1 Demo buttons stop wiping all data
 
@@ -423,24 +423,24 @@ The app has no authentication, accepts any payload, and lets stale tabs and agen
 | P1.1 | Lock down the server | SRV-1 | 3 | logic | M | open |
 | P1.2 | Production build and start that hide the source | SRV-2, BLD-2, SRV-3, BLD-1 | 3 | logic | S | open |
 | P1.3 | Replace the vulnerable SheetJS build | BLD-3 | 3 | logic | M | open |
-| P1.4 | Escape the HTML export | UI-11 | 3 | logic | S | open |
+| P1.4 | Escape the HTML export | UI-11 | 3 | logic | S | done |
 | P1.5 | Atomic store with backups | DATA-2, SRV-13 | 3 | logic | M | open |
 | P1.6 | One writer for `data.json` | DATA-3 | 3 | logic | M | open |
 | P1.7 | Revision-checked writes on one channel | DATA-4, DATA-8, SRV-9 | 3 | logic | L | open |
 | P1.8 | Visible save failures | DATA-5, DATA-21 | 3 | logic | M | open |
 | P1.9 | Durable storage for deployed instances | DATA-9 | 3 | logic | M–L | open |
 | P1.10 | Validate every project payload | DATA-7, DATA-10, UI-23, DATA-22, DATA-23, STAT-27 | 3 | logic | M | open |
-| P1.11 | Validate runs before fitting | STAT-11, STAT-14, STAT-26 | 1 | logic | M | open |
+| P1.11 | Validate runs before fitting | STAT-11, STAT-14, STAT-26 | 1 | logic | M | done |
 | P1.12 | Validated run-sheet import and number entry | DATA-6, UI-12, DES-13 | 3 | logic | M | open |
 | P1.13 | Confirm every destructive action | DATA-17, UI-20 | 3 | logic | S | open |
-| P1.14 | Exact lookup for MCP write tools | MCP-4 | 3 | logic | S | open |
+| P1.14 | Exact lookup for MCP write tools | MCP-4 | 3 | logic | S | done |
 | P1.15 | Standard MCP HTTP transport | MCP-5, MCP-17, MCP-22 | 2 | logic | M | open |
 | P1.16 | MCP write and predict contracts | MCP-12, MCP-14, MCP-15 | 2 | logic | M | open |
 | P1.17 | Working stdio MCP configuration | MCP-18 | 2 | logic | S | open |
-| P1.18 | Correct D-efficiency | DES-5, MCP-13 | 1 | logic | S | open |
-| P1.19 | Valid, reproducible randomisation | DES-7 | 1 | logic | M | open |
-| P1.20 | Honour the centre-point setting | DES-6, DES-19, DES-21, DES-20 | 1 | logic | M | open |
-| P1.21 | Optimizer accepts a target of 0 | STAT-10, UI-10 | 1 | logic | S | open |
+| P1.18 | Correct D-efficiency | DES-5, MCP-13 | 1 | logic | S | done |
+| P1.19 | Valid, reproducible randomisation | DES-7 | 1 | logic | M | done |
+| P1.20 | Honour the centre-point setting | DES-6, DES-19, DES-21, DES-20 | 1 | logic | M | done |
+| P1.21 | Optimizer accepts a target of 0 | STAT-10, UI-10 | 1 | logic | S | done |
 | P1.22 | Excel export that does not fail silently | UI-8, STAT-17 | 4 | move, then logic | S | open |
 | P1.23 | Residual plot download per response | UI-13 | 4 | logic | S | open |
 

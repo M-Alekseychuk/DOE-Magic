@@ -54,76 +54,63 @@ runs ─► filter on response (191) ─► code factors (58-88) ─► model te
    ─► result object (1153-1184)
 ```
 
-### 1. Inputs and run filtering
+### 1. Inputs and run validation (`validateRuns`)
 
-- `excludedTerms` holds **term IDs**, not names: a main effect's ID is the factor `id`, and a 2FI's ID is `` `${f1.id}*${f2.id}` `` with `f1` before `f2` in `project.factors` order (lines 220, 278-279).
+- `excludedTerms` holds **term IDs** or display names/aliases resolved by `resolveExcludedTerms`: a main effect's ID is the factor `id`, a 2FI's ID is `` `${f1.id}*${f2.id}` `` with `f1` before `f2` in `project.factors` order, and a quadratic term's ID is `` `${f.id}^2` ``.
 - `effectiveGoal` is `'maximize' | 'minimize' | 'target'`, and `effectiveTargetValue` is a number. Both are used only by the desirability step.
-- A run is used when its response is not `null`, `undefined` or `''` (line 191). There is no other check:
-  - a non-numeric string or `NaN` passes the filter and turns every result into NaN (STAT-26);
-  - runs whose factor values are missing or invalid are kept (STAT-11).
-- `Run` has no "exclude this run" flag (`src/core/types.ts:29-35`).
+- `validateRuns(project, activeResponse)` (`src/core/analysis/modelSpec.ts`, P1.11 / STAT-11, STAT-14, STAT-26) checks every run before fitting:
+  - A run is excluded and recorded in `excludedRuns: { runId, runOrder, reason }[]` if any numeric factor is missing (`null`, `undefined`, `''`) or not a finite number, if any categorical factor does not match a defined level (trimmed, case-insensitive), or if the response value is missing (`null`, `undefined`, `''`) or not a finite number (such as `'12.5a'`).
+  - Valid runs whose numeric factor values fall outside `[min, max]` (`|coded| > 1`) are kept, coded at their true value without clamping, and reported in `warnings: string[]` as extrapolated.
 
-### 2. Factor coding — `getFactorContrasts` (58-88)
+### 2. Factor coding — `getFactorContrasts` (`src/core/analysis/modelSpec.ts`)
 
 | Factor | Columns | Coding |
 |---|---|---|
-| Numeric | 1 | `2(x − mid)/range`, with `mid = (min+max)/2` and `range = max − min` (1 when `min == max`). Clamped to [−2, 2] (line 86, STAT-14). `NaN` codes to 0 (the centre). `Number('')` and `Number(null)` are 0, so a blank value is coded as the natural value 0, not the centre (STAT-11). |
-| Categorical, 1-2 levels | 1 | `levels[1]` → +1. Every other value → −1, including unknown labels. With one level, every run is −1 and the column is named `name[undefined]` (STAT-27). |
+| Numeric | 1 | `2(x − mid)/range`, with `mid = (min+max)/2` and `range = max − min` (0 when `min == max`). **Unclamped** (P1.11 / STAT-14): values outside `[min, max]` retain their true coded value `2(x − mid)/range`. |
+| Categorical, 1-2 levels | 1 | `levels[1]` → +1, `levels[0]` → −1. |
 | Categorical, L ≥ 3 levels | L − 1 | Sum-to-zero (effect) coding. Level j < L−1 has +1 in column j; the last level is the reference, with −1 in every column. |
 
-- Categorical values are matched case-insensitively after trimming. If no label matches, a numeric value in `[0, L)` is used as a level index. Otherwise the value becomes level 0 without any warning (lines 62-68).
+- Categorical values are matched case-insensitively after trimming. Unknown categorical labels are rejected by `validateRuns` (P1.11 / STAT-11).
 - The default levels are `['Level 1', 'Level 2']`.
-- The doc comment at line 52 says numeric values are coded into [−1, +1]. The code clamps at ±2.
 
-### 3. Model specification (216-329)
+### 3. Model specification (`src/core/analysis/modelSpec.ts`)
 
-- The terms are: intercept, then one main effect per factor (df = 1, or L − 1), then every pair of factors as a 2FI. An interaction's columns are all products of its parents' contrast columns (Kronecker order, lines 287-293 and 304-314), so its df is `df1 × df2`.
-- There are **no** quadratic terms (STAT-3), no 3FIs and no block terms. The model does not depend on `project.designType`.
-- Excluded terms get `isExcluded = true` and no columns. Hierarchy is not enforced: you can drop a main effect and keep its interactions.
-- Active terms get column indices from 1 (column 0 is the intercept) in declaration order (lines 322-329). `numTerms = 1 + Σ df` over the active terms.
+- The terms are: intercept, then one main effect per factor (df = 1, or L − 1), then every pair of factors as a 2FI, and—when quadratic terms are enabled for the design—one quadratic term `${f.id}^2` per numeric factor that has at least 3 distinct coded levels in the valid runs (P0.9 / STAT-3).
+- Quadratic terms are included by default when `project.designType` is `'ccd'`, `'bbd'`, `'dsd'` or `'custom_d_optimal'`, or when `project.designType` is unset and the numeric factors have ≥ 3 distinct levels that are not merely a single shared centre-point indicator on a 2-level design and the 2FI model has spare degrees of freedom (`nRuns > 1 + pMain + pInt`).
+- Excluded terms get `isExcluded = true` and no columns. Both `${f.id}^2` and `${f.id}*${f.id}` are recognised in `excludedTerms`.
+- Active terms get column indices from 1 (column 0 is the intercept) in declaration order. `numTerms = 1 + Σ df` over the active terms.
 - Column names:
   - numeric: `name`;
   - categorical: `name[level]`;
-  - interaction: `a*b`.
+  - interaction: `a*b`;
+  - quadratic: `a*a`.
 
   These names appear in `parameterEstimates.term`.
 
-### 4. OLS solve — `solveOLS` (109-184)
+### 4. OLS solve — `solveOLS` (`src/core/analysis/linalg.ts`)
 
-1. It forms `X'X` and `X'Y` explicitly (113-115).
-2. It runs Gauss-Jordan elimination with partial **row** pivoting on `[X'X | X'Y | I]` (128-163).
-3. A column whose largest remaining pivot is below an **absolute** 1e-9 is marked aliased, and its coefficient stays 0 (138-141).
-4. It returns `beta`, `diagInv`, `invXtX`, `aliased` and `rank`. Rows and columns of aliased terms in `invXtX` are 0.
+1. Columns of `X` are processed sequentially in model order using two-pass modified Gram-Schmidt QR (`X_S = Q_S R_S`).
+2. A column whose residual Euclidean norm after projecting out earlier kept columns is `≤ 1e-9 · max(1, ‖col‖₂)` is marked aliased (`aliased[j] = true`), and its coefficient is 0. This keeps the later term in model order as the aliased one.
+3. `beta` on the kept columns `S` is solved by back-substitution on `R_S β_S = Q_S' Y`.
+4. `(X_S'X_S)⁻¹` is computed as `R_S⁻¹ (R_S⁻¹)'` and placed at the `(kept[a], kept[b])` indices of `invXtX` (with 0 on aliased rows and columns).
+5. It returns `beta`, `diagInv`, `invXtX`, `aliased`, `rank` and `kept`.
 
-The coefficients are correct even when the model is rank-deficient (STAT-1, *run*). `diagInv` and `invXtX` are read at `aug[r][k+1+c]` (172-178), which is valid only if the pivot rows coincide with the estimable columns. That can fail whenever the model is rank-deficient, which the default model is for Plackett-Burman (PB), "DSD" and D-optimal designs. It failed for PB12 with 6 factors and 3 centre points (*run*) and, per an earlier reader's notes (not re-run here), for the 6-factor "DSD"; a regular 2^(4−1) with centre points came out correct. Do not assume a design is safe without the leverage check below.
-
-The values below depend on `diagInv` and `invXtX`:
-
-- 1-df Type III SS (586);
-- standard errors and t (935-940);
-- reference-level SE (962-969);
-- VIF (909);
-- interval leverage `h00` (736);
-- residual leverage, studentized residuals and Cook's D (1012-1032);
-- Box-Cox (1094).
-
-The multi-df Type III SS (589-601) uses only SSE from a refit. It therefore depends only on `beta`, so it should not be affected (*by reading, not run*).
-
-### 5. Whole-model ANOVA (455-480)
+### 5. Whole-model ANOVA
 
 | Quantity | Definition in code |
 |---|---|
 | SSE, SST | Residual SS and SS about the mean of the valid runs |
-| `p_model` | `rank − 1` |
-| `df_error` | `max(0, n − rank)` |
-| MSE | `SSE/df_error`, or **0** when `df_error = 0` (line 470, STAT-5) |
+| `p_model` (`dfModel`) | `rank − 1` |
+| `df_error` (`dfError`) | `max(0, n − rank)` |
+| MSE | `SSE/df_error`, or **0** when `df_error = 0` |
 | F | `MS_model / MSE`, or 0 when MSE = 0 |
+| `modelPValue` | `1 − F_cdf(F; dfModel, dfError)` when `df_error > 0` and `dfModel > 0`, or `null` when `df_error = 0` (P0.5 / MCP-1 / UI-31) |
 | R² | `1 − SSE/SST` |
 | adj R² | `1 − (1 − R²)(n − 1)/df_error`, or 0 when `df_error = 0` |
 
-There is no model p-value, PRESS or predicted R² (STAT-22). The result field `p` (line 1164) is `p_model`, a **degrees-of-freedom count**, and so is `optimalConditions.pModel` (line 890). MCP reports `p` as a p-value (MCP-1), and so does the HTML export (UI-31).
+There is no PRESS or predicted R² (STAT-22). `dfModel` holds the model degrees of freedom (`rank − 1`), `modelPValue` holds the whole-model F-test p-value (or `null` when `dfError === 0`), and `p` is retained only as a deprecated alias for `dfModel`.
 
-### 6. Lack of fit and pure error (483-536)
+### 6. Lack of fit and pure error
 
 - Runs are grouped by their settings of every factor that appears in any active term. Numeric settings use `toFixed(6)` of the raw value; categorical settings use the trimmed, lower-cased label.
 - Pure error is pooled within groups that have ≥ 2 runs.
@@ -132,35 +119,30 @@ There is no model p-value, PRESS or predicted R² (STAT-22). The result field `p
 - `F_lof = Infinity` when `MS_pure = 0` and `MS_lof > 0`.
 - Callers must treat `p_lof = null` as "not testable" (MCP-8 shows a caller that does not).
 
-### 7. Error term for the effect tests (539-566)
+### 7. Error term for the effect tests and `computeLenth`
 
 - The error term is normally MSE with `df_error`.
-- A fallback to pure error exists (543-546), but it is effectively unreachable because `df_pure ≤ df_error` (STAT-25).
-- **Lenth path.** When `test_df ≤ 0` or `test_ms === 0`, the code switches to Lenth's pseudo standard error (PSE):
-  - The pool is the `absEffect` of every non-aliased main effect and interaction (552-555). Excluded terms count as not aliased (empty `colIndices`), so they enter the pool:
-    - an excluded numeric term or interaction enters as 0;
-    - an excluded categorical main effect enters with its raw range (STAT-2, STAT-15).
-  - `s0 = 1.5·median`, then `PSE = 1.5·median(|e| < 2.5·s0)`.
-  - The pseudo mean square is `PSE²/(n/4)` (line 563). This should be `n·PSE²/4`, because effect = 2β, so t is inflated by n/4 and F by (n/4)² (STAT-2, *run*).
-  - The df is `max(1, floor(m/3))`, where m is the pool size.
-- `paretoThreshold = 2.12·PSE` is computed and returned, but no caller reads it (STAT-25).
+- **Lenth path (`df_error = 0`, P0.4 / STAT-2).** `computeLenth(contrasts)` implements Lenth (1989, *Technometrics* 31:469–473):
+  - The pool is the `2β` contrast of every active, non-aliased, 1-df term (`!isExcluded && !isAliased && df === 1`).
+  - `s0 = 1.5 · median(|c|)`, `PSE = 1.5 · median(|c| < 2.5 · s0)` using standard median (averaging the two middle values when the count is even).
+  - `df = m / 3`, `ME = t(0.975, df) · PSE`, `SME = t(γ, df) · PSE` where `γ = (1 + 0.95^(1/m)) / 2`.
+  - For each 1-df term, `tRatio = |2β| / PSE` and `fRatio = tRatio²` (equivalent to `test_ms = n · PSE² / 4` on orthogonal 2-level designs).
 
-### 8. Type III effect tests (571-631)
+### 8. Type III effect tests
 
 - **1-df terms:** `SS = β²/diagInv`.
-- **Multi-df terms:** drop the term's columns, refit with `solveOLS`, and take `SS = SSE_reduced − SSE`.
-- Then `F = (SS/df)/test_ms`, p from `jStat.centralF` (floored at 1e-15) and `logworth = −log10 p`.
+- **Multi-df terms:** drop the term's columns from the kept estimable columns `kept`, refit with `solveOLS`, and take `SS = SSE_reduced − SSE`.
+- When `df_error > 0`, `F = (SS/df)/MSE`, p from `jStat.centralF` (floored at 1e-15) and `logworth = −log10 p`. When `df_error = 0` and Lenth applies (`PSE > 0`), 1-df terms use `F = (|2β| / PSE)²` and two-sided Student t p-value with `df = m / 3`.
 - Aliased and excluded terms get `SS = 0` and `p = 1`. Aliased terms get " (Aliased)" appended to their name.
 - `effectSummary` contains **all** terms, excluded ones included (flag `isExcluded`). It is sorted by logworth, with aliased terms last.
 - Each entry has `name, logworth, pVal, ss, fRatio, df, nparm, isAliased, isExcluded, id`.
 
-### 9. Parameter estimates and VIF (897-990)
+### 9. Parameter estimates and VIF
 
-- `SE = √(MSE·diagInv)`, `t = β/SE`, and p is two-sided from Student t with `df_error`. When `df_error = 0`, MSE is 0, so SE = 0, t = 0 and p = 1 (STAT-5, *run*).
-- `VIF = diagInv·Σ(x − x̄)²`, floored at 1, and `Infinity` for aliased columns. This formula is correct for a full-rank model with an intercept.
-- For categorical factors with L ≥ 3, the code adds a reference-level row:
-  - estimate `−Σβ` and `SE = √(MSE·1'V1)`, where V is the term's `invXtX` block;
-  - `stdError`, `tRatio` and `pVal` can be `undefined` (969-974), which crashes MCP (MCP-9).
+- When `df_error > 0`: `SE = √(MSE·diagInv)`, `t = β/SE`, and p is two-sided from Student t with `df_error`.
+- When `df_error = 0` (P0.4 / STAT-5): active 1-df contrasts when `PSE > 0` use `SE = PSE / 2`, `t = β / SE = 2β / PSE` and p from Student t with `df = m / 3`; otherwise (including the intercept and reference rows) `stdError`, `tRatio` and `pVal` are `null`.
+- `VIF = diagInv·Σ(x − x̄)²`, floored at 1, and `Infinity` for aliased columns.
+- For categorical factors with L ≥ 3, the code adds a reference-level row with estimate `−Σβ`, `SE = √(MSE·1'V1)` when `df_error > 0`, and `null` (never `undefined`) for `stdError`, `tRatio`, `pVal` and `vif` when `df_error = 0`.
 - Estimate rows carry `term`, `cleanTerm`, `factorId`, `f1Id`, `f2Id`, `isAliased`, `vif` and, for reference rows, `isReference`.
 
 ### 10. Effects for the Pareto and half-normal plots (358-451, 633-702)
@@ -221,12 +203,12 @@ The comment says Derringer-Suich. The code is:
 
 **Ranking score:** `1000·d ± ŷ`. The ± term only breaks ties: +ŷ for maximize, −ŷ for minimize, −|ŷ − T| for target.
 
-**Search:**
+**Search (`src/core/optimization/optimize.ts`, P0.8):**
 
-- Candidates are `{min, mid, max}` for each numeric factor and every level of each categorical factor.
-- Combinations are built factor by factor, and after each step the list is **cut to the first 512** (810). The first factor varies slowest, so:
-  - with 6 numeric factors the first factor reaches its max in only 26 of 512 combinations;
-  - with 7 or more it never leaves its min (STAT-4, *run*).
+- `optimizeFactorBox` evaluates the complete 3-level numeric × categorical Cartesian grid when the grid size is `<= 729` (up to 6 numeric factors).
+- When the grid exceeds 729 combinations, it runs a deterministic seeded (`Mulberry32`) Latin-hypercube + anchor start set followed by discrete coordinate search across `{min, mid, max}` and all categorical levels so every factor is searched without lexicographic truncation (fixing STAT-4).
+- When `refineContinuous` is true (active quadratic terms exist), it refines numeric settings via bounded step-halving coordinate search.
+- Multi-response fitting (`src/core/analysis/projectModels.ts`, P0.6): `fitProjectModels` fits each response with its own saved `excludedTerms` (fixing STAT-7 / UI-3).
 
 **Per-factor output (`optimalConditions.factors`):**
 

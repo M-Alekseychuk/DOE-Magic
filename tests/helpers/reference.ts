@@ -140,10 +140,11 @@ export function checkLeverageInvariants(result: Analysis, rank: number): void {
   }
 }
 
-// The estimate of a 1-df term by ID: 'Intercept', a factor id, or `${a}*${b}` for an interaction.
+// The estimate of a 1-df term by ID: 'Intercept', a factor id, `${a}*${b}` for an interaction, or `${a}^2` / `${a}*${a}` for a quadratic term.
 export function estimateOf(result: Analysis, id: string): number {
-  const [a, b] = id.split('*');
-  const r = id === 'Intercept'
+  const normId = id.endsWith('^2') ? `${id.slice(0, -2)}*${id.slice(0, -2)}` : id;
+  const [a, b] = normId.split('*');
+  const r = normId === 'Intercept'
     ? row(result, 'Intercept')
     : estimateRows(result).find((x) => (b ? x.f1Id === a && x.f2Id === b : x.factorId === a && !x.f1Id));
   expect(r, `parameter estimate for ${id}`).toBeDefined();

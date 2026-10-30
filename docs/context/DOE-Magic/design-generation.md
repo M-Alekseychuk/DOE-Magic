@@ -18,24 +18,29 @@ Audience: a statistician or AI agent who has to fix design generation. Every sta
   - face-centred CCD with a full 2^c cube;
   - Box-Behnken for 3-5 continuous factors.
 
-  Two do not deliver what their labels promise:
-  - the "fractional factorial" is a D-optimal subset, not a regular fraction (DES-2);
-  - the "Definitive Screening Design" (DSD) is not built from a conference matrix, so its main effects are correlated (DES-3).
-- The D-optimal criterion never includes quadratic terms (DES-4), and neither does the analysis model (STAT-3). So no design here is optimised or analysed for curvature.
-- MCP designs are not randomised. The UI uses a biased, unseeded shuffle (DES-7). Generating a design replaces all runs, measured results included, without confirmation (DES-1).
+  Two previously defective generators have been replaced with textbook constructions (P0.11, P0.12):
+  - Regular $2^{k-p}$ fractional factorials (`src/core/design/fractions.ts`) built from minimum-aberration generators (Montgomery 2013 Table 8.14 / Wu & Hamada 2009 / NIST §5.3.3.4.7), matching the corrected resolution table in `src/core/design/designMatrixData.ts` (DES-2, DES-10, DES-17, UI-14).
+  - Definitive Screening Designs (`src/core/design/dsd.ts`) built from Paley conference matrices $[C; -C; 0]$ per Jones & Nachtsheim (2011, 2013) and Xiao, Lin & Bai (2012), with mutually orthogonal main effects and main effects orthogonal to all 2FIs and pure quadratics (DES-3).
+- Both the D-optimal criterion and the analysis model include quadratic terms when 3-level continuous factors are present (P0.9 / STAT-3, DES-4).
+- D-efficiency is reported as $100 \cdot |X'X|^{1/p} / N$ on a $0$–$100$ scale, or `null` ("not estimable") for singular designs, without double $\times 100$ scaling (P1.18 / DES-5, MCP-13).
+- Designs assign sequential `stdOrder = 1..N` in standard order and then shuffle `runOrder = 1..N` with a reproducible seeded Fisher-Yates PRNG (`src/core/design/randomize.ts`, P1.19 / DES-7).
+- Centre points are generated across all design types by a single helper (`buildCenterPointRuns` in `src/core/design/centerPoints.ts`, P1.20 / DES-6, DES-19, DES-20, DES-21), distributing categorical centre runs across levels and adding none when no continuous factor exists.
+- Generating a design or importing Excel runs asks for confirmation before overwriting measured results (P0.2 / DES-1, UI-2, MCP-10).
 
 ## Files and callers
 
 | File | Lines | Exports | Used by |
 |---|---|---|---|
-| `src/core/design/doeGenerator.ts` | 457 | `generateDesign`, `GenerateDesignOptions`, `GeneratedDesignResult` | MCP `create_project` (`src/server/mcp/doeMcpServer.ts:273`, passes `centerPoints` only) and `generate_doe_design` (`:462`, passes `centerPoints` and `targetRuns`) |
-| `src/core/design/dOptimal.ts` | 213 | `generateDOptimalSubset`, `buildCandidateRow`, `computeLogDetXtX` | `doeGenerator.ts:3`; `ProjectDesign.tsx:9` (calls at 494, 525, 676, 835, 858, 923) |
+| `src/core/design/doeGenerator.ts` | 457 | `generateDesign`, `GenerateDesignOptions`, `GeneratedDesignResult` | MCP `create_project` and `generate_doe_design` |
+| `src/core/design/dOptimal.ts` | 240 | `generateDOptimalSubset`, `buildCandidateRow`, `computeLogDetXtX`, `computeExactLogDetXtX`, `computeDEfficiency` | `doeGenerator.ts`; `ProjectDesign.tsx`; `dsd.ts` |
+| `src/core/design/randomize.ts` | 75 | `randomize`, `createSeededRng`, `generateRandomSeed` | `doeGenerator.ts`; `ProjectDesign.tsx` |
+| `src/core/design/centerPoints.ts` | 110 | `buildCenterPointRuns`, `buildAxialPointRuns`, `getSafeCategoricalLevels` | `doeGenerator.ts`; `fractions.ts`; `dsd.ts`; `ProjectDesign.tsx` |
 | `src/core/design/designMatrixData.ts` | 102 | `designMatrix` (resolution table) | `src/web/features/design/TwoLevelDesignSelector.tsx:2` |
 | `src/core/design/doePatterns.ts` | 49 | `getRunPattern` | `ProjectDesign.tsx:1553`, `src/web/pages/ProjectView.tsx:164` (Excel), `src/web/features/export/htmlExport.ts:178` |
-| `src/web/features/design/ProjectDesign.tsx` | 1,632 | component; `generateRuns` (451-991), augmentation (994-1085), run-count planner (144-183) | Design tab |
+| `src/web/features/design/ProjectDesign.tsx` | 1,632 | component; `generateRuns`, augmentation, run-count planner | Design tab |
 | `src/web/features/design/TwoLevelDesignSelector.tsx` | 194 | component | `ProjectDesign.tsx:1383-1387` |
 
-Dependency note: `dOptimal.ts:4` imports `getFactorContrasts` from `src/core/analysis/analysisCore.ts`, so designs are scored with the analysis coding. `dOptimal.ts:1-2` imports `jstat` but never uses it (STAT-25).
+Dependency note: `dOptimal.ts` imports `getFactorContrasts` from `src/core/analysis/analysisCore.ts`, so designs are scored with the analysis coding.
 
 ## Conventions shared by both generators
 
@@ -43,7 +48,7 @@ Dependency note: `dOptimal.ts:4` imports `getFactorContrasts` from `src/core/ana
 - **Runs are stored in natural units:**
   - low = `min`, high = `max`, centre = `(min+max)/2`;
   - categorical factors hold the level label, with default levels `['Level 1', 'Level 2']`.
-  - Coding to ±1 happens later in `getFactorContrasts` (see [Statistics engine](statistics-engine.md#2-factor-coding--getfactorcontrasts-58-88)).
+  - Coding to ±1 happens later in `getFactorContrasts` (see [Statistics engine](statistics-engine.md#2-factor-coding--getfactorcontrasts-src-core-analysis-modelspec-ts)).
 - **Nothing checks `min < max`** (UI-27).
 - **Candidate grids:** a Cartesian product in which the **last** factor varies fastest (`doeGenerator.ts:49-67`, `ProjectDesign.tsx:459-477`). This is not Yates order. CCD cube points use the opposite convention: bit `idx` of the run index, so the first factor varies fastest.
 - **New runs:** every response is set to `null`. `id` comes from `uuidv4()`.
@@ -54,68 +59,41 @@ Notation: c = number of continuous factors, q = number of categorical factors, k
 
 | Type (`designType`) | What the code builds | Textbook | Gap | Issues |
 |---|---|---|---|---|
-| Full factorial (`factorial_2level`, run count = full grid) | Every combination of `{min, max}` per numeric factor and all levels per categorical factor (`doeGenerator.ts:409-448`, `ProjectDesign.tsx:908-959`). With 3+ level categoricals the UI calls it "General Mixed-Level Factorial Design" (`:955`). | 2^k (or mixed-level) full factorial in standard order, randomised, optionally with centre points. | Matches, except order, centre-point and randomisation rules (below). | DES-6, DES-7 |
-| "Fractional factorial" (`factorial_2level`, `0 < targetRuns < full grid`) | `generateDOptimalSubset` of the full grid (`doeGenerator.ts:421-426`, `ProjectDesign.tsx:921-940`). Notes say "Resolution-optimized". There are no generators, no defining relation and no resolution logic anywhere in `src/`. | Regular 2^(k−p) fraction defined by p generators; resolution = length of the shortest word in the defining relation; minimum-aberration catalogue. | The resolution shown by the selector is never built. *Run*: 4 factors/8 runs (labelled IV) → Res III, a main effect fully aliased with a 2FI (\|r\| = 1); 5/16 (labelled V) → main-main \|r\| = 0.25, main-2FI 0.5; 6/32 (labelled VI) → main-main 0.125, main-2FI 0.378. Reported D-efficiency 100/99/95. | DES-2, DES-9, DES-10, UI-14 |
-| Plackett-Burman (`plackett_burman`) | Cyclic shifts of the standard generator row: 11 entries (N = 12) for k ≤ 11 and 19 entries (N = 20) otherwise, plus an all-low row (`doeGenerator.ts:298-348`, `ProjectDesign.tsx:782-826`). Factors with index ≥ 19 are always low (`doeGenerator.ts:311`, `ProjectDesign.tsx:795`). | Plackett & Burman (1946): N a multiple of 4, rows are cyclic shifts of a generator plus a row of minuses; main effects orthogonal, 2FIs partially aliased. | Rows match the published N = 12 and N = 20 designs. No N = 24, 28, ... With 20 or more factors the extra factors never vary, and nothing warns about it (*run*: factor 20 has one value). | DES-12 |
-| PB fallback (any categorical with more than 2 levels) | D-optimal subset of a 2-level-numeric / all-categorical-levels grid. The UI always uses 12 runs (`ProjectDesign.tsx:834`); core uses `targetRuns` or 12 (`doeGenerator.ts:356`). Labelled "Orthogonal screening array". | No orthogonal-array guarantee. | The note claims orthogonality that is not checked. | DES-12 |
-| CCD (`ccd`) | Face-centred only (α = 1): the full 2^c cube, 2c axial points at `min`/`max` with the other factors at centre, and centre points (`doeGenerator.ts:110-224`, `ProjectDesign.tsx:514-661`). With categoricals, the continuous CCD is repeated for every categorical combination ("Stratified CCD"). With no continuous factor, it falls back to D-optimal. | Box-Wilson CCD: 2^c or Res V 2^(c−p) cube, 2c axial points at ±α (α = 1 face-centred, (n_F)^(1/4) rotatable, or orthogonal), typically 3-6 centre points. | Only α = 1; never a fractional cube (c = 10 gives more than 1,000 runs); centre-point count ignored in the UI. Analysis cannot fit the quadratic model the design is meant for. | DES-14, DES-6, STAT-3 |
-| Box-Behnken (`bbd`) | Every pair of continuous factors at the four ±1 combinations, others at centre, plus centre points (`doeGenerator.ts:226-296`, `ProjectDesign.tsx:662-781`); repeated across categorical combinations. With fewer than 3 continuous factors it falls back to "D-Optimal RSM" in core and in the UI's with-categoricals path. The UI's continuous-only path has no such guard: k = 2 gives a 2² factorial plus a centre point labelled BBD, and k = 1 gives one run. | Box & Behnken (1960): built from balanced incomplete block designs. The pairwise form is the published design for k = 3, 4, 5. For k = 6 the published design has 48 runs plus centre points. | k ≥ 6 is not the published design (k = 6 gives 60 runs). | DES-14, DES-8 |
-| "DSD" (`dsd`), continuous only | For each factor i, a row with factor i at centre and every other factor j at `(−1)^(i+j)` (high if i + j is even), its fold-over, then centre point(s) (`doeGenerator.ts:379-407`, `ProjectDesign.tsx:870-907`). | Jones & Nachtsheim (2011) and Xiao, Lin & Bai (2012): `[C; −C; 0]`, where C is an m × m **conference matrix** (zero diagonal, ±1 elsewhere, C'C = (m−1)I). For odd m, use order m+1 and drop a column. Main effects are orthogonal to each other and to 2FIs and quadratics. | The code's C has entries (−1)^(i+j), so for columns j and k, C'C = (m−2)(−1)^(j+k). Main-effect columns therefore correlate at (m−2)/(m−1): *run* 0.667, 0.800 and 0.857 for m = 4, 6, 8. | DES-3 |
-| "DSD" with categoricals | D-optimal subset of a 3-level-numeric × all-levels grid, with N = `max(2c + 1 + 2q, pMain + 2)`. `targetRuns` is ignored (`doeGenerator.ts:366-378`, `ProjectDesign.tsx:850-869`). | Jones & Nachtsheim (2013): DSD with added two-level categorical factors. | Not a DSD. *Run*: 4 numeric + 1 two-level categorical gives 11 runs with **0** mid-level settings, so the design has no third level. | DES-3, DES-4 |
-| Custom D-optimal (`custom_d_optimal`) | D-optimal subset of a grid with 3 levels per numeric factor when k ≤ 5, else 2 levels, and all categorical levels. Default N = `min(M, max(pMain + 3, 12))` (`doeGenerator.ts:91-108`, `ProjectDesign.tsx:479-513`). | Optimal design for a user-specified model, usually by coordinate exchange (Meyer & Nachtsheim 1995). | The model is fixed (main effects ± 2FIs, never quadratic). *Run*: 5 factors, 12 runs → 0 mid-level cells. Core notes say "D-Efficiency: 10000.0%". | DES-4, DES-5, DES-9 |
-
-Fallback note: the criterion has no quadratic terms, so mid-level points are never deliberately selected. Any that do appear are incidental. *Run*: the core BBD fallback with 2 numeric factors and one 3-level categorical put 4 of 32 numeric settings at mid-level. With 2 numeric factors only, it returns the whole 3² grid (N ≥ M).
+| Full factorial (`factorial_2level`, run count = full grid) | Every combination of `{min, max}` per numeric factor and all levels per categorical factor (`doeGenerator.ts`, `ProjectDesign.tsx`), plus `cp` centre points when $c > 0$. | 2^k (or mixed-level) full factorial in standard order, randomised, optionally with centre points. | Matches textbook. | — |
+| Fractional factorial (`factorial_2level`, `0 < targetRuns < full grid`) | Regular $2^{k-p}$ minimum-aberration fraction (`src/core/design/fractions.ts`, P0.11 / DES-2) when all factors have 2 levels and `targetRuns` is a power of 2; falls back to `generateDOptimalSubset` for mixed-level or non-power-of-2 run counts, plus `cp` centre points when $c > 0$ (P1.20 / DES-21). | Regular 2^(k−p) fraction defined by p generators; resolution = length of the shortest word in the defining relation; minimum-aberration catalogue. | Matches textbook for all regular 2-level fractions. | — |
+| Plackett-Burman (`plackett_burman`) | Cyclic shifts of the standard generator row: 11 entries (N = 12) for k ≤ 11 and 19 entries (N = 20) otherwise, plus an all-low row (`doeGenerator.ts`, `ProjectDesign.tsx`), plus `cp` centre points when $c > 0$. | Plackett & Burman (1946): N a multiple of 4, rows are cyclic shifts of a generator plus a row of minuses; main effects orthogonal, 2FIs partially aliased. | Rows match the published N = 12 and N = 20 designs. No N = 24, 28, ... With 20 or more factors the extra factors never vary (DES-12). | DES-12 |
+| PB fallback (any categorical with more than 2 levels) | D-optimal subset of a 2-level-numeric / all-categorical-levels grid, plus `cp` centre points when $c > 0$. | No orthogonal-array guarantee. | The note claims orthogonality that is not checked. | DES-12 |
+| CCD (`ccd`) | Face-centred (α = 1): the full 2^c cube, 2c axial points at `min`/`max` with the other factors at centre, and `cp` centre points (`doeGenerator.ts`, `ProjectDesign.tsx`, P1.20 / DES-6). With categoricals, the continuous CCD is repeated for every categorical combination ("Stratified CCD"). With no continuous factor, it falls back to D-optimal. | Box-Wilson CCD: 2^c or Res V 2^(c−p) cube, 2c axial points at ±α (α = 1 face-centred, (n_F)^(1/4) rotatable, or orthogonal), typically 3-6 centre points. | Only α = 1; never a fractional cube (c = 10 gives more than 1,000 runs). | DES-14 |
+| Box-Behnken (`bbd`) | Every pair of continuous factors at the four ±1 combinations, others at centre, plus `cp` centre points (`doeGenerator.ts`, `ProjectDesign.tsx`, P1.20 / DES-6); repeated across categorical combinations. With fewer than 3 continuous factors it falls back to "D-Optimal RSM". | Box & Behnken (1960): built from balanced incomplete block designs. The pairwise form is the published design for k = 3, 4, 5. For k = 6 the published design has 48 runs plus centre points. | k ≥ 6 is not the published design (k = 6 gives 60 runs). | DES-14, DES-8 |
+| DSD (`dsd`), continuous + 2-level categoricals | Conference-matrix DSD $[C; -C; 0_{\text{cp}}]$ (`src/core/design/dsd.ts`, P0.12 / DES-3), with `cp` centre points (P1.20 / DES-6). | Jones & Nachtsheim (2011, 2013) and Xiao, Lin & Bai (2012): `[C; −C; 0]`, where C is an m × m **conference matrix** (zero diagonal, ±1 elsewhere, C'C = (m−1)I). | Matches textbook. | — |
+| DSD fallback (3+ level categoricals) | D-optimal subset of a 3-level-numeric × all-levels grid explicitly labelled as D-optimal (P0.9 / P0.12). | — | Honest fallback label. | — |
+| Custom D-optimal (`custom_d_optimal`) | D-optimal subset of a grid with 3 levels per numeric factor when k ≤ 5, else 2 levels, and all categorical levels, plus `cp` centre points when $c > 0$ (P1.20 / DES-21). | Optimal design for a user-specified model, usually by coordinate exchange (Meyer & Nachtsheim 1995). | Includes quadratic terms when $N \ge p_{\text{main}} + p_{\text{quad}}$ and numeric factors have $\ge 3$ levels (P0.9 / DES-4). | DES-9 |
 
 ## D-optimal algorithm (`dOptimal.ts`)
 
 | Step | Code | Remark |
 |---|---|---|
-| Run count | `N = min(M, max(k + 1, targetRuns))` (114) | Raised to k+1, not to the number of model parameters (DES-5). If N ≥ M, it returns every candidate with efficiency 100 (116-121). |
-| Model | Intercept + main effects (`getFactorContrasts` coding); all 2FIs only when `N ≥ pMain + pInt + 2` (124-139) | Never quadratic (DES-4). With small N the model is main-effects only, so any orthogonal main-effect array scores 100% and nothing prefers Res IV over Res III. This is how DES-2 arises. |
+| Run count | `N = targetRuns > 0 ? min(M, targetRuns) : min(M, pMain)` | Default raises $N$ to `pMain`; an explicit `targetRuns < pMain` is kept so singular designs report `dEfficiency: null` ("not estimable", P1.18 / DES-5). |
+| Model | Intercept + main effects (`getFactorContrasts` coding); quadratics when $p_{\text{quad}} > 0$ and $N \ge p_{\text{main}} + p_{\text{quad}}$; all 2FIs when $N \ge p_{\text{main}} + p_{\text{quad}} + p_{\text{int}} + 2$ | Includes quadratic terms on 3-level grids (P0.9 / DES-4). |
 | Candidates | The caller's Cartesian grid; each candidate at most once (`selected` Set) | No replicated points. |
-| Start | Deterministic, evenly spaced indices `floor(i·M/N)`, then filled (147-157) | No random starts (DES-9). |
-| Exchange | For each position, try every unselected candidate; recompute `log det(X'X + 1e-4·I)` by Cholesky from scratch; keep the best gain > 1e-4; at most 3 passes; stop early if a pass does not improve (164-198) | Fedorov-type point exchange. The comment (106) and the UI text (`ProjectDesign.tsx:1198`) call it "coordinate exchange". Cost per pass is about N·M·(N·p² + p³) on the main thread (DES-11). |
-| Criterion failure | `computeLogDetXtX` returns −1e9 if n < p or a pivot ≤ 1e-9 (47-102) | |
-| Efficiency | `exp((logdet_S − logdet_full)/p − ln(N/M))·100`, rounded and clamped to [25, 100]; **95** if either log-det is −1e9 (200-207) | Per-run information relative to the whole candidate grid, not the usual `100·\|X'X\|^(1/p)/N`. The value is already on a 0-100 scale. Core notes (`doeGenerator.ts:108`) and MCP (`doeMcpServer.ts:494`) multiply by 100 again; the UI shows it correctly (`ProjectDesign.tsx:1512-1514`). |
-
-Measured cost (*run*, this machine): a half fraction takes 0.04 s for k = 6 and 0.47 s for k = 7, roughly ×12 per factor. The registry extrapolates to about 1.5 min for k = 9 (DES-11).
+| Start | Deterministic, evenly spaced indices `floor(i·M/N)`, then filled | No random starts (DES-9). |
+| Exchange | For each position, try every unselected candidate; recompute `log det(X'X + 1e-4·I)` by Cholesky; keep the best gain > 1e-4; at most 3 passes | Fedorov-type point exchange. |
+| Criterion failure | `computeExactLogDetXtX` returns `null` if $N < p$ or any unregularised Cholesky pivot $\le 10^{-10}$ | Detects singular designs without ridge bias (P1.18 / DES-5). |
+| Efficiency | `computeDEfficiency(X)` returns $100 \cdot |X'X|^{1/p} / N$ on a $0$–$100$ scale, or `null` when singular | Standard textbook D-efficiency on the coded scale; never exceeds $100$, and never multiplied by $100$ a second time (P1.18 / DES-5, MCP-13). |
 
 ## Centre points, randomisation, replicates, augmentation
 
-**Centre points:**
+**Centre points (`src/core/design/centerPoints.ts`, P1.20 / DES-6, DES-19, DES-20, DES-21):**
 
-| Path | Rule |
-|---|---|
-| Setup tab | `project.centerPoints`, default 0, with a text explaining curvature and pure error (`src/web/features/setup/ProjectSetup.tsx:174-188`). |
-| UI generator | Applied only to `factorial_2level` (full **and** fractional) and `custom_d_optimal` (`ProjectDesign.tsx:962-984`). CCD, BBD and DSD hard-code 1 centre point (`:569-573`, `:647-653`, `:706-708`, `:769-773`, `:895-899`). PB adds none. Categoricals are set to `levels[0]`. There is no check for a continuous factor, so an all-categorical design gets `centerPoints` duplicates of one corner run (DES-19). |
-| Core generator | `options.centerPoints`, default 3 (`doeGenerator.ts:89`). The regular CCD, BBD and continuous DSD paths use `max(1, cp)`. The 2-level PB path adds `cp`. Factorial adds them to the **full** factorial only, and only when there is a continuous factor (`:431`). Fraction, custom D-optimal and every D-optimal fallback (CCD all-categorical, BBD with c < 3, PB fallback, DSD with categoricals) add none, even when `centerPoints` > 0; the UI does add them for custom D-optimal (DES-21). Categoricals are set to `levels[0]` (`:339`, `:437`). |
-| MCP | `create_project` defaults to 3 (`doeMcpServer.ts:244`). `generate_doe_design` uses `project.centerPoints \|\| 3` when the call omits `centerPoints`, so a stored 0 becomes 3 (`:460`). An explicit `centerPoints: 0` in the call is honoured. |
+- `buildCenterPointRuns(factors, responses, count, startOrder)` adds `count` centre runs (`count` may be `0`) for every design type.
+- When `continuousFactors.length === 0`, no centre runs are added (`DES-19`).
+- When categorical factors exist, centre runs cycle through `levels[i % levels.length]` so categorical levels are balanced (`DES-6`), and empty `levels` arrays never produce `undefined` (`DES-20`).
 
-Textbook practice: honour the requested count, and spread categorical centre runs across levels (or level combinations) so that they stay balanced. DES-6 covers all of these deviations.
+**Randomisation (`src/core/design/randomize.ts`, P1.19 / DES-7):**
 
-**Randomisation (DES-7):**
-
-- **Core:** none. `runOrder = stdOrder = 1..N` (`doeGenerator.ts:74-77`; *run*: `runOrder == stdOrder` for every generated design).
-- **UI:** `newRuns.sort(() => Math.random() − 0.5)`, then `runOrder = 1..N` (`ProjectDesign.tsx:987-988`). A comparator-based shuffle is not a uniform permutation, it is unseeded, and nothing is recorded.
-- **UI standard order:** `stdOrder` is 0 for continuous CCD, BBD, PB and DSD runs and for added centre points (for example `:628`, `:765`, `:805`, `:892-893`, `:978-979`), so standard order is lost.
-- **Textbook:** Fisher-Yates with a stored seed, keeping standard order.
-
-**Augmentation (UI only: the Design tab's "Augment Design" menu at `ProjectDesign.tsx:1461-1472` and the separate "Add Empty Run" button at `:1475`):**
-
-| Action | Code | Behaviour |
-|---|---|---|
-| Replicate design | `replicateDesign` (1053-1067) | Appends a copy of every run with responses cleared. The copies get new `runOrder` and `stdOrder` values after the current maximum. Not randomised, and the link to the original standard-order point is lost. |
-| Add centre points | `addCenterPoints(3)` (994-1014) | Appends 3 runs at numeric centre. Categoricals are set to `levels[0]`, or `''` when the factor has no `levels` array. With `levels: []` the test `fac.levels ? fac.levels[0] : ''` is truthy, so the run gets `undefined` (DES-20). |
-| Add axial points | `addAxialPoints` (1016-1051) | α = 1: for each numeric factor, a run at `min` and a run at `max`, with the others at centre and categoricals as above. |
-| Add empty run | `addEmptyRun` (1069-1085) | All factors at `min` or the first level. `runOrder = runs.length + 1` can duplicate an existing order. |
-
-There is no core augmentation function and no MCP augmentation tool.
-
-**Overwrite:**
-
-- The Generate button calls `generateRuns` directly (`ProjectDesign.tsx:1188`). It replaces `project.runs` (`:990`).
-- MCP `generate_doe_design` does the same (`doeMcpServer.ts:469`).
-- No `confirm()` exists anywhere in `src/web` (DES-1, MCP-10, UI-2).
+- `randomize(runs, seed)` assigns `stdOrder = 1..N` in standard order and then shuffles `runOrder = 1..N` using Fisher-Yates and a seeded PRNG (`createSeededRng(seed)`).
+- `Project.randomSeed` stores the seed used, and both the UI and HTML export display it.
+- MCP randomises by default and accepts `randomize?: boolean` and `randomSeed?: number`.
 
 ## Resolution table and selector
 

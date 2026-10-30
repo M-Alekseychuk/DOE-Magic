@@ -236,6 +236,23 @@ export const translations: Record<SupportedLocale, Record<string, string>> = {
     // Guide Tab
     'guide_title': 'Comprehensive DOE & Statistical Optimization Guide',
     'guide_subtitle': 'Systematic principles, design selection criteria, regression modeling, and pharmaceutical quality-by-design (QbD)',
+
+    // Confirmation Dialogs (P0.2)
+    'confirm_overwrite_runs_title': 'Replace Recorded Experimental Data?',
+    'confirm_overwrite_generate_msg': 'Generating a new design matrix will replace all current runs and permanently discard {count} recorded response measurement(s). Do you want to continue?',
+    'confirm_overwrite_import_msg': 'Importing worksheet "{sheet}" will replace all current runs and permanently discard {count} recorded response measurement(s). Do you want to continue?',
+    'confirm_overwrite_button': 'Replace & Discard Data',
+    'confirm_simulate_title': 'Populate Empty Cells with Simulated Sample Data?',
+    'confirm_simulate_msg': 'This will generate synthetic sample values for {emptyCount} empty run cell(s) of "{response}". Your {preservedCount} already-recorded measurement(s) will be preserved.',
+    'confirm_simulate_button': 'Fill Empty Cells',
+    'simulate_no_empty_cells': 'All runs for this response already have recorded measurements.',
+
+    // Tier 4 Validation, RandomSeed, D-Efficiency & Target (P1.11, P1.18, P1.19, P1.21)
+    'random_seed': 'Random Seed',
+    'not_estimable': 'Not estimable',
+    'excluded_runs_banner_title': '{count} run(s) excluded before model fitting',
+    'analysis_warnings_title': 'Model & Data Warnings',
+    'target_required_error': 'A finite numeric Target Value is required when the optimization goal is set to Target.',
   },
 
   zh: {
@@ -460,6 +477,23 @@ export const translations: Record<SupportedLocale, Record<string, string>> = {
     // Guide Tab
     'guide_title': '实验设计 (DOE) 与统计优化操作指南',
     'guide_subtitle': '面向工艺研发与分析科学家的系统化方法论、模型回归与质量源于设计 (QbD) 实践',
+
+    // Confirmation Dialogs (P0.2)
+    'confirm_overwrite_runs_title': '确认替换已录入的实验测量数据？',
+    'confirm_overwrite_generate_msg': '重新生成实验设计矩阵将替换当前所有运行批次，并永久清除已记录的 {count} 个响应测量值。是否继续？',
+    'confirm_overwrite_import_msg': '从工作表“{sheet}”导入将替换当前所有运行批次，并永久清除已记录的 {count} 个响应测量值。是否继续？',
+    'confirm_overwrite_button': '确认替换并清除',
+    'confirm_simulate_title': '使用模拟样本数据填充空白单元格？',
+    'confirm_simulate_msg': '此操作将为响应变量“{response}”的 {emptyCount} 个空白试验批次生成合成模拟数据。已录入的 {preservedCount} 个真实测量值将保持不变。',
+    'confirm_simulate_button': '填充空白项',
+    'simulate_no_empty_cells': '该响应变量的所有运行批次均已有测量数据。',
+
+    // Tier 4 Validation, RandomSeed, D-Efficiency & Target (P1.11, P1.18, P1.19, P1.21)
+    'random_seed': '随机种子 (Seed)',
+    'not_estimable': '无法估计 (Not estimable)',
+    'excluded_runs_banner_title': '拟合前已自动排除 {count} 个无效或已标记排除的试验批次',
+    'analysis_warnings_title': '模型与数据诊断提示',
+    'target_required_error': '当优化目标设为“达到目标值 (Target)”时，必须输入有效的数值目标。',
   },
 
   // Stubs for future extensions (fallback cleanly to English)

@@ -3,6 +3,7 @@ import { Project } from '../../../core/types';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts';
 import { Activity, Play, Info, AlertTriangle } from 'lucide-react';
 import { computeAnalysis, predictModelResponse } from '../../../core/analysis/analysisCore';
+import { fitProjectModelsById } from '../../../core/analysis/projectModels';
 import { useTranslation } from '../../i18n/LanguageContext';
 import { useIsDarkMode, getChartAxisProps, getGridStroke } from '../../shared/chartTheme';
 
@@ -70,10 +71,7 @@ export default function RobustnessSimulation({ project, updateProject }: Robustn
 
 
   const allModels = useMemo(() => {
-    return project.responses.reduce((acc, r) => {
-      acc[r.id] = computeAnalysis(project, r, r.excludedTerms || [], r.goal, r.targetValue);
-      return acc;
-    }, {} as Record<string, any>);
+    return fitProjectModelsById(project);
   }, [project]);
 
 

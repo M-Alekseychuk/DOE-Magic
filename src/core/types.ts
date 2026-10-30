@@ -44,6 +44,7 @@ export interface Project {
   runs: Run[];
   centerPoints?: number;
   designType?: DesignType;
+  randomSeed?: number;
   optimizationResults?: string;
   optimizationCandidates?: Record<string, string | number>[];
   robustnessState?: any;

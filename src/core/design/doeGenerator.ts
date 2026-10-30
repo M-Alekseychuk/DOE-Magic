@@ -1,457 +1,468 @@
 import { v4 as uuidv4 } from 'uuid';
-import { Factor, Response, Run, DesignType } from '../types';
-import { generateDOptimalSubset } from './dOptimal';
+import { DesignType, Factor, Response, Run } from '../types';
+import { generateDOptimalSubset, computeDEfficiency, buildCodedModelRow } from './dOptimal';
+import {
+  computeFractionResolution,
+  buildRegularFraction,
+  getRegularFractionGenerators,
+  formatFractionGenerators,
+} from './fractions';
+import { buildDSD, generateDefinitiveScreeningDesign, buildConferenceMatrix } from './dsd';
+import { buildCenterPointRuns, buildAxialPointRuns, getSafeCategoricalLevels } from './centerPoints';
+import { randomize, generateRandomSeed, createSeededRng } from './randomize';
 
-export interface GenerateDesignOptions {
+export {
+  computeFractionResolution,
+  buildRegularFraction,
+  getRegularFractionGenerators,
+  formatFractionGenerators,
+  buildDSD,
+  generateDefinitiveScreeningDesign,
+  buildConferenceMatrix,
+  buildCenterPointRuns,
+  buildAxialPointRuns,
+  getSafeCategoricalLevels,
+  randomize,
+  generateRandomSeed,
+  createSeededRng,
+  computeDEfficiency,
+};
+
+export interface DoeGeneratorOptions {
+  designType?: DesignType;
+  resolution?: 'Full' | 'III' | 'IV' | 'V' | 'Custom' | string;
+  fractionP?: number;
   centerPoints?: number;
+  replicates?: number;
   targetRuns?: number;
+  numRuns?: number;
+  ccdType?: 'faced' | 'circumscribed' | 'inscribed';
+  /** Whether to randomise runOrder after assigning stdOrder = 1..N (default: true). */
+  randomize?: boolean;
+  /** Optional integer seed for reproducible Fisher-Yates randomisation (P1.19 / DES-7). */
+  randomSeed?: number;
 }
 
 export interface GeneratedDesignResult {
   runs: Run[];
+  designType: string;
   designName: string;
+  totalRuns: number;
+  dEfficiency?: number | null;
+  resolution?: string;
+  generators?: string[];
+  isRegularFraction?: boolean;
+  isTrueDsd?: boolean;
+  randomSeed?: number;
+  warnings?: string[];
   notes: string;
-  dEfficiency?: number;
 }
 
 /**
- * Generates experimental runs for any supported DOE design type
+ * Generates an n x (n-1) Plackett-Burman matrix using standard cyclic Hadamard first rows
+ * for n = 8, 12, 16, 20, 24.
+ */
+function getPlackettBurmanMatrix(k: number): number[][] {
+  let n = 8;
+  if (k >= 8 && k <= 11) n = 12;
+  else if (k >= 12 && k <= 15) n = 16;
+  else if (k >= 16 && k <= 19) n = 20;
+  else if (k >= 20) n = 24;
+
+  const firstRows: Record<number, number[]> = {
+    8: [1, 1, 1, -1, 1, -1, -1],
+    12: [1, 1, -1, 1, 1, 1, -1, -1, -1, 1, -1],
+    16: [1, 1, 1, 1, -1, 1, -1, 1, 1, -1, -1, 1, -1, -1, -1],
+    20: [1, 1, -1, -1, 1, 1, 1, 1, -1, 1, -1, 1, -1, -1, -1, -1, 1, 1, -1],
+    24: [1, 1, 1, 1, 1, -1, 1, -1, 1, 1, -1, -1, 1, 1, -1, -1, 1, -1, 1, -1, -1, -1, -1],
+  };
+
+  const generator = firstRows[n] || firstRows[12];
+  const cols = n - 1;
+  const matrix: number[][] = [];
+
+  for (let r = 0; r < n - 1; r++) {
+    const row: number[] = [];
+    for (let c = 0; c < Math.min(k, cols); c++) {
+      row.push(generator[(c - r + cols) % cols]);
+    }
+    matrix.push(row);
+  }
+  matrix.push(new Array(Math.min(k, cols)).fill(-1));
+  return matrix;
+}
+
+/**
+ * Core DOE Matrix Generator shared between UI and MCP Server.
+ * Supports both `generateDesign(factors, responses, designType, options)` and
+ * `generateDoeDesign(factors, responses, options)`.
  */
 export function generateDesign(
   factors: Factor[],
   responses: Response[],
-  designType: DesignType = 'factorial_2level',
-  options: GenerateDesignOptions = {}
+  designTypeArg?: DesignType | DoeGeneratorOptions,
+  optionsArg: DoeGeneratorOptions = {}
 ): GeneratedDesignResult {
-  if (!factors || factors.length === 0) {
-    return {
-      runs: [],
-      designName: 'Empty Design',
-      notes: 'No factors defined.',
-    };
-  }
+  const options: DoeGeneratorOptions =
+    typeof designTypeArg === 'object' && designTypeArg !== null
+      ? designTypeArg
+      : { ...optionsArg, designType: (designTypeArg as DesignType) || optionsArg.designType };
 
-  const fCount = factors.length;
-  const continuousFactors = factors.filter(f => f.type !== 'categorical');
-  const categoricalFactors = factors.filter(f => f.type === 'categorical');
-  const hasCategorical = categoricalFactors.length > 0;
-  const allCategoricalAre2Level = categoricalFactors.every(f => !f.levels || f.levels.length <= 2);
+  const designType: DesignType = options.designType || 'factorial_2level';
+  const replicates = Math.max(1, options.replicates ?? 1);
+  const ccdType = options.ccdType || 'faced';
 
-  // Degrees of freedom needed for main effects
-  const pMain = 1 + factors.reduce((acc, f) => {
-    if (f.type === 'categorical') {
-      const lvls = f.levels && f.levels.length > 0 ? f.levels.length : 2;
-      return acc + (lvls - 1);
-    }
-    return acc + 1;
-  }, 0);
-
-  const getCartesianRuns = (candidateLevelsMap: (string | number)[][]): Record<string, string | number>[] => {
-    let combs: (string | number)[][] = [[]];
-    for (const levels of candidateLevelsMap) {
-      const nextComb: (string | number)[][] = [];
-      for (const comb of combs) {
-        for (const lvl of levels) {
-          nextComb.push([...comb, lvl]);
-        }
-      }
-      combs = nextComb;
-    }
-    return combs.map(comb => {
-      const runSettings: Record<string, string | number> = {};
-      factors.forEach((f, idx) => {
-        runSettings[f.id] = comb[idx];
-      });
-      return runSettings;
-    });
-  };
-
-  const createRun = (order: number, settings: Record<string, string | number>): Run => {
-    const runResponses: Record<string, null> = {};
-    responses.forEach(r => {
-      runResponses[r.id] = null;
-    });
-    return {
-      id: uuidv4(),
-      runOrder: order,
-      stdOrder: order,
-      factors: { ...settings },
-      responses: runResponses,
-    };
-  };
+  // Honour explicit centerPoints = 0 for every design type (P1.20 / DES-6)
+  const defaultCenterPoints =
+    designType === 'dsd' ? 1 : designType === 'ccd' || designType === 'bbd' ? 3 : 0;
+  const centerPoints =
+    options.centerPoints !== undefined && Number.isFinite(options.centerPoints)
+      ? Math.max(0, Math.floor(options.centerPoints))
+      : defaultCenterPoints;
 
   let newRuns: Run[] = [];
-  let designName = '';
+  let order = 1;
+  let designName = 'Full Factorial Design';
+  let dEfficiency: number | null | undefined = undefined;
+  let resolutionOut: string | undefined = undefined;
+  let generatorsOut: string[] | undefined = undefined;
+  let isRegularFractionOut: boolean | undefined = undefined;
+  let isTrueDsdOut: boolean | undefined = undefined;
+  const warnings: string[] = [];
   let notes = '';
-  let dEfficiency: number | undefined;
 
-  const targetRuns = options.targetRuns;
-  const centerPoints = Math.max(0, options.centerPoints !== undefined ? options.centerPoints : 3);
+  const continuousFactors = factors.filter(f => f.type === 'numeric');
+  const categoricalFactors = factors.filter(f => f.type === 'categorical');
+  const k = continuousFactors.length;
 
-  if (designType === 'custom_d_optimal') {
-    const candidateLevelsList: (string | number)[][] = factors.map(f => {
-      if (f.type === 'categorical') {
-        return f.levels && f.levels.length > 0 ? f.levels : ['Level 1', 'Level 2'];
-      }
-      return fCount <= 5 ? [f.min, (f.min + f.max) / 2, f.max] : [f.min, f.max];
+  let catCombinations: Record<string, string>[] = [{}];
+  categoricalFactors.forEach(cf => {
+    const levels = getSafeCategoricalLevels(cf);
+    const next: Record<string, string>[] = [];
+    catCombinations.forEach(comb => {
+      levels.forEach(lvl => {
+        next.push({ ...comb, [cf.id]: lvl });
+      });
     });
-    const allCandidateRuns = getCartesianRuns(candidateLevelsList);
-    const runsToGen = targetRuns && targetRuns > 0
-      ? Math.min(allCandidateRuns.length, targetRuns)
-      : Math.min(allCandidateRuns.length, Math.max(pMain + 3, 12));
+    catCombinations = next;
+  });
 
-    const result = generateDOptimalSubset(allCandidateRuns, factors, runsToGen);
-    dEfficiency = result.dEfficiency;
-
-    newRuns = result.selectedIndices.map((idx, i) => createRun(i + 1, allCandidateRuns[idx]));
-    designName = 'D-Optimal Custom Design';
-    notes = `Selected ${newRuns.length} statistically optimal treatment runs from ${allCandidateRuns.length} candidates (D-Efficiency: ${(dEfficiency * 100).toFixed(1)}%)`;
-
-  } else if (designType === 'ccd') {
-    // Central Composite Design
-    if (hasCategorical) {
-      if (continuousFactors.length === 0) {
-        // Fallback to D-optimal for pure categorical
-        const candidateLevelsList = factors.map(f => f.levels && f.levels.length > 0 ? f.levels : ['Level 1', 'Level 2']);
-        const allCandidateRuns = getCartesianRuns(candidateLevelsList);
-        const runsToGen = targetRuns && targetRuns > 0 ? Math.min(allCandidateRuns.length, targetRuns) : Math.min(allCandidateRuns.length, 12);
-        const result = generateDOptimalSubset(allCandidateRuns, factors, runsToGen);
-        dEfficiency = result.dEfficiency;
-        newRuns = result.selectedIndices.map((idx, i) => createRun(i + 1, allCandidateRuns[idx]));
-        designName = 'D-Optimal Design (Categorical)';
-        notes = 'Generated D-Optimal design because CCD requires continuous factors.';
-      } else {
-        const ccdContinuousRuns: Record<string, number>[] = [];
-        const cNum = continuousFactors.length;
-        const numRuns = Math.pow(2, cNum);
-
-        // Cube points
-        for (let i = 0; i < numRuns; i++) {
-          const runFactors: Record<string, number> = {};
-          continuousFactors.forEach((f, idx) => {
-            const isHi = (i & (1 << idx)) !== 0;
-            runFactors[f.id] = isHi ? f.max : f.min;
-          });
-          ccdContinuousRuns.push(runFactors);
-        }
-
-        // Axial points (alpha = 1)
-        continuousFactors.forEach(fAxis => {
-          const runLow: Record<string, number> = {};
-          const runHi: Record<string, number> = {};
-          continuousFactors.forEach(f => {
-            runLow[f.id] = (f.id === fAxis.id) ? f.min : ((f.min + f.max) / 2);
-            runHi[f.id] = (f.id === fAxis.id) ? f.max : ((f.min + f.max) / 2);
-          });
-          ccdContinuousRuns.push(runLow);
-          ccdContinuousRuns.push(runHi);
-        });
-
-        // Center points
-        for (let cp = 0; cp < Math.max(1, centerPoints); cp++) {
-          const runCp: Record<string, number> = {};
-          continuousFactors.forEach(f => {
-            runCp[f.id] = (f.min + f.max) / 2;
-          });
-          ccdContinuousRuns.push(runCp);
-        }
-
-        // Stratified combinations across categorical
-        const catLevelsList = categoricalFactors.map(f => f.levels && f.levels.length > 0 ? f.levels : ['Level 1', 'Level 2']);
-        let catCombs: (string | number)[][] = [[]];
-        for (const levels of catLevelsList) {
-          const nextComb: (string | number)[][] = [];
-          for (const comb of catCombs) {
-            for (const lvl of levels) {
-              nextComb.push([...comb, lvl]);
-            }
-          }
-          catCombs = nextComb;
-        }
-
-        let order = 1;
-        for (const catComb of catCombs) {
-          const catSettings: Record<string, string | number> = {};
-          categoricalFactors.forEach((cf, cIdx) => {
-            catSettings[cf.id] = catComb[cIdx];
-          });
-          for (const contRun of ccdContinuousRuns) {
-            newRuns.push(createRun(order++, { ...contRun, ...catSettings }));
-          }
-        }
-
-        designName = 'Stratified Central Composite Design (CCD)';
-        notes = `${ccdContinuousRuns.length} continuous RSM points replicated across ${catCombs.length} categorical level combination(s)`;
-      }
-    } else {
-      // Continuous CCD
-      const numRuns = Math.pow(2, fCount);
-      let order = 1;
-
-      // Cube points
-      for (let i = 0; i < numRuns; i++) {
-        const runFactors: Record<string, number> = {};
-        factors.forEach((f, idx) => {
-          const isHi = (i & (1 << idx)) !== 0;
-          runFactors[f.id] = isHi ? f.max : f.min;
-        });
-        newRuns.push(createRun(order++, runFactors));
-      }
-
-      // Axial star points
-      factors.forEach(fAxis => {
-        const runLow: Record<string, number> = {};
-        const runHi: Record<string, number> = {};
-        factors.forEach(f => {
-          runLow[f.id] = (f.id === fAxis.id) ? f.min : ((f.min + f.max) / 2);
-          runHi[f.id] = (f.id === fAxis.id) ? f.max : ((f.min + f.max) / 2);
-        });
-        newRuns.push(createRun(order++, runLow));
-        newRuns.push(createRun(order++, runHi));
-      });
-
-      // Center points
-      for (let cp = 0; cp < Math.max(1, centerPoints); cp++) {
-        const runCp: Record<string, number> = {};
-        factors.forEach(f => {
-          runCp[f.id] = (f.min + f.max) / 2;
-        });
-        newRuns.push(createRun(order++, runCp));
-      }
-
-      designName = 'Central Composite Design (CCD)';
-      notes = `Full response surface: ${numRuns} cube points, ${2 * fCount} axial points, and ${Math.max(1, centerPoints)} center points`;
-    }
-
-  } else if (designType === 'bbd') {
-    // Box-Behnken Design
-    if (continuousFactors.length < 3) {
-      // Fallback to D-optimal RSM
-      const candidateLevelsList: (string | number)[][] = factors.map(f => {
-        if (f.type === 'categorical') return f.levels && f.levels.length > 0 ? f.levels : ['Level 1', 'Level 2'];
-        return [f.min, (f.min + f.max) / 2, f.max];
-      });
-      const allCandidateRuns = getCartesianRuns(candidateLevelsList);
-      const runsToGen = targetRuns && targetRuns > 0 ? Math.min(allCandidateRuns.length, targetRuns) : Math.min(allCandidateRuns.length, 16);
-      const result = generateDOptimalSubset(allCandidateRuns, factors, runsToGen);
-      dEfficiency = result.dEfficiency;
-      newRuns = result.selectedIndices.map((idx, i) => createRun(i + 1, allCandidateRuns[idx]));
-      designName = 'D-Optimal RSM Design';
-      notes = 'Generated D-optimal response surface design because Box-Behnken requires at least 3 continuous factors.';
-    } else {
-      const cCount = continuousFactors.length;
-      const bbdContinuousRuns: Record<string, number>[] = [];
-
-      for (let i = 0; i < cCount - 1; i++) {
-        for (let j = i + 1; j < cCount; j++) {
-          const combos = [[-1, -1], [-1, 1], [1, -1], [1, 1]];
-          combos.forEach(combo => {
-            const runFactors: Record<string, number> = {};
-            continuousFactors.forEach((f, idx) => {
-              if (idx === i) runFactors[f.id] = combo[0] === 1 ? f.max : f.min;
-              else if (idx === j) runFactors[f.id] = combo[1] === 1 ? f.max : f.min;
-              else runFactors[f.id] = (f.min + f.max) / 2;
-            });
-            bbdContinuousRuns.push(runFactors);
-          });
-        }
-      }
-
-      for (let cp = 0; cp < Math.max(1, centerPoints); cp++) {
-        const cpContinuous: Record<string, number> = {};
-        continuousFactors.forEach(f => cpContinuous[f.id] = (f.min + f.max) / 2);
-        bbdContinuousRuns.push(cpContinuous);
-      }
-
-      if (hasCategorical) {
-        const catLevelsList = categoricalFactors.map(f => f.levels && f.levels.length > 0 ? f.levels : ['Level 1', 'Level 2']);
-        let catCombs: (string | number)[][] = [[]];
-        for (const levels of catLevelsList) {
-          const nextComb: (string | number)[][] = [];
-          for (const comb of catCombs) {
-            for (const lvl of levels) {
-              nextComb.push([...comb, lvl]);
-            }
-          }
-          catCombs = nextComb;
-        }
-
-        let order = 1;
-        for (const catComb of catCombs) {
-          const catSettings: Record<string, string | number> = {};
-          categoricalFactors.forEach((cf, cIdx) => {
-            catSettings[cf.id] = catComb[cIdx];
-          });
-          for (const contRun of bbdContinuousRuns) {
-            newRuns.push(createRun(order++, { ...contRun, ...catSettings }));
-          }
-        }
-        designName = 'Stratified Box-Behnken Design (BBD)';
-        notes = `${bbdContinuousRuns.length} continuous BBD points replicated across ${catCombs.length} categorical level combination(s)`;
-      } else {
-        newRuns = bbdContinuousRuns.map((r, i) => createRun(i + 1, r));
-        designName = 'Box-Behnken Design (BBD)';
-        notes = `Spherical 3-level response surface design avoiding extreme corners (${newRuns.length} runs)`;
-      }
-    }
-
-  } else if (designType === 'plackett_burman') {
-    // Plackett-Burman Design
-    if (allCategoricalAre2Level) {
-      let seedRow: number[] = [];
-      if (fCount <= 11) seedRow = [1, 1, -1, 1, 1, 1, -1, -1, -1, 1, -1];
-      else seedRow = [1, 1, -1, -1, 1, 1, 1, 1, -1, 1, -1, 1, -1, -1, -1, -1, 1, 1, -1];
-
-      const N = seedRow.length + 1;
-      let order = 1;
-
-      for (let i = 0; i < N - 1; i++) {
+  if (designType === 'plackett_burman') {
+    const pbMatrix = getPlackettBurmanMatrix(factors.length);
+    for (let rep = 0; rep < replicates; rep++) {
+      pbMatrix.forEach(row => {
         const runFactors: Record<string, string | number> = {};
         factors.forEach((f, idx) => {
-          const isHi = idx < seedRow.length ? (seedRow[(idx - i + seedRow.length) % seedRow.length] === 1) : false;
+          const code = row[idx] ?? -1;
           if (f.type === 'categorical') {
-            const lvls = f.levels && f.levels.length > 0 ? f.levels : ['Level 1', 'Level 2'];
-            runFactors[f.id] = isHi ? (lvls[1] || lvls[0]) : lvls[0];
+            const levels = getSafeCategoricalLevels(f);
+            runFactors[f.id] = code === 1 ? levels[Math.min(1, levels.length - 1)] : levels[0];
           } else {
-            runFactors[f.id] = isHi ? f.max : f.min;
+            runFactors[f.id] = code === 1 ? f.max : f.min;
           }
         });
-        newRuns.push(createRun(order++, runFactors));
-      }
-
-      const lastRowFactors: Record<string, string | number> = {};
-      factors.forEach(f => {
-        if (f.type === 'categorical') {
-          const lvls = f.levels && f.levels.length > 0 ? f.levels : ['Level 1', 'Level 2'];
-          lastRowFactors[f.id] = lvls[0];
-        } else {
-          lastRowFactors[f.id] = f.min;
-        }
-      });
-      newRuns.push(createRun(order++, lastRowFactors));
-
-      // Optional center points
-      for (let cp = 0; cp < centerPoints; cp++) {
-        const cpFactors: Record<string, string | number> = {};
-        factors.forEach(f => {
-          if (f.type === 'categorical') {
-            const lvls = f.levels && f.levels.length > 0 ? f.levels : ['Level 1', 'Level 2'];
-            cpFactors[f.id] = lvls[0];
-          } else {
-            cpFactors[f.id] = (f.min + f.max) / 2;
-          }
+        newRuns.push({
+          id: uuidv4(),
+          runOrder: order,
+          stdOrder: order++,
+          factors: runFactors,
+          responses: responses.reduce((acc, r) => ({ ...acc, [r.id]: null }), {}),
         });
-        newRuns.push(createRun(order++, cpFactors));
-      }
-
-      designName = 'Plackett-Burman Design (PB)';
-      notes = `Orthogonal 2-level screening matrix (${newRuns.length} runs)`;
-    } else {
-      // Multi-level categorical fallback to D-Optimal screening
-      const candidateLevelsList = factors.map(f => {
-        if (f.type === 'categorical') return f.levels && f.levels.length > 0 ? f.levels : ['Level 1', 'Level 2'];
-        return [f.min, f.max];
       });
-      const allCandidateRuns = getCartesianRuns(candidateLevelsList);
-      const runsToGen = targetRuns && targetRuns > 0 ? targetRuns : 12;
-      const result = generateDOptimalSubset(allCandidateRuns, factors, runsToGen);
-      dEfficiency = result.dEfficiency;
-      newRuns = result.selectedIndices.map((idx, i) => createRun(i + 1, allCandidateRuns[idx]));
-      designName = '12-Run Screening Design (D-Optimal PB Equivalent)';
-      notes = 'Orthogonal screening array adapted for 3+ level categorical factors';
     }
-
-  } else if (designType === 'dsd') {
-    // Definitive Screening Design
-    if (hasCategorical) {
-      const candidateLevelsList = factors.map(f => {
-        if (f.type === 'categorical') return f.levels && f.levels.length > 0 ? f.levels : ['Level 1', 'Level 2'];
-        return [f.min, (f.min + f.max) / 2, f.max];
-      });
-      const allCandidateRuns = getCartesianRuns(candidateLevelsList);
-      const targetDSDRuns = 2 * continuousFactors.length + 1 + 2 * categoricalFactors.length;
-      const runsToGen = Math.max(targetDSDRuns, pMain + 2);
-      const result = generateDOptimalSubset(allCandidateRuns, factors, runsToGen);
-      dEfficiency = result.dEfficiency;
-      newRuns = result.selectedIndices.map((idx, i) => createRun(i + 1, allCandidateRuns[idx]));
-      designName = 'Definitive Screening Design (DSD)';
-      notes = '3-level screening for continuous factors with balanced categorical assignments';
-    } else {
-      const m = fCount;
-      let order = 1;
-      for (let i = 0; i < m; i++) {
-        const run1: Record<string, number> = {};
-        const run2: Record<string, number> = {};
-        factors.forEach((f, fIdx) => {
-          if (fIdx === i) {
-            run1[f.id] = (f.min + f.max) / 2;
-            run2[f.id] = (f.min + f.max) / 2;
-          } else {
-            const isHi = ((i + fIdx) % 2) === 0;
-            run1[f.id] = isHi ? f.max : f.min;
-            run2[f.id] = isHi ? f.min : f.max;
-          }
-        });
-        newRuns.push(createRun(order++, run1));
-        newRuns.push(createRun(order++, run2));
-      }
-
-      for (let cp = 0; cp < Math.max(1, centerPoints); cp++) {
-        const cpFactors: Record<string, number> = {};
-        factors.forEach(f => cpFactors[f.id] = (f.min + f.max) / 2);
-        newRuns.push(createRun(order++, cpFactors));
-      }
-
-      designName = 'Definitive Screening Design (DSD)';
-      notes = `${newRuns.length} runs with foldover pairs and center point(s)`;
+    if (centerPoints > 0) {
+      const cpResult = buildCenterPointRuns(factors, responses, centerPoints, order);
+      if (cpResult.warning) warnings.push(cpResult.warning);
+      newRuns.push(...cpResult.runs);
+      order += cpResult.runs.length;
     }
+    const codedRows = newRuns.map(r => buildCodedModelRow(factors, r.factors, false, false));
+    dEfficiency = computeDEfficiency(codedRows);
+    designName = 'Plackett-Burman Design (PB)';
+    notes = `Plackett-Burman Screening Design (${pbMatrix.length} base runs${centerPoints > 0 ? ` + ${centerPoints} center pts` : ''}, Resolution III)`;
+  } else if (designType === 'ccd') {
+    let alpha = 1.0;
+    if (ccdType === 'circumscribed') alpha = Math.pow(Math.pow(2, k), 0.25);
+    else if (ccdType === 'inscribed') alpha = 1 / Math.pow(Math.pow(2, k), 0.25);
 
-  } else {
-    // Two-Level Factorial / Fractional Factorial
-    const factorLevelsList: (string | number)[][] = factors.map(f => {
-      if (f.type === 'categorical' && f.levels && f.levels.length > 0) {
-        return f.levels;
-      }
-      return [f.min, f.max];
-    });
-    const allCandidateRuns = getCartesianRuns(factorLevelsList);
-    const numRuns = allCandidateRuns.length;
-    const runsToGen = targetRuns && targetRuns > 0 ? targetRuns : numRuns;
-
-    if (runsToGen > 0 && runsToGen < numRuns) {
-      const result = generateDOptimalSubset(allCandidateRuns, factors, runsToGen);
-      dEfficiency = result.dEfficiency;
-      newRuns = result.selectedIndices.map((idx, i) => createRun(i + 1, allCandidateRuns[idx]));
-      designName = 'Fractional Factorial Design';
-      notes = `Resolution-optimized fractional subset of ${runsToGen} runs from ${numRuns} full factorial treatments`;
-    } else {
-      newRuns = allCandidateRuns.map((settings, i) => createRun(i + 1, settings));
-
-      // Add center points if continuous factors exist
-      if (continuousFactors.length > 0 && centerPoints > 0) {
-        const nextOrder = newRuns.length + 1;
-        for (let cp = 0; cp < centerPoints; cp++) {
-          const cpFactors: Record<string, string | number> = {};
-          factors.forEach(f => {
-            if (f.type === 'categorical') {
-              cpFactors[f.id] = f.levels && f.levels.length > 0 ? f.levels[0] : 'Level 1';
+    const numCube = Math.pow(2, k);
+    for (let rep = 0; rep < replicates; rep++) {
+      catCombinations.forEach(catComb => {
+        for (let i = 0; i < numCube; i++) {
+          const runFactors: Record<string, string | number> = { ...catComb };
+          continuousFactors.forEach((f, idx) => {
+            const isHigh = (i & (1 << idx)) !== 0;
+            if (ccdType === 'inscribed') {
+              const mid = (f.min + f.max) / 2;
+              const half = (f.max - f.min) / 2;
+              runFactors[f.id] = Number((mid + (isHigh ? 1 : -1) * alpha * half).toFixed(4));
             } else {
-              cpFactors[f.id] = (f.min + f.max) / 2;
+              runFactors[f.id] = isHigh ? f.max : f.min;
             }
           });
-          newRuns.push(createRun(nextOrder + cp, cpFactors));
+          newRuns.push({
+            id: uuidv4(),
+            runOrder: order,
+            stdOrder: order++,
+            factors: runFactors,
+            responses: responses.reduce((acc, r) => ({ ...acc, [r.id]: null }), {}),
+          });
         }
-      }
-
-      designName = 'Full Factorial Design';
-      notes = `Complete orthogonal factorial matrix with ${newRuns.length} runs`;
+        continuousFactors.forEach(f => {
+          [-1, 1].forEach(dir => {
+            const runFactors: Record<string, string | number> = { ...catComb };
+            continuousFactors.forEach(otherF => {
+              const mid = (otherF.min + otherF.max) / 2;
+              const half = (otherF.max - otherF.min) / 2;
+              if (otherF.id === f.id) {
+                if (ccdType === 'inscribed') {
+                  runFactors[otherF.id] = dir === 1 ? otherF.max : otherF.min;
+                } else {
+                  runFactors[otherF.id] = Number((mid + dir * alpha * half).toFixed(4));
+                }
+              } else {
+                runFactors[otherF.id] = Number(mid.toFixed(4));
+              }
+            });
+            newRuns.push({
+              id: uuidv4(),
+              runOrder: order,
+              stdOrder: order++,
+              factors: runFactors,
+              responses: responses.reduce((acc, r) => ({ ...acc, [r.id]: null }), {}),
+            });
+          });
+        });
+      });
     }
+    if (centerPoints > 0) {
+      const cpResult = buildCenterPointRuns(factors, responses, centerPoints, order);
+      if (cpResult.warning) warnings.push(cpResult.warning);
+      newRuns.push(...cpResult.runs);
+      order += cpResult.runs.length;
+    }
+    const codedRows = newRuns.map(r => buildCodedModelRow(factors, r.factors, true, true));
+    dEfficiency = computeDEfficiency(codedRows);
+    designName = 'Central Composite Design (CCD)';
+    notes = `Central Composite Design (${ccdType}, alpha=${alpha.toFixed(2)}, ${centerPoints} center pts)`;
+  } else if (designType === 'bbd') {
+    for (let rep = 0; rep < replicates; rep++) {
+      catCombinations.forEach(catComb => {
+        for (let i = 0; i < k; i++) {
+          for (let j = i + 1; j < k; j++) {
+            [-1, 1].forEach(dir1 => {
+              [-1, 1].forEach(dir2 => {
+                const runFactors: Record<string, string | number> = { ...catComb };
+                continuousFactors.forEach((f, idx) => {
+                  if (idx === i) runFactors[f.id] = dir1 === 1 ? f.max : f.min;
+                  else if (idx === j) runFactors[f.id] = dir2 === 1 ? f.max : f.min;
+                  else runFactors[f.id] = Number(((f.min + f.max) / 2).toFixed(4));
+                });
+                newRuns.push({
+                  id: uuidv4(),
+                  runOrder: order,
+                  stdOrder: order++,
+                  factors: runFactors,
+                  responses: responses.reduce((acc, r) => ({ ...acc, [r.id]: null }), {}),
+                });
+              });
+            });
+          }
+        }
+      });
+    }
+    if (centerPoints > 0) {
+      const cpResult = buildCenterPointRuns(factors, responses, centerPoints, order);
+      if (cpResult.warning) warnings.push(cpResult.warning);
+      newRuns.push(...cpResult.runs);
+      order += cpResult.runs.length;
+    }
+    const codedRows = newRuns.map(r => buildCodedModelRow(factors, r.factors, true, true));
+    dEfficiency = computeDEfficiency(codedRows);
+    designName = 'Box-Behnken Design (BBD)';
+    notes = `Box-Behnken Response Surface Design (${centerPoints} center pts)`;
+  } else if (designType === 'dsd') {
+    const dsdResult = buildDSD(factors, responses, centerPoints);
+    newRuns = dsdResult.runs;
+    designName = dsdResult.designName;
+    dEfficiency = dsdResult.dEfficiency;
+    isTrueDsdOut = dsdResult.isTrueDsd;
+    if (dsdResult.warning) warnings.push(dsdResult.warning);
+    notes = dsdResult.notes;
+  } else if (designType === 'custom_d_optimal') {
+    let candidates: Record<string, string | number>[] = [{}];
+    factors.forEach(f => {
+      const next: Record<string, string | number>[] = [];
+      if (f.type === 'categorical') {
+        const levels = getSafeCategoricalLevels(f);
+        candidates.forEach(c => levels.forEach(l => next.push({ ...c, [f.id]: l })));
+      } else {
+        const mid = Number(((f.min + f.max) / 2).toFixed(4));
+        candidates.forEach(c => [f.min, mid, f.max].forEach(v => next.push({ ...c, [f.id]: v })));
+      }
+      candidates = next;
+    });
+
+    const explicitTarget = options.targetRuns ?? options.numRuns;
+    const targetRuns =
+      explicitTarget !== undefined && Number.isFinite(explicitTarget)
+        ? Math.floor(explicitTarget)
+        : Math.min(candidates.length, Math.max(factors.length + 3, 12));
+    const dOpt = generateDOptimalSubset(factors, candidates, targetRuns);
+    if (dOpt.warning) warnings.push(dOpt.warning);
+    dOpt.selectedRuns.forEach(pt => {
+      newRuns.push({
+        id: uuidv4(),
+        runOrder: order,
+        stdOrder: order++,
+        factors: pt,
+        responses: responses.reduce((acc, r) => ({ ...acc, [r.id]: null }), {}),
+      });
+    });
+    if (centerPoints > 0) {
+      const cpResult = buildCenterPointRuns(factors, responses, centerPoints, order);
+      if (cpResult.warning) warnings.push(cpResult.warning);
+      newRuns.push(...cpResult.runs);
+      order += cpResult.runs.length;
+    }
+    dEfficiency = dOpt.dEfficiency;
+    designName = 'D-Optimal Custom Design';
+    const effStr = dOpt.dEfficiency !== null ? `${dOpt.dEfficiency.toFixed(1)}%` : 'not estimable';
+    notes = `D-Optimal Custom Design (${dOpt.selectedRuns.length} model runs${centerPoints > 0 ? ` + ${centerPoints} center pts` : ''}, D-eff: ${effStr})`;
+  } else {
+    // 2-Level Full or Fractional Factorial (or Mixed-Level Factorial / D-Optimal Subset)
+    const allTwoLevel = factors.every(
+      f => f.type !== 'categorical' || getSafeCategoricalLevels(f).length <= 2
+    );
+    const fullTwoLevelRuns = Math.pow(2, factors.length);
+    const explicitTarget = options.targetRuns ?? options.numRuns;
+
+    let targetCornerRuns = fullTwoLevelRuns;
+    if (explicitTarget !== undefined && Number.isFinite(explicitTarget) && explicitTarget > 0) {
+      targetCornerRuns = Math.floor(explicitTarget);
+    } else if (options.fractionP !== undefined && options.fractionP > 0) {
+      targetCornerRuns = Math.max(4, Math.round(fullTwoLevelRuns / Math.pow(2, options.fractionP)));
+    }
+
+    if (allTwoLevel && targetCornerRuns < fullTwoLevelRuns) {
+      const reg = buildRegularFraction(factors, responses, targetCornerRuns, centerPoints);
+      if (reg) {
+        newRuns = reg.runs;
+        designName = reg.designName;
+        resolutionOut = reg.resolutionRoman;
+        generatorsOut = reg.generators;
+        isRegularFractionOut = true;
+        dEfficiency = 100;
+        notes = reg.notes;
+      }
+    }
+
+    if (newRuns.length === 0) {
+      // Either Full Factorial or non-regular / mixed-level D-Optimal Subset
+      let candidates: Record<string, string | number>[] = [{}];
+      factors.forEach(f => {
+        const next: Record<string, string | number>[] = [];
+        if (f.type === 'categorical') {
+          const levels = getSafeCategoricalLevels(f);
+          candidates.forEach(c => levels.forEach(l => next.push({ ...c, [f.id]: l })));
+        } else {
+          candidates.forEach(c => [f.min, f.max].forEach(v => next.push({ ...c, [f.id]: v })));
+        }
+        candidates = next;
+      });
+
+      const effectiveTarget =
+        explicitTarget !== undefined && Number.isFinite(explicitTarget) && explicitTarget > 0
+          ? Math.floor(explicitTarget)
+          : candidates.length;
+
+      if (effectiveTarget < candidates.length) {
+        const dOpt = generateDOptimalSubset(factors, candidates, effectiveTarget);
+        if (dOpt.warning) warnings.push(dOpt.warning);
+        for (let rep = 0; rep < replicates; rep++) {
+          dOpt.selectedRuns.forEach(pt => {
+            newRuns.push({
+              id: uuidv4(),
+              runOrder: order,
+              stdOrder: order++,
+              factors: pt,
+              responses: responses.reduce((acc, r) => ({ ...acc, [r.id]: null }), {}),
+            });
+          });
+        }
+        if (centerPoints > 0) {
+          const cpResult = buildCenterPointRuns(factors, responses, centerPoints, order);
+          if (cpResult.warning) warnings.push(cpResult.warning);
+          newRuns.push(...cpResult.runs);
+          order += cpResult.runs.length;
+        }
+        dEfficiency = dOpt.dEfficiency;
+        designName = 'D-Optimal Subset Design';
+        resolutionOut = 'D-Optimal Subset';
+        isRegularFractionOut = false;
+        const effStr = dOpt.dEfficiency !== null ? `${dOpt.dEfficiency.toFixed(1)}%` : 'not estimable';
+        notes = `D-Optimal subset of ${effectiveTarget} runs from ${candidates.length} candidate treatments${centerPoints > 0 ? ` + ${centerPoints} center pts` : ''} (D-eff: ${effStr})`;
+      } else {
+        for (let rep = 0; rep < replicates; rep++) {
+          candidates.forEach(pt => {
+            newRuns.push({
+              id: uuidv4(),
+              runOrder: order,
+              stdOrder: order++,
+              factors: pt,
+              responses: responses.reduce((acc, r) => ({ ...acc, [r.id]: null }), {}),
+            });
+          });
+        }
+        if (centerPoints > 0) {
+          const cpResult = buildCenterPointRuns(factors, responses, centerPoints, order);
+          if (cpResult.warning) warnings.push(cpResult.warning);
+          newRuns.push(...cpResult.runs);
+          order += cpResult.runs.length;
+        }
+        const codedRows = newRuns.map(r => buildCodedModelRow(factors, r.factors, false, false));
+        dEfficiency = computeDEfficiency(codedRows);
+        designName = allTwoLevel ? 'Full Factorial Design' : 'General Mixed-Level Factorial Design';
+        resolutionOut = 'Full';
+        isRegularFractionOut = false;
+        notes = `${designName} (${candidates.length * replicates} corner runs${centerPoints > 0 ? ` + ${centerPoints} center pts` : ''})`;
+      }
+    }
+  }
+
+  // Assign unique sequential stdOrder = 1..N before optional randomisation (P1.19 / DES-7)
+  const stdOrderedRuns: Run[] = newRuns.map((r, idx) => ({
+    ...r,
+    stdOrder: idx + 1,
+    runOrder: idx + 1,
+  }));
+
+  const shouldRandomize = options.randomize !== false;
+  let finalRuns = stdOrderedRuns;
+  let usedSeed: number | undefined = options.randomSeed;
+
+  if (shouldRandomize && stdOrderedRuns.length > 1) {
+    usedSeed =
+      options.randomSeed !== undefined && Number.isFinite(options.randomSeed)
+        ? Math.floor(options.randomSeed)
+        : generateRandomSeed();
+    finalRuns = randomize(stdOrderedRuns, usedSeed);
   }
 
   return {
-    runs: newRuns,
+    runs: finalRuns,
+    designType,
     designName,
-    notes,
+    totalRuns: finalRuns.length,
     dEfficiency,
+    resolution: resolutionOut,
+    generators: generatorsOut,
+    isRegularFraction: isRegularFractionOut,
+    isTrueDsd: isTrueDsdOut,
+    randomSeed: usedSeed,
+    warnings: warnings.length > 0 ? warnings : undefined,
+    notes,
   };
 }
+
+export const generateDoeDesign = generateDesign;

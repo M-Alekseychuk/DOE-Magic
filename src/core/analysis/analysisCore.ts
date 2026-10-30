@@ -1,6 +1,119 @@
 import jstat from 'jstat';
 const jStat = (jstat as any).default || jstat;
 import { Project, Response, Factor } from '../types';
+import { solveOLS, computeLenth } from './linalg';
+import {
+  getFactorContrasts,
+  buildModelEffects,
+  resolveExcludedTerms,
+  validateRuns,
+  type ModelEffect,
+  type ResolvedExclusions,
+  type ExcludedRunInfo,
+  type ValidatedRunsResult,
+} from './modelSpec';
+import { optimizeFactorBox } from '../optimization/optimize';
+
+export {
+  getFactorContrasts,
+  computeLenth,
+  resolveExcludedTerms,
+  validateRuns,
+  type ModelEffect,
+  type ResolvedExclusions,
+  type ExcludedRunInfo,
+  type ValidatedRunsResult,
+};
+
+export interface ParameterEstimateRow {
+  term: string;
+  cleanTerm: string;
+  factorId?: string;
+  f1Id?: string;
+  f2Id?: string;
+  estimate: number;
+  stdError: number | null;
+  tRatio: number | null;
+  pVal: number | null;
+  isAliased: boolean;
+  vif?: number;
+  isReference?: boolean;
+}
+
+export interface EffectSummaryRow {
+  id: string;
+  name: string;
+  logworth: number;
+  pVal: number;
+  ss: number;
+  fRatio: number;
+  df: number;
+  nparm: number;
+  isAliased: boolean;
+  isExcluded: boolean;
+}
+
+export interface ParetoItem {
+  name: string;
+  absEffect: number;
+  direction: string;
+  factor: Factor;
+  tRatio: number;
+}
+
+export interface LackOfFitResult {
+  ss_lof: number;
+  df_lof: number;
+  ms_lof: number;
+  f_lof: number;
+  p_lof: number | null;
+  ss_pure: number;
+  df_pure: number;
+  ms_pure: number;
+  sse: number;
+  df_error: number;
+  sst: number;
+}
+
+export interface AnalysisResult {
+  response: Response;
+  effects: any[];
+  paretoData: ParetoItem[];
+  optimalSettings: any[];
+  optimalConditions: any;
+  halfNormalData: any[];
+  halfNormalLine: { x: number; y: number }[];
+  bestPred: number;
+  rSquared: number;
+  adjRSquared: number;
+  /** Model degrees of freedom (rank - 1). */
+  dfModel: number;
+  /** Whole-model ANOVA F-test p-value: 1 - F_cdf(fRatio; dfModel, dfError), or null when dfError === 0. */
+  modelPValue: number | null;
+  /** @deprecated Alias for dfModel (model degrees of freedom, NOT a p-value). Use dfModel or modelPValue instead. */
+  p: number;
+  nRuns: number;
+  paretoThreshold: number;
+  tLimitPareto: number;
+  bonferroniLimitPareto: number;
+  effectSummary: EffectSummaryRow[];
+  lackOfFit: LackOfFitResult;
+  parameterEstimates: ParameterEstimateRow[];
+  rmse: number;
+  fRatio: number;
+  dfError: number;
+  mse: number;
+  actualByPredicted: { actual: number; predicted: number }[];
+  studentizedResiduals: any[];
+  adequatePrecision: number;
+  boxCox: any;
+  activeEffects: ModelEffect[];
+  beta: number[];
+  aliased: boolean[];
+  predictAtSettings: (factorSettings: Record<string, any>) => number;
+  excludedRuns: ExcludedRunInfo[];
+  warnings: string[];
+}
 
 function normSInv(p: number): number {
   if (p >= 1) return 3.5;
@@ -47,47 +160,7 @@ function normSInv(p: number): number {
   return x;
 }
 
-/**
- * Computes contrast values for a factor setting.
- * - Numeric factors: coded into [-1, +1] based on (min + max)/2 and range.
- * - 2-level categorical: [-1] for level 0, [+1] for level 1.
- * - L >= 3 categorical: sum-to-zero contrasts (L-1 columns):
- *   Level j (0 <= j < L - 1): +1 for column j, 0 elsewhere.
- *   Level L - 1 (reference): -1 across all L - 1 columns.
- */
-export function getFactorContrasts(factor: Factor, runVal: any): number[] {
-  if (factor.type === 'categorical') {
-    const levels = factor.levels && factor.levels.length > 0 ? factor.levels : ['Level 1', 'Level 2'];
-    const L = levels.length;
-    const strVal = String(runVal ?? '').trim().toLowerCase();
-    let idx = levels.findIndex(l => l.trim().toLowerCase() === strVal);
-    if (idx === -1) {
-      const n = Number(runVal);
-      if (!isNaN(n) && n >= 0 && n < L) idx = Math.floor(n);
-      else idx = 0;
-    }
-
-    if (L <= 2) {
-      return [idx === 1 ? 1 : -1];
-    } else {
-      const contrasts = new Array(L - 1).fill(0);
-      if (idx === L - 1) {
-        contrasts.fill(-1);
-      } else if (idx >= 0 && idx < L - 1) {
-        contrasts[idx] = 1;
-      }
-      return contrasts;
-    }
-  } else {
-    const num = Number(runVal);
-    const mid = (factor.min + factor.max) / 2;
-    const range = (factor.max - factor.min) || 1;
-    const val = isNaN(num) ? 0 : 2 * (num - mid) / range;
-    return [Math.max(-2, Math.min(2, val))];
-  }
-}
-
-// Matrix math utilities for OLS
+// Matrix math utilities for Box-Cox projection
 function transpose(m: number[][]) {
     return m[0].map((_, i) => m.map(row => row[i]));
 }
@@ -106,236 +179,40 @@ function multiply(m1: number[][], m2: number[][]) {
     return res;
 }
 
-function solveOLS(X: number[][], Y: number[][]) {
-    const n = X.length;
-    const k = X[0].length;
-    
-    const Xt = transpose(X);
-    const XtX = multiply(Xt, X);
-    const XtY = multiply(Xt, Y);
-    
-    const aug: number[][] = [];
-    for (let i = 0; i < k; i++) {
-        const row = [...XtX[i], XtY[i][0]];
-        for (let j = 0; j < k; j++) row.push(i === j ? 1 : 0);
-        aug.push(row);
-    }
-    
-    const aliased = new Array(k).fill(false);
-    let currentRow = 0;
-    const colToRow = new Array(k).fill(-1);
-    
-    for (let col = 0; col < k; col++) {
-        let pivotRow = currentRow;
-        let maxVal = 0;
-        for (let r = currentRow; r < k; r++) {
-            if (Math.abs(aug[r][col]) > maxVal) {
-                maxVal = Math.abs(aug[r][col]);
-                pivotRow = r;
-            }
-        }
-        
-        if (maxVal < 1e-9) {
-            aliased[col] = true;
-            continue;
-        }
-        
-        const pivotVal = aug[pivotRow][col];
-        const temp = aug[currentRow];
-        aug[currentRow] = aug[pivotRow];
-        aug[pivotRow] = temp;
-        
-        for (let j = col; j < k + 1 + k; j++) {
-            aug[currentRow][j] /= pivotVal;
-        }
-        
-        for (let r = 0; r < k; r++) {
-            if (r !== currentRow) {
-                const factor = aug[r][col];
-                for (let j = col; j < k + 1 + k; j++) {
-                    aug[r][j] -= factor * aug[currentRow][j];
-                }
-            }
-        }
-        
-        colToRow[col] = currentRow;
-        currentRow++;
-    }
-    
-    const rank = currentRow;
-    const beta = new Array(k).fill(0);
-    const diagInv = new Array(k).fill(0);
-    const invXtX = Array(k).fill(0).map(() => Array(k).fill(0));
-    
-    for (let col = 0; col < k; col++) {
-        if (!aliased[col]) {
-            const r = colToRow[col];
-            beta[col] = aug[r][k];
-            diagInv[col] = Math.max(0, aug[r][k + 1 + col]);
-            for (let c2 = 0; c2 < k; c2++) {
-                if (!aliased[c2]) {
-                    invXtX[col][c2] = aug[r][k + 1 + c2];
-                }
-            }
-        }
-    }
-    
-    return { beta, diagInv, invXtX, aliased, rank };
-}
-
-export function computeAnalysis(project: Project, activeResponse: Response, excludedTerms: string[], effectiveGoal: string | undefined, effectiveTargetValue: number | undefined) {
+export function computeAnalysis(
+  project: Project,
+  activeResponse: Response,
+  excludedTerms: string[] = [],
+  effectiveGoal?: string,
+  effectiveTargetValue?: number
+): AnalysisResult | null {
     const hasData = project.runs.length > 0 && project.factors.length > 0;
 
     if (!hasData || !activeResponse) return null;
 
-    const validRuns = project.runs.filter(r => r.responses[activeResponse.id] !== null && r.responses[activeResponse.id] !== undefined && String(r.responses[activeResponse.id]) !== '');
+    const { validRuns, excludedRuns, warnings } = validateRuns(project, activeResponse);
     if (validRuns.length === 0) return null;
+
+    const getRunResponseValue = (r: (typeof validRuns)[number]): number => {
+      const raw = r.responses[activeResponse.id] !== undefined
+        ? r.responses[activeResponse.id]
+        : r.responses[activeResponse.name];
+      return Number(String(raw).trim());
+    };
 
     const k = project.factors.length;
     const nRuns = validRuns.length;
-    const overallMean = validRuns.reduce((sum, r) => sum + Number(r.responses[activeResponse.id]), 0) / validRuns.length;
+    const overallMean = validRuns.reduce((sum, r) => sum + getRunResponseValue(r), 0) / validRuns.length;
 
-    // 1. Build Design Matrix X and Response Vector Y for OLS
-    
-    // 1. Build Model Effects (Main Effects and 2-Factor Interactions)
-    interface ModelEffect {
-      id: string;
-      name: string;
-      type: 'main' | 'interaction';
-      factor?: Factor;
-      f1?: Factor;
-      f2?: Factor;
-      df: number;
-      columnNames: string[];
-      cleanNames: string[];
-      getContrasts: (factorsRecord: Record<string, any>) => number[];
-      isExcluded: boolean;
-      colIndices: number[]; // Column indices in X (1-based, after intercept 0)
-    }
-
-    const allEffects: ModelEffect[] = [];
-
-    // Main factors
-    project.factors.forEach(f => {
-      const isExcluded = excludedTerms.includes(f.id);
-      if (f.type === 'categorical') {
-        const levels = f.levels && f.levels.length > 0 ? f.levels : ['Level 1', 'Level 2'];
-        const L = levels.length;
-        if (L <= 2) {
-          const colName = `${f.name}[${levels[1]}]`;
-          allEffects.push({
-            id: f.id,
-            name: f.name,
-            type: 'main',
-            factor: f,
-            df: 1,
-            columnNames: [colName],
-            cleanNames: [colName],
-            getContrasts: (rec) => getFactorContrasts(f, rec[f.id] !== undefined ? rec[f.id] : rec[f.name]),
-            isExcluded,
-            colIndices: []
-          });
-        } else {
-          const columnNames: string[] = [];
-          for (let j = 0; j < L - 1; j++) {
-            columnNames.push(`${f.name}[${levels[j]}]`);
-          }
-          allEffects.push({
-            id: f.id,
-            name: f.name,
-            type: 'main',
-            factor: f,
-            df: L - 1,
-            columnNames,
-            cleanNames: [...columnNames],
-            getContrasts: (rec) => getFactorContrasts(f, rec[f.id] !== undefined ? rec[f.id] : rec[f.name]),
-            isExcluded,
-            colIndices: []
-          });
-        }
-      } else {
-        const colName = `${f.name}`;
-        allEffects.push({
-          id: f.id,
-          name: f.name,
-          type: 'main',
-          factor: f,
-          df: 1,
-          columnNames: [colName],
-          cleanNames: [f.name],
-          getContrasts: (rec) => getFactorContrasts(f, rec[f.id] !== undefined ? rec[f.id] : rec[f.name]),
-          isExcluded,
-          colIndices: []
-        });
-      }
-    });
-
-    // 2-factor interactions
-    for (let i = 0; i < k; i++) {
-      for (let j = i + 1; j < k; j++) {
-        const f1 = project.factors[i];
-        const f2 = project.factors[j];
-        const intId = `${f1.id}*${f2.id}`;
-        const isExcluded = excludedTerms.includes(intId);
-        
-        const e1 = allEffects.find(e => e.type === 'main' && e.id === f1.id)!;
-        const e2 = allEffects.find(e => e.type === 'main' && e.id === f2.id)!;
-        const intDf = e1.df * e2.df;
-        const columnNames: string[] = [];
-        const cleanNames: string[] = [];
-
-        e1.columnNames.forEach(c1 => {
-          e2.columnNames.forEach(c2 => {
-            const name = `${c1}*${c2}`;
-            columnNames.push(name);
-            cleanNames.push(name);
-          });
-        });
-
-        allEffects.push({
-          id: intId,
-          name: `${f1.name}*${f2.name}`,
-          type: 'interaction',
-          f1,
-          f2,
-          df: intDf,
-          columnNames,
-          cleanNames,
-          getContrasts: (rec) => {
-            const c1 = e1.getContrasts(rec);
-            const c2 = e2.getContrasts(rec);
-            const res: number[] = [];
-            for (let p = 0; p < c1.length; p++) {
-              for (let q = 0; q < c2.length; q++) {
-                res.push(c1[p] * c2[q]);
-              }
-            }
-            return res;
-          },
-          isExcluded,
-          colIndices: []
-        });
-      }
-    }
-
-    // Assign column indices for active effects
-    const activeEffects = allEffects.filter(e => !e.isExcluded);
-    let currentCol = 1;
-    activeEffects.forEach(e => {
-      e.colIndices = [];
-      for (let c = 0; c < e.df; c++) {
-        e.colIndices.push(currentCol++);
-      }
-    });
-
-    const numTerms = currentCol;
+    // 1. Build Model Effects (Main Effects, 2-Factor Interactions, and Quadratic Terms)
+    const { allEffects, activeEffects, numTerms, hasQuadraticTerms } = buildModelEffects(project, validRuns, excludedTerms);
 
     // Build Design Matrix X and Response Vector Y for OLS
     const X: number[][] = [];
     const Y: number[][] = [];
 
     validRuns.forEach(run => {
-      const res = Number(run.responses[activeResponse.id]);
+      const res = getRunResponseValue(run);
       Y.push([res]);
 
       const row = [1]; // Intercept
@@ -348,12 +225,13 @@ export function computeAnalysis(project: Project, activeResponse: Response, excl
       X.push(row);
     });
 
-    // 2. Perform Robust OLS solving
-    const { beta, diagInv, invXtX, aliased, rank } = solveOLS(X, Y);
+    // 2. Perform Robust OLS solving via two-pass Gram-Schmidt QR
+    const { beta, diagInv, invXtX, aliased, rank, kept } = solveOLS(X, Y);
 
     // 3. Map Effects & Level Averages for UI (Pareto, Main Effects, Half-Normal)
     const effects: any[] = [];
     const interactions: any[] = [];
+    const quadratics: any[] = [];
 
     project.factors.forEach(factor => {
       const e = allEffects.find(eff => eff.type === 'main' && eff.id === factor.id)!;
@@ -450,8 +328,26 @@ export function computeAnalysis(project: Project, activeResponse: Response, excl
       }
     }
 
-    // 4. Calculate SSE, SST, and R-squared based on the exact OLS model
+    allEffects.filter(eff => eff.type === 'quadratic').forEach(e => {
+      const isAliased = e.colIndices.some(c => aliased[c]);
+      const isExcluded = e.isExcluded;
+      const betaIdx = e.colIndices.length > 0 ? e.colIndices[0] : -1;
+      const effectVal = !isExcluded && betaIdx !== -1 ? beta[betaIdx] * 2 : 0;
 
+      quadratics.push({
+        factor: e.factor!,
+        id: e.id,
+        name: e.name,
+        effect: effectVal,
+        absEffect: Math.abs(effectVal),
+        direction: effectVal >= 0 ? 'Positive' : 'Negative',
+        betaIdx,
+        isAliased,
+        isExcluded
+      });
+    });
+
+    // 4. Calculate SSE, SST, and R-squared based on the exact OLS model
     let sse = 0;
     let sst = 0;
     validRuns.forEach((run, idx) => {
@@ -466,12 +362,16 @@ export function computeAnalysis(project: Project, activeResponse: Response, excl
     });
 
     const p_model = rank - 1; // parameters excluding intercept
+    const dfModel = p_model;
     const df_error = Math.max(0, nRuns - rank);
     const mse = df_error > 0 ? sse / df_error : 0;
     
     const ss_model = Math.max(0, sst - sse);
     const ms_model = p_model > 0 ? ss_model / p_model : 0;
     const f_model = mse > 0 ? ms_model / mse : 0;
+    const modelPValue: number | null = (df_error > 0 && dfModel > 0 && Number.isFinite(f_model))
+      ? Math.max(0, 1 - jStat.centralF.cdf(f_model, dfModel, df_error))
+      : null;
     
     const rSquared = sst > 0 ? 1 - (sse / sst) : 0;
     let adjRSquared = 0;
@@ -485,7 +385,7 @@ export function computeAnalysis(project: Project, activeResponse: Response, excl
     // Determine which factors are active in the model
     const activeFactorIds = new Set<string>();
     activeEffects.forEach(t => {
-      if (t.type === 'main' && t.factor) activeFactorIds.add(t.factor.id);
+      if ((t.type === 'main' || t.type === 'quadratic') && t.factor) activeFactorIds.add(t.factor.id);
       if (t.type === 'interaction' && t.f1 && t.f2) {
         activeFactorIds.add(t.f1.id);
         activeFactorIds.add(t.f2.id);
@@ -539,31 +439,33 @@ export function computeAnalysis(project: Project, activeResponse: Response, excl
     let test_df = df_error;
     let test_ms = mse;
 
-    // If perfectly saturated model, fall back to pure error (if available) or PSE
-    if (test_df <= 0 && df_pure > 0) {
-      test_df = df_pure;
-      test_ms = ms_pure;
+    // Lenth's Pseudo Standard Error (for unreplicated, saturated designs, Lenth 1989)
+    // Pool only active, non-aliased, 1-df terms on the 2 * beta contrast scale.
+    const lenthContrasts: Record<string, number> = {};
+    allEffects.forEach(e => {
+      if (!e.isExcluded && e.df === 1 && e.colIndices.length === 1) {
+        const colIdx = e.colIndices[0];
+        if (!aliased[colIdx]) {
+          lenthContrasts[e.id] = beta[colIdx] * 2;
+        }
+      }
+    });
+    const lenthRes = computeLenth(lenthContrasts);
+    const pse = lenthRes.PSE;
+    const useLenths = df_error <= 0;
+    if (useLenths) {
+      test_df = lenthRes.df > 0 ? lenthRes.df : 1;
     }
-
-    // Lenth's Pseudo Standard Error (for unreplicated, saturated designs)
-    let useLenths = false;
-    let paretoThreshold = 0;
-    
-    const unaliasedEffectsAbs = [
-      ...effects.filter(e => !e.isAliased).map(e => e.absEffect), 
-      ...interactions.filter(i => !i.isAliased).map(i => i.absEffect)
-    ];
-    
-    const s0 = 1.5 * jStat.median(unaliasedEffectsAbs);
-    const retainedEffects = unaliasedEffectsAbs.filter(e => e < 2.5 * s0);
-    const pse = 1.5 * jStat.median(retainedEffects);
-    
-    if (test_df <= 0 || test_ms === 0) {
-      useLenths = true;
-      test_ms = Math.pow(pse, 2) / (nRuns / 4); // convert PSE to pseudo-MS
-      test_df = Math.max(1, Math.floor(unaliasedEffectsAbs.length / 3));
+    let paretoThreshold = 2.12 * pse;
+    if (!useLenths) {
+      const unaliasedEffectsAbs = [
+        ...effects.filter(e => !e.isAliased).map(e => e.absEffect),
+        ...interactions.filter(i => !i.isAliased).map(i => i.absEffect)
+      ];
+      const s0Legacy = 1.5 * jStat.median(unaliasedEffectsAbs);
+      const retainedLegacy = unaliasedEffectsAbs.filter(e => e < 2.5 * s0Legacy);
+      paretoThreshold = 2.12 * (1.5 * jStat.median(retainedLegacy));
     }
-    paretoThreshold = 2.12 * pse;
 
     // 6. Partial Sum of Squares (Type III ANOVA) for individual terms
     const effectSummary: any[] = [];
@@ -586,9 +488,10 @@ export function computeAnalysis(project: Project, activeResponse: Response, excl
             ss = Math.pow(beta[betaIdx], 2) / diagInv[betaIdx];
           }
         } else {
-          // Multi-df term: Type III Partial SS via reduced model
+          // Multi-df term: Type III Partial SS via reduced model on kept estimable columns
           const reducedColSet = new Set(effect.colIndices);
-          const X_red: number[][] = X.map(row => row.filter((_, colIdx) => !reducedColSet.has(colIdx)));
+          const redCols = kept.filter(c => !reducedColSet.has(c));
+          const X_red: number[][] = X.map(row => redCols.map(c => row[c]));
           const redModel = solveOLS(X_red, Y);
           let sse_red = 0;
           for (let r = 0; r < nRuns; r++) {
@@ -601,11 +504,18 @@ export function computeAnalysis(project: Project, activeResponse: Response, excl
           ss = Math.max(0, sse_red - sse);
         }
 
-        if (test_df > 0 && test_ms > 0) {
+        if (!useLenths && test_df > 0 && test_ms > 0) {
           const ms = ss / effect.df;
           fRatio = ms / test_ms;
           pVal = 1 - jStat.centralF.cdf(fRatio, effect.df, test_df);
           if (pVal < 1e-15) pVal = 1e-15;
+          logworth = -Math.log10(pVal);
+        } else if (useLenths && effect.df === 1 && pse > 0) {
+          const tLenth = lenthRes.t[effect.id] ?? (Math.abs(beta[effect.colIndices[0]] * 2) / pse);
+          fRatio = tLenth * tLenth;
+          pVal = lenthRes.df > 0
+            ? Math.max(1e-15, (1 - jStat.studentt.cdf(tLenth, lenthRes.df)) * 2)
+            : 1;
           logworth = -Math.log10(pVal);
         }
       }
@@ -643,9 +553,11 @@ export function computeAnalysis(project: Project, activeResponse: Response, excl
       tRatios[i] = stdErrors[i] > 0 ? beta[i] / stdErrors[i] : 0;
     }
 
-    const tLimitPareto = df_error > 0 ? Math.abs(jStat.studentt.inv(1 - 0.05 / 2, df_error)) : 3;
+    const tLimitPareto = df_error > 0
+      ? Math.abs(jStat.studentt.inv(1 - 0.05 / 2, df_error))
+      : (lenthRes.df > 0 ? Math.abs(jStat.studentt.inv(1 - 0.05 / 2, lenthRes.df)) : 3);
     
-    // 7. Data for Plots (always show all primary and secondary effects; exclude aliased and excluded terms)
+    // 7. Data for Plots (always show all primary, secondary, and quadratic effects; exclude aliased and excluded terms)
     const combinedEffectsForPlot = [
       ...effects.filter(e => !e.isAliased && !e.isExcluded).map(e => {
         const effSummary = effectSummary.find(s => s.id === e.id);
@@ -666,6 +578,17 @@ export function computeAnalysis(project: Project, activeResponse: Response, excl
           absEffect: i.absEffect, 
           direction: i.direction, 
           factor: { name: `${i.f1.name}*${i.f2.name}` },
+          tRatio: tVal
+        };
+      }),
+      ...quadratics.filter(q => !q.isAliased && !q.isExcluded).map(q => {
+        const effSummary = effectSummary.find(s => s.id === q.id);
+        const tVal = effSummary && effSummary.fRatio > 0 ? Math.sqrt(effSummary.fRatio) : (q.betaIdx >= 0 ? Math.abs(tRatios[q.betaIdx]) : 0);
+        return {
+          name: q.name,
+          absEffect: q.absEffect,
+          direction: q.direction,
+          factor: { name: q.name },
           tRatio: tVal
         };
       })
@@ -737,10 +660,23 @@ export function computeAnalysis(project: Project, activeResponse: Response, excl
         }
       }
       h00 = Math.max(0, h00);
+      const y_hat = predictAtSettings(settingsMap);
+      if (df_error <= 0 || mse <= 0) {
+        return {
+          y_hat,
+          h00,
+          seMean: null,
+          sePred: null,
+          tCrit: null,
+          ciLower: null,
+          ciUpper: null,
+          piLower: null,
+          piUpper: null
+        };
+      }
       const seMean = Math.sqrt(Math.max(0, mse * h00));
       const sePred = Math.sqrt(Math.max(0, mse * (1 + h00)));
-      const tCrit = df_error > 0 ? (jStat.studentt.inv(0.975, df_error) || 1.96) : 1.96;
-      const y_hat = predictAtSettings(settingsMap);
+      const tCrit = jStat.studentt.inv(0.975, df_error) || 1.96;
       return {
         y_hat,
         h00,
@@ -781,45 +717,24 @@ export function computeAnalysis(project: Project, activeResponse: Response, excl
       }
     };
 
-    // Candidate search for optimal factor settings
-    const factorCandidateValues: (string | number)[][] = project.factors.map(f => {
-      if (f.type === 'categorical') {
-        return f.levels && f.levels.length > 0 ? f.levels : ['Level 1', 'Level 2'];
-      } else {
-        const mid = (f.min + f.max) / 2;
-        return [f.min, mid, f.max];
+    // Candidate search for optimal factor settings without 512-combination truncation (STAT-4 / P0.8)
+    const hasActiveQuadratic = quadratics.some(q => !q.isExcluded && !q.isAliased);
+    const optSearch = optimizeFactorBox(
+      project.factors,
+      (comb) => {
+        const y_hat = predictAtSettings(comb);
+        const { d, score } = calcDesirabilityAndScore(y_hat);
+        return { score, d, y_hat };
+      },
+      {
+        seed: 20261021,
+        refineContinuous: hasQuadraticTerms && hasActiveQuadratic,
       }
-    });
+    );
 
-    let bestSettingsMap: Record<string, any> = {};
-    let bestScore = -Infinity;
-    let bestD = 0;
-    let bestPred = overallMean;
-
-    // Evaluate combinations
-    let candidateCombinations: Record<string, any>[] = [{}];
-    for (let fIdx = 0; fIdx < project.factors.length; fIdx++) {
-      const f = project.factors[fIdx];
-      const vals = factorCandidateValues[fIdx];
-      const nextCombs: Record<string, any>[] = [];
-      for (const comb of candidateCombinations) {
-        for (const v of vals) {
-          nextCombs.push({ ...comb, [f.id]: v });
-        }
-      }
-      candidateCombinations = nextCombs.length > 512 ? nextCombs.slice(0, 512) : nextCombs;
-    }
-
-    candidateCombinations.forEach(comb => {
-      const y_hat = predictAtSettings(comb);
-      const { d, score } = calcDesirabilityAndScore(y_hat);
-      if (score > bestScore) {
-        bestScore = score;
-        bestD = d;
-        bestPred = y_hat;
-        bestSettingsMap = comb;
-      }
-    });
+    const bestSettingsMap: Record<string, any> = optSearch.bestSettings;
+    const bestD = optSearch.bestD;
+    const bestPred = optSearch.bestPred;
 
     // Statistical inference metrics at optimum
     const optStats = getPointStats(bestSettingsMap);
@@ -916,9 +831,14 @@ export function computeAnalysis(project: Project, activeResponse: Response, excl
     const parameterEstimates: any[] = [];
     
     // Intercept
-    const intStdError = Math.sqrt(mse * diagInv[0]);
-    const intTRatio = intStdError > 0 ? beta[0] / intStdError : 0;
-    const intPVal = (df_error > 0 && intStdError > 0) ? (1 - jStat.studentt.cdf(Math.abs(intTRatio), df_error)) * 2 : 1;
+    let intStdError: number | null = null;
+    let intTRatio: number | null = null;
+    let intPVal: number | null = null;
+    if (df_error > 0) {
+      intStdError = Math.sqrt(mse * diagInv[0]);
+      intTRatio = intStdError > 0 ? beta[0] / intStdError : 0;
+      intPVal = intStdError > 0 ? (1 - jStat.studentt.cdf(Math.abs(intTRatio), df_error)) * 2 : 1;
+    }
     parameterEstimates.push({
       term: "Intercept",
       cleanTerm: "Intercept",
@@ -932,17 +852,24 @@ export function computeAnalysis(project: Project, activeResponse: Response, excl
 
     activeEffects.forEach(e => {
       e.colIndices.forEach((colIdx, idx) => {
-        const stdError = Math.sqrt(mse * diagInv[colIdx]);
-        const tRatio = stdError > 0 ? beta[colIdx] / stdError : 0;
-        let pVal = 1;
-        if (df_error > 0 && stdError > 0) {
-          pVal = (1 - jStat.studentt.cdf(Math.abs(tRatio), df_error)) * 2;
+        let stdError: number | null = null;
+        let tRatio: number | null = null;
+        let pVal: number | null = null;
+
+        if (df_error > 0) {
+          stdError = Math.sqrt(mse * diagInv[colIdx]);
+          tRatio = stdError > 0 ? beta[colIdx] / stdError : 0;
+          pVal = stdError > 0 ? (1 - jStat.studentt.cdf(Math.abs(tRatio), df_error)) * 2 : 1;
+        } else if (!aliased[colIdx] && e.df === 1 && pse > 0) {
+          stdError = pse / 2;
+          tRatio = beta[colIdx] / stdError;
+          pVal = lenthRes.df > 0 ? (1 - jStat.studentt.cdf(Math.abs(tRatio), lenthRes.df)) * 2 : null;
         }
 
         parameterEstimates.push({
           term: e.columnNames[idx],
           cleanTerm: e.cleanNames[idx],
-          factorId: e.factor?.id,
+          factorId: e.type === 'main' ? e.factor?.id : undefined,
           f1Id: e.f1?.id,
           f2Id: e.f2?.id,
           estimate: beta[colIdx],
@@ -966,10 +893,14 @@ export function computeAnalysis(project: Project, activeResponse: Response, excl
               sumInv += invXtX[r1]?.[r2] || 0;
             }
           }
-          const refStdError = (mse > 0 && sumInv > 0) ? Math.sqrt(mse * sumInv) : (df_error > 0 ? 0 : undefined);
-          const refTRatio = (refStdError && refStdError > 0) ? (-sumBeta) / refStdError : undefined;
-          let refPVal: number | undefined = undefined;
-          if (df_error > 0 && refTRatio !== undefined) {
+          const refStdError: number | null = (mse > 0 && sumInv > 0)
+            ? Math.sqrt(mse * sumInv)
+            : (df_error > 0 ? 0 : null);
+          const refTRatio: number | null = (refStdError !== null && refStdError > 0)
+            ? (-sumBeta) / refStdError
+            : null;
+          let refPVal: number | null = null;
+          if (df_error > 0 && refTRatio !== null) {
             refPVal = (1 - jStat.studentt.cdf(Math.abs(refTRatio), df_error)) * 2;
           }
 
@@ -1062,92 +993,94 @@ export function computeAnalysis(project: Project, activeResponse: Response, excl
         ? (maxPred - minPred) / Math.sqrt(avgPredVar) 
         : (maxPred > minPred ? 99.9 : 0);
 
-    // Box-Cox Profile Log-Likelihood estimation
+    // Box-Cox Profile Log-Likelihood estimation (STAT-21: requires df_error >= 2 and positive SSE)
     let boxCox: any = null;
-    try {
-        const minObs = Math.min(...observedY);
-        const shift = minObs <= 0 ? Math.abs(minObs) + 1 : 0;
-        const yShifted = observedY.map(y => y + shift);
-        const logYSum = yShifted.reduce((sum, y) => sum + Math.log(y), 0);
-        const geoMean = Math.exp(logYSum / nRuns);
+    if (df_error >= 2 && sse > 1e-12) {
+      try {
+          const minObs = Math.min(...observedY);
+          const shift = minObs <= 0 ? Math.abs(minObs) + 1 : 0;
+          const yShifted = observedY.map(y => y + shift);
+          const logYSum = yShifted.reduce((sum, y) => sum + Math.log(y), 0);
+          const geoMean = Math.exp(logYSum / nRuns);
 
-        const evalBoxCox = (lam: number) => {
-            const yTrans: number[][] = [];
-            for (let r = 0; r < nRuns; r++) {
-                const y = yShifted[r];
-                let yt = 0;
-                if (Math.abs(lam) < 1e-4) {
-                    yt = geoMean * Math.log(y);
-                } else {
-                    yt = (Math.pow(y, lam) - 1) / (lam * Math.pow(geoMean, lam - 1));
-                }
-                yTrans.push([yt]);
-            }
-            const XtY_trans = multiply(transpose(X), yTrans);
-            let sse_trans = 0;
-            for (let r = 0; r < nRuns; r++) {
-                let pred_trans = 0;
-                for (let c = 0; c < numTerms; c++) {
-                    if (aliased[c]) continue;
-                    let b = 0;
-                    for (let k = 0; k < numTerms; k++) {
-                        if (!aliased[k]) b += invXtX[c][k] * XtY_trans[k][0];
-                    }
-                    pred_trans += b * X[r][c];
-                }
-                sse_trans += Math.pow(yTrans[r][0] - pred_trans, 2);
-            }
-            const logL = sse_trans > 1e-12 ? -(nRuns / 2) * Math.log(sse_trans / nRuns) : 0;
-            return { logL, sse: sse_trans };
-        };
+          const evalBoxCox = (lam: number) => {
+              const yTrans: number[][] = [];
+              for (let r = 0; r < nRuns; r++) {
+                  const y = yShifted[r];
+                  let yt = 0;
+                  if (Math.abs(lam) < 1e-4) {
+                      yt = geoMean * Math.log(y);
+                  } else {
+                      yt = (Math.pow(y, lam) - 1) / (lam * Math.pow(geoMean, lam - 1));
+                  }
+                  yTrans.push([yt]);
+              }
+              const XtY_trans = multiply(transpose(X), yTrans);
+              let sse_trans = 0;
+              for (let r = 0; r < nRuns; r++) {
+                  let pred_trans = 0;
+                  for (let c = 0; c < numTerms; c++) {
+                      if (aliased[c]) continue;
+                      let b = 0;
+                      for (let k = 0; k < numTerms; k++) {
+                          if (!aliased[k]) b += invXtX[c][k] * XtY_trans[k][0];
+                      }
+                      pred_trans += b * X[r][c];
+                  }
+                  sse_trans += Math.pow(yTrans[r][0] - pred_trans, 2);
+              }
+              const logL = sse_trans > 1e-12 ? -(nRuns / 2) * Math.log(sse_trans / nRuns) : 0;
+              return { logL, sse: sse_trans };
+          };
 
-        const grid: { lambda: number; logLikelihood: number }[] = [];
-        let maxLogL = -Infinity;
-        let bestLambda = 1.0;
+          const grid: { lambda: number; logLikelihood: number }[] = [];
+          let maxLogL = -Infinity;
+          let bestLambda = 1.0;
 
-        for (let lam = -2.0; lam <= 2.001; lam += 0.1) {
-            const lRounded = Math.round(lam * 10) / 10;
-            const { logL } = evalBoxCox(lRounded);
-            grid.push({ lambda: lRounded, logLikelihood: logL });
-            if (logL > maxLogL) {
-                maxLogL = logL;
-                bestLambda = lRounded;
-            }
-        }
+          for (let lam = -2.0; lam <= 2.001; lam += 0.1) {
+              const lRounded = Math.round(lam * 10) / 10;
+              const { logL } = evalBoxCox(lRounded);
+              grid.push({ lambda: lRounded, logLikelihood: logL });
+              if (logL > maxLogL) {
+                  maxLogL = logL;
+                  bestLambda = lRounded;
+              }
+          }
 
-        const cutoffLogL = maxLogL - 1.92;
-        const ciLambdas = grid.filter(g => g.logLikelihood >= cutoffLogL).map(g => g.lambda);
-        const ciLow = ciLambdas.length > 0 ? Math.min(...ciLambdas) : bestLambda;
-        const ciHigh = ciLambdas.length > 0 ? Math.max(...ciLambdas) : bestLambda;
-        const isOneInCi = 1.0 >= ciLow && 1.0 <= ciHigh;
+          const cutoffLogL = maxLogL - 1.92;
+          const ciLambdas = grid.filter(g => g.logLikelihood >= cutoffLogL).map(g => g.lambda);
+          const ciLow = ciLambdas.length > 0 ? Math.min(...ciLambdas) : bestLambda;
+          const ciHigh = ciLambdas.length > 0 ? Math.max(...ciLambdas) : bestLambda;
+          const isOneInCi = 1.0 >= ciLow && 1.0 <= ciHigh;
 
-        const standardOptions = [
-            { lambda: -1, name: "Inverse (1/Y)", label: "1 / Y" },
-            { lambda: -0.5, name: "Inverse Sqrt (1/√Y)", label: "1 / √Y" },
-            { lambda: 0, name: "Natural Log (ln Y)", label: "ln(Y)" },
-            { lambda: 0.5, name: "Square Root (√Y)", label: "√Y" },
-            { lambda: 1, name: "None (Current Scale)", label: "Y" },
-            { lambda: 2, name: "Square (Y²)", label: "Y²" },
-        ];
-        const closestStandard = standardOptions.reduce((prev, curr) =>
-            Math.abs(curr.lambda - bestLambda) < Math.abs(prev.lambda - bestLambda) ? curr : prev
-        );
+          const standardOptions = [
+              { lambda: -1, name: "Inverse (1/Y)", label: "1 / Y" },
+              { lambda: -0.5, name: "Inverse Sqrt (1/√Y)", label: "1 / √Y" },
+              { lambda: 0, name: "Natural Log (ln Y)", label: "ln(Y)" },
+              { lambda: 0.5, name: "Square Root (√Y)", label: "√Y" },
+              { lambda: 1, name: "None (Current Scale)", label: "Y" },
+              { lambda: 2, name: "Square (Y²)", label: "Y²" },
+          ];
+          const closestStandard = standardOptions.reduce((prev, curr) =>
+              Math.abs(curr.lambda - bestLambda) < Math.abs(prev.lambda - bestLambda) ? curr : prev
+          );
 
-        boxCox = {
-            shift,
-            optimalLambda: bestLambda,
-            ciLow,
-            ciHigh,
-            isOneInCi,
-            recommendedTransform: closestStandard.name,
-            recommendedLabel: closestStandard.label,
-            recommendedLambda: closestStandard.lambda,
-            grid: grid.filter((_, idx) => idx % 2 === 0),
-            maxLogL,
-            cutoffLogL
-        };
-    } catch {
-        boxCox = null;
+          boxCox = {
+              shift,
+              optimalLambda: bestLambda,
+              ciLow,
+              ciHigh,
+              isOneInCi,
+              recommendedTransform: closestStandard.name,
+              recommendedLabel: closestStandard.label,
+              recommendedLambda: closestStandard.lambda,
+              grid: grid.filter((_, idx) => idx % 2 === 0),
+              maxLogL,
+              cutoffLogL
+          };
+      } catch {
+          boxCox = null;
+      }
     }
 
     return { 
@@ -1161,6 +1094,8 @@ export function computeAnalysis(project: Project, activeResponse: Response, excl
       bestPred, 
       rSquared, 
       adjRSquared, 
+      dfModel,
+      modelPValue,
       p: p_model, 
       nRuns, 
       paretoThreshold, 
@@ -1180,7 +1115,9 @@ export function computeAnalysis(project: Project, activeResponse: Response, excl
       activeEffects,
       beta,
       aliased,
-      predictAtSettings
+      predictAtSettings,
+      excludedRuns,
+      warnings
     };
 
 }
@@ -1236,6 +1173,15 @@ export function predictModelResponse(
               pred += analysisResult.beta[colIdx] * (c1[p] * c2[q]);
             }
           }
+        }
+      } else if (e.type === 'quadratic' && e.factor) {
+        const rawVal = factorSettings[e.factor.id] !== undefined
+          ? factorSettings[e.factor.id]
+          : factorSettings[e.factor.name];
+        const c = getFactorContrasts(e.factor, rawVal);
+        const colIdx = e.colIndices[0];
+        if (colIdx !== undefined && !analysisResult.aliased[colIdx] && c[0] !== undefined) {
+          pred += analysisResult.beta[colIdx] * (c[0] * c[0]);
         }
       }
     });

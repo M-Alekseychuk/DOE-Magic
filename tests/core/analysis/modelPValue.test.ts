@@ -16,14 +16,14 @@ const CASES: [string, number][] = [
 describe('model p-value', () => {
   for (const [id, index] of CASES) {
     const { result, ref } = analyseFixture(id, index);
-    it.fails(`MCP-1/UI-31 (P0.5): ${id} / ${ref.name}: modelPValue = 1 − F_cdf(F; dfModel, dfError)`, () => {
+    it(`MCP-1/UI-31 (P0.5): ${id} / ${ref.name}: modelPValue = 1 − F_cdf(F; dfModel, dfError)`, () => {
       const r = result as Record<string, any>;
       expect(r.dfModel, 'dfModel').toBe(ref.dfModel);
       expectClose(r.modelPValue, ref.modelPValue!, 'modelPValue', 1e-6, 1e-12);
     });
   }
 
-  it.fails('MCP-1/UI-31 (P0.5): modelPValue is null when error DF = 0 (Montgomery Ex. 8.1)', () => {
+  it('MCP-1/UI-31 (P0.5): modelPValue is null when error DF = 0 (Montgomery Ex. 8.1)', () => {
     const { result } = analyseFixture('montgomery-ex8-1-half-fraction');
     expect((result as Record<string, any>).modelPValue).toBeNull();
   });

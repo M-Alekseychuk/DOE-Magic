@@ -36,9 +36,6 @@ export default function TwoLevelDesignSelector({ factorsCount, selectedRuns, onS
       } else if (lookup.color === 'G') {
         colorClass = 'bg-emerald-600 hover:bg-emerald-500';
         textColor = 'text-white';
-      } else if (lookup.color === 'B') {
-        colorClass = 'bg-slate-900 hover:bg-slate-800';
-        textColor = 'text-red-400';
       }
       return { type: 'fractional', p: lookup.p, res: lookup.res, color: colorClass, textColor };
     }
@@ -53,8 +50,8 @@ export default function TwoLevelDesignSelector({ factorsCount, selectedRuns, onS
         </h2>
         <p className="text-[10px] text-slate-600 dark:text-slate-400 leading-tight max-w-4xl">
           {locale === 'zh'
-            ? '适用于 2 至 16 个因素（每个因素均为 2 个水平）的实验方案。可用于精准估计主效应与交互作用。部分析因设计能在最少实验次数下快速筛选出关键少数因素。'
-            : 'Design for 2 to 16 factors where each factor is set to 2 levels. Useful for estimating main effects and interactions. Fractional factorials can be used for screening many factors to find the significant few.'}
+            ? '适用于 2 至 16 个因素（每个因素均为 2 个水平）的最小低阶混杂标准部分析因方案（参考 Montgomery Table 8.14 / NIST §5.3.3.4.7）。可用于精准估计主效应与交互作用。'
+            : 'Minimum-aberration regular 2^(k-p) designs for 2 to 16 two-level factors (Montgomery Table 8.14 / NIST §5.3.3.4.7). Useful for estimating main effects and interactions.'}
         </p>
         
         {/* Color Legend */}

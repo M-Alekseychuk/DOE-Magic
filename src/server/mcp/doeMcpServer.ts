@@ -3,7 +3,9 @@ import { z } from 'zod';
 import { v4 as uuidv4 } from 'uuid';
 import { Project, Factor, Response, Run, DesignType, Folder } from '../../core/types';
 import { generateDesign } from '../../core/design/doeGenerator';
-import { computeAnalysis, predictModelResponse } from '../../core/analysis/analysisCore';
+import { computeAnalysis, predictModelResponse, resolveExcludedTerms } from '../../core/analysis/analysisCore';
+import { fitProjectModelsById, countMeasuredValues } from '../../core/analysis/projectModels';
+import { buildCompleteSearchCandidates } from '../../core/optimization/optimize';
 
 export interface McpDatabaseContext {
   getProjects: () => Project[];
@@ -58,14 +60,55 @@ export function createDoeMcpServer(context: McpDatabaseContext) {
     }
   );
 
-  // Helper to locate a project by ID or case-insensitive name
-  const findProject = (identifier: string): Project | undefined => {
+  // Exact lookup for write tools and unambiguous resolution (P1.14 / MCP-4):
+  // - Rejects empty or whitespace-only identifiers
+  // - Matches exact project ID first, then unique case-insensitive exact project name
+  // - Throws an "ambiguous" error listing candidate IDs when multiple projects share the same name
+  // - Never matches partial substrings
+  const findProjectExact = (identifier: string): Project => {
+    const raw = String(identifier ?? '');
+    const trimmed = raw.trim();
+    if (!trimmed) {
+      throw new Error('Invalid projectId: identifier cannot be empty or whitespace.');
+    }
     const projects = context.getProjects();
-    const exactId = projects.find(p => p.id === identifier);
+    const exactId = projects.find(p => p.id === raw || p.id === trimmed);
     if (exactId) return exactId;
-    const lower = identifier.toLowerCase().trim();
-    return projects.find(p => p.name.toLowerCase().trim() === lower) ||
-      projects.find(p => p.name.toLowerCase().includes(lower));
+
+    const lower = trimmed.toLowerCase();
+    const nameMatches = projects.filter(p => p.name.trim().toLowerCase() === lower);
+    if (nameMatches.length === 1) {
+      return nameMatches[0];
+    }
+    if (nameMatches.length > 1) {
+      const candidates = nameMatches.map(p => `'${p.name}' (id: ${p.id})`).join(', ');
+      throw new Error(
+        `Ambiguous project identifier '${identifier}' matches ${nameMatches.length} projects: ${candidates}. Specify the exact project ID.`
+      );
+    }
+    throw new Error(`Project '${identifier}' not found`);
+  };
+
+  // Read-only lookup: exact ID or unique exact name first, then unique substring match
+  const findProject = (identifier: string): Project | undefined => {
+    const raw = String(identifier ?? '');
+    const trimmed = raw.trim();
+    if (!trimmed) return undefined;
+    const projects = context.getProjects();
+    const exactId = projects.find(p => p.id === raw || p.id === trimmed);
+    if (exactId) return exactId;
+    const lower = trimmed.toLowerCase();
+    const exactNameMatches = projects.filter(p => p.name.trim().toLowerCase() === lower);
+    if (exactNameMatches.length === 1) return exactNameMatches[0];
+    if (exactNameMatches.length > 1) {
+      const candidates = exactNameMatches.map(p => `'${p.name}' (id: ${p.id})`).join(', ');
+      throw new Error(
+        `Ambiguous project identifier '${identifier}' matches ${exactNameMatches.length} projects: ${candidates}. Specify the exact project ID.`
+      );
+    }
+    const substrMatches = projects.filter(p => p.name.toLowerCase().includes(lower));
+    if (substrMatches.length === 1) return substrMatches[0];
+    return undefined;
   };
 
   // Helper to resolve factor ID by factor name or ID
@@ -77,13 +120,37 @@ export function createDoeMcpServer(context: McpDatabaseContext) {
     return fByName ? fByName.id : key;
   };
 
-  // Helper to resolve response by ID or name
-  const resolveResponse = (project: Project, key: string): Response | undefined => {
-    const rById = project.responses.find(r => r.id === key);
+  // Exact response lookup for write tools (P1.14 / MCP-4): rejects partial keys like 'Yie'
+  const resolveResponseExact = (project: Project, key: string): Response => {
+    const raw = String(key ?? '');
+    const trimmed = raw.trim();
+    if (!trimmed) {
+      throw new Error('Invalid response key: identifier cannot be empty or whitespace.');
+    }
+    const rById = project.responses.find(r => r.id === raw || r.id === trimmed);
     if (rById) return rById;
-    const lower = key.toLowerCase().trim();
-    return project.responses.find(r => r.name.toLowerCase().trim() === lower) ||
-      project.responses.find(r => r.name.toLowerCase().includes(lower));
+
+    const lower = trimmed.toLowerCase();
+    const matches = project.responses.filter(r => r.name.trim().toLowerCase() === lower);
+    if (matches.length === 1) return matches[0];
+    if (matches.length > 1) {
+      throw new Error(
+        `Ambiguous response key '${key}' matches multiple responses: ${matches.map(r => `${r.name} (${r.id})`).join(', ')}`
+      );
+    }
+    throw new Error(
+      `Response '${key}' not found in project '${project.name}'. Valid responses are: ${project.responses.map(r => `${r.name} (${r.id})`).join(', ')}`
+    );
+  };
+
+  // Helper to resolve response by ID or exact name (for read tools)
+  const resolveResponse = (project: Project, key: string): Response | undefined => {
+    const trimmed = String(key ?? '').trim();
+    if (!trimmed) return undefined;
+    const rById = project.responses.find(r => r.id === key || r.id === trimmed);
+    if (rById) return rById;
+    const lower = trimmed.toLowerCase();
+    return project.responses.find(r => r.name.toLowerCase().trim() === lower);
   };
 
   // ==========================================
@@ -243,8 +310,10 @@ export function createDoeMcpServer(context: McpDatabaseContext) {
       designType: z.enum(['factorial_2level', 'dsd', 'ccd', 'bbd', 'plackett_burman', 'custom_d_optimal']).optional().default('factorial_2level'),
       centerPoints: z.number().optional().default(3).describe('Number of replicate center points for curvature / pure error testing'),
       autoGenerateRuns: z.boolean().optional().default(true).describe('Whether to automatically generate the design runs table'),
+      randomize: z.boolean().optional().default(true).describe('Whether to randomise the generated runOrder (default: true)'),
+      randomSeed: z.number().optional().describe('Optional integer seed for reproducible Fisher-Yates randomisation'),
     },
-    async ({ name, description, folderId, factors: inputFactors, responses: inputResponses, designType, centerPoints, autoGenerateRuns }) => {
+    async ({ name, description, folderId, factors: inputFactors, responses: inputResponses, designType, centerPoints, autoGenerateRuns, randomize, randomSeed }) => {
       const startTime = Date.now();
       try {
         const projectId = uuidv4();
@@ -268,10 +337,16 @@ export function createDoeMcpServer(context: McpDatabaseContext) {
 
         let runs: Run[] = [];
         let designInfo = '';
+        let usedSeed: number | undefined = randomSeed;
 
         if (autoGenerateRuns && factors.length > 0) {
-          const generated = generateDesign(factors, responses, designType as DesignType, { centerPoints });
+          const generated = generateDesign(factors, responses, designType as DesignType, {
+            centerPoints,
+            randomize,
+            randomSeed,
+          });
           runs = generated.runs;
+          usedSeed = generated.randomSeed;
           designInfo = `${generated.designName}: ${generated.notes}`;
         }
 
@@ -284,6 +359,7 @@ export function createDoeMcpServer(context: McpDatabaseContext) {
           responses,
           runs,
           centerPoints,
+          randomSeed: usedSeed,
           designType: designType as DesignType,
           createdAt: Date.now(),
           updatedAt: Date.now(),
@@ -344,8 +420,7 @@ export function createDoeMcpServer(context: McpDatabaseContext) {
     async ({ projectId, name, description, folderId, isArchived, designType }) => {
       const startTime = Date.now();
       try {
-        const project = findProject(projectId);
-        if (!project) throw new Error(`Project '${projectId}' not found`);
+        const project = findProjectExact(projectId);
 
         if (name !== undefined) project.name = name;
         if (description !== undefined) project.description = description;
@@ -393,15 +468,45 @@ export function createDoeMcpServer(context: McpDatabaseContext) {
   // Tool 5: delete_project
   server.tool(
     'delete_project',
-    'Delete a project from the DOE Magic workspace',
+    'Archive or permanently delete a project from the DOE Magic workspace (archives first if not yet archived)',
     {
-      projectId: z.string().describe('The project ID or name to delete'),
+      projectId: z.string().describe('The exact project ID or unique exact project name to delete'),
+      permanent: z.boolean().optional().describe('Set to true to permanently delete immediately even if not yet archived'),
     },
-    async ({ projectId }) => {
+    async ({ projectId, permanent }) => {
       const startTime = Date.now();
       try {
-        const project = findProject(projectId);
-        if (!project) throw new Error(`Project '${projectId}' not found`);
+        const project = findProjectExact(projectId);
+
+        if (!project.isArchived && !permanent) {
+          project.isArchived = true;
+          project.updatedAt = Date.now();
+          context.saveProject(project);
+          context.broadcastSync();
+
+          recordMcpActivity({
+            type: 'tool',
+            name: 'delete_project',
+            params: { projectId, archivedFirst: true },
+            resultSummary: `Archived project '${project.name}'`,
+            success: true,
+            durationMs: Date.now() - startTime,
+          });
+
+          return {
+            content: [
+              {
+                type: 'text',
+                text: JSON.stringify({
+                  message: `Project '${project.name}' (${project.id}) has been archived for safety. Call delete_project again (or pass permanent: true) to permanently delete it.`,
+                  archived: true,
+                  deleted: false,
+                  projectId: project.id,
+                }),
+              },
+            ],
+          };
+        }
 
         context.deleteProject(project.id);
         context.broadcastSync();
@@ -409,7 +514,7 @@ export function createDoeMcpServer(context: McpDatabaseContext) {
         recordMcpActivity({
           type: 'tool',
           name: 'delete_project',
-          params: { projectId },
+          params: { projectId, permanent: true },
           resultSummary: `Deleted project '${project.name}'`,
           success: true,
           durationMs: Date.now() - startTime,
@@ -419,7 +524,12 @@ export function createDoeMcpServer(context: McpDatabaseContext) {
           content: [
             {
               type: 'text',
-              text: JSON.stringify({ message: `Project '${project.name}' (${project.id}) deleted successfully` }),
+              text: JSON.stringify({
+                message: `Project '${project.name}' (${project.id}) deleted permanently`,
+                archived: false,
+                deleted: true,
+                projectId: project.id,
+              }),
             },
           ],
         };
@@ -444,31 +554,47 @@ export function createDoeMcpServer(context: McpDatabaseContext) {
     'generate_doe_design',
     'Generate or regenerate the experimental design matrix for a project (2-Level Full/Fractional Factorial, DSD, CCD, BBD, Plackett-Burman, or D-Optimal)',
     {
-      projectId: z.string().describe('The project ID or name'),
+      projectId: z.string().describe('The exact project ID or unique exact project name'),
       designType: z.enum(['factorial_2level', 'dsd', 'ccd', 'bbd', 'plackett_burman', 'custom_d_optimal']).optional().describe('DOE design architecture'),
-      centerPoints: z.number().optional().describe('Number of replicate center points (default: 3)'),
+      centerPoints: z.number().optional().describe('Number of replicate center points (0 is honoured)'),
       targetRuns: z.number().optional().describe('Target number of runs for fractional or D-optimal designs'),
+      randomize: z.boolean().optional().describe('Whether to randomise the generated runOrder (default: true)'),
+      randomSeed: z.number().optional().describe('Optional integer seed for reproducible Fisher-Yates randomisation'),
+      force: z.boolean().optional().describe('Set to true to overwrite existing measured response values'),
     },
-    async ({ projectId, designType, centerPoints, targetRuns }) => {
+    async ({ projectId, designType, centerPoints, targetRuns, randomize, randomSeed, force }) => {
       const startTime = Date.now();
       try {
-        const project = findProject(projectId);
-        if (!project) throw new Error(`Project '${projectId}' not found`);
+        const project = findProjectExact(projectId);
         if (project.factors.length === 0) throw new Error('Cannot generate design: Project has 0 factors defined.');
 
+        const existingMeasuredCount = countMeasuredValues(project);
+        if (existingMeasuredCount > 0 && !force) {
+          throw new Error(
+            `Refusing to regenerate design: project '${project.name}' has ${existingMeasuredCount} recorded response measurement(s). Pass force: true to overwrite them.`
+          );
+        }
+
         const effectiveDesignType = designType || project.designType || 'factorial_2level';
-        const effectiveCenterPoints = centerPoints !== undefined ? centerPoints : (project.centerPoints || 3);
+        const defaultCp = effectiveDesignType === 'dsd' ? 1 : effectiveDesignType === 'ccd' || effectiveDesignType === 'bbd' ? 3 : 0;
+        const effectiveCenterPoints =
+          centerPoints !== undefined
+            ? centerPoints
+            : project.centerPoints !== undefined
+            ? project.centerPoints
+            : defaultCp;
 
         const generated = generateDesign(
           project.factors,
           project.responses,
           effectiveDesignType as DesignType,
-          { centerPoints: effectiveCenterPoints, targetRuns }
+          { centerPoints: effectiveCenterPoints, targetRuns, randomize, randomSeed }
         );
 
         project.runs = generated.runs;
         project.designType = effectiveDesignType as DesignType;
         project.centerPoints = effectiveCenterPoints;
+        project.randomSeed = generated.randomSeed;
         project.updatedAt = Date.now();
 
         context.saveProject(project);
@@ -477,11 +603,16 @@ export function createDoeMcpServer(context: McpDatabaseContext) {
         recordMcpActivity({
           type: 'tool',
           name: 'generate_doe_design',
-          params: { projectId, designType: effectiveDesignType, runsCount: project.runs.length },
+          params: { projectId, designType: effectiveDesignType, runsCount: project.runs.length, force },
           resultSummary: `Generated ${project.runs.length} runs for '${project.name}'`,
           success: true,
           durationMs: Date.now() - startTime,
         });
+
+        const formattedDEff =
+          generated.dEfficiency !== null && generated.dEfficiency !== undefined
+            ? `${generated.dEfficiency.toFixed(1)}%`
+            : 'not estimable';
 
         return {
           content: [
@@ -491,10 +622,15 @@ export function createDoeMcpServer(context: McpDatabaseContext) {
                 message: `Successfully generated ${project.runs.length} runs for '${project.name}'`,
                 designName: generated.designName,
                 notes: generated.notes,
-                dEfficiency: generated.dEfficiency ? `${(generated.dEfficiency * 100).toFixed(1)}%` : undefined,
+                dEfficiency: formattedDEff,
+                dEfficiencyValue: generated.dEfficiency ?? null,
+                randomSeed: generated.randomSeed,
+                warnings: generated.warnings,
                 runsCount: project.runs.length,
+                discardedValuesCount: existingMeasuredCount,
                 sampleRuns: project.runs.slice(0, 5).map(r => ({
                   runOrder: r.runOrder,
+                  stdOrder: r.stdOrder,
                   factors: r.factors,
                 })),
               }, null, 2),
@@ -522,20 +658,19 @@ export function createDoeMcpServer(context: McpDatabaseContext) {
     'add_run_results',
     'Record experimental measurements and observed response values for experimental runs',
     {
-      projectId: z.string().describe('The project ID or name'),
+      projectId: z.string().describe('The exact project ID or unique exact project name'),
       runs: z.array(
         z.object({
           runOrder: z.number().optional().describe('Run order index (1-based)'),
           runId: z.string().optional().describe('Run ID if known'),
-          responses: z.record(z.string(), z.union([z.number(), z.null()])).describe('Map of responseId or responseName to measured numeric value'),
+          responses: z.record(z.string(), z.union([z.number(), z.null()])).describe('Map of exact responseId or responseName to measured numeric value'),
         })
       ).describe('List of run results to record'),
     },
     async ({ projectId, runs: inputRuns }) => {
       const startTime = Date.now();
       try {
-        const project = findProject(projectId);
-        if (!project) throw new Error(`Project '${projectId}' not found`);
+        const project = findProjectExact(projectId);
 
         let updatedCount = 0;
 
@@ -546,14 +681,10 @@ export function createDoeMcpServer(context: McpDatabaseContext) {
           );
 
           if (targetRun) {
-            // Map keys in inputRun.responses to matching response IDs
+            // Map keys in inputRun.responses to matching response IDs (rejecting partial keys per P1.14 / MCP-4)
             for (const [key, val] of Object.entries(inputRun.responses)) {
-              const resp = resolveResponse(project, key);
-              if (resp) {
-                targetRun.responses[resp.id] = (val as any) ?? null;
-              } else {
-                targetRun.responses[key] = (val as any) ?? null;
-              }
+              const resp = resolveResponseExact(project, key);
+              targetRun.responses[resp.id] = (val as any) ?? null;
             }
             updatedCount++;
           }
@@ -609,7 +740,7 @@ export function createDoeMcpServer(context: McpDatabaseContext) {
     {
       projectId: z.string().describe('The project ID or name'),
       responseId: z.string().optional().describe('Response ID or response name to analyze (defaults to first response)'),
-      excludedTerms: z.array(z.string()).optional().describe('Optional list of model term names to exclude from regression equation'),
+      excludedTerms: z.array(z.string()).optional().describe('Optional list of model term names or IDs to exclude from regression equation'),
     },
     async ({ projectId, responseId, excludedTerms }) => {
       const startTime = Date.now();
@@ -620,19 +751,70 @@ export function createDoeMcpServer(context: McpDatabaseContext) {
         const resp = responseId ? resolveResponse(project, responseId) : project.responses[0];
         if (!resp) throw new Error(`Response '${responseId || 'default'}' not found in project`);
 
-        const termsToExclude = excludedTerms || resp.excludedTerms || [];
-        const analysis = computeAnalysis(project, resp, termsToExclude, resp.goal, resp.targetValue);
+        const validRuns = project.runs.filter(
+          (r) =>
+            r.responses[resp.id] !== null &&
+            r.responses[resp.id] !== undefined &&
+            String(r.responses[resp.id]).trim() !== '' &&
+            !isNaN(Number(r.responses[resp.id]))
+        );
 
-        // Format terms for clean readability
-        const formattedTerms = (analysis.parameterEstimates || []).map((t: any) => ({
+        const rawExclusions = excludedTerms !== undefined ? excludedTerms : (resp.excludedTerms || []);
+        const resolvedExclusions = resolveExcludedTerms(project, validRuns, rawExclusions);
+
+        if (excludedTerms !== undefined && resolvedExclusions.unknownTerms.length > 0) {
+          throw new Error(
+            `Unknown model term(s) in excludedTerms: ${resolvedExclusions.unknownTerms.join(', ')}. Valid terms are: ${resolvedExclusions.validTerms.map((t) => t.name).join(', ')}`
+          );
+        }
+
+        const analysis = computeAnalysis(project, resp, resolvedExclusions.excludedIds, resp.goal, resp.targetValue);
+        if (!analysis) {
+          throw new Error(`Insufficient measured data to analyze response '${resp.name}'`);
+        }
+
+        // Format terms with null-safe rounding for reference/aliased rows (MCP-9)
+        const formattedTerms = (analysis.parameterEstimates || []).map((t) => ({
           term: t.term,
-          estimate: Number(t.estimate.toFixed(4)),
-          stdError: Number(t.stdError.toFixed(4)),
-          tRatio: Number(t.tRatio.toFixed(3)),
-          pValue: Number(t.pVal.toFixed(5)),
-          significant: t.pVal < 0.05,
-          vif: t.vif ? Number(t.vif.toFixed(2)) : 1.0,
+          estimate: t.estimate !== null && t.estimate !== undefined ? Number(t.estimate.toFixed(4)) : null,
+          stdError: t.stdError !== null && t.stdError !== undefined ? Number(t.stdError.toFixed(4)) : null,
+          tRatio: t.tRatio !== null && t.tRatio !== undefined ? Number(t.tRatio.toFixed(3)) : null,
+          pValue: t.pVal !== null && t.pVal !== undefined ? Number(t.pVal.toFixed(5)) : null,
+          significant: t.pVal !== null && t.pVal !== undefined ? t.pVal < 0.05 : false,
+          vif: t.vif !== null && t.vif !== undefined && Number.isFinite(t.vif) ? Number(t.vif.toFixed(2)) : null,
+          ...(t.isReference ? { isReference: true } : {}),
+          ...(t.isAliased ? { isAliased: true } : {}),
         }));
+
+        const lof = analysis.lackOfFit;
+        const lofPayload =
+          lof && lof.p_lof !== null && lof.p_lof !== undefined
+            ? {
+                testable: true,
+                dfLackOfFit: lof.df_lof,
+                dfPureError: lof.df_pure,
+                fRatio: Number((lof.f_lof ?? 0).toFixed(3)),
+                pValue: Number(lof.p_lof.toFixed(4)),
+                significant: lof.p_lof < 0.05,
+                interpretation:
+                  lof.p_lof < 0.05
+                    ? 'Warning: Lack of Fit is statistically significant (p < 0.05). Consider adding interaction or quadratic terms.'
+                    : 'Lack of Fit is not significant (p >= 0.05). The current model structure adequately explains the data.',
+              }
+            : {
+                testable: false,
+                dfLackOfFit: lof?.df_lof ?? 0,
+                dfPureError: lof?.df_pure ?? 0,
+                fRatio: null,
+                pValue: null,
+                significant: null,
+                reason:
+                  (lof?.df_pure ?? 0) === 0
+                    ? 'No replicate runs to estimate pure error (dfPureError = 0).'
+                    : (lof?.df_lof ?? 0) === 0
+                    ? 'Saturated model with no lack-of-fit degrees of freedom (dfLackOfFit = 0).'
+                    : 'Pure error mean square is zero.',
+              };
 
         const resultPayload = {
           project: project.name,
@@ -643,29 +825,31 @@ export function createDoeMcpServer(context: McpDatabaseContext) {
             targetValue: resp.targetValue,
             unit: resp.unit,
           },
+          excludedTerms: resolvedExclusions.appliedTerms.map((t) => t.name),
           summary: {
             rSquared: Number((analysis.rSquared ?? 0).toFixed(4)),
             adjRSquared: Number((analysis.adjRSquared ?? 0).toFixed(4)),
             rmse: Number((analysis.rmse ?? 0).toFixed(4)),
-            fRatio: analysis.fRatio !== undefined ? Number(analysis.fRatio.toFixed(3)) : null,
-            pValue: analysis.p !== undefined ? Number(analysis.p.toFixed(5)) : null,
-            runsAnalyzed: analysis.nRuns || project.runs.length,
+            dfModel: analysis.dfModel,
+            dfError: analysis.dfError,
+            fRatio: analysis.dfError > 0 && analysis.fRatio !== undefined ? Number(analysis.fRatio.toFixed(3)) : null,
+            pValue:
+              analysis.modelPValue !== null && analysis.modelPValue !== undefined
+                ? Number(analysis.modelPValue.toFixed(6))
+                : null,
+            runsAnalyzed: analysis.nRuns || validRuns.length,
             adequatePrecision: analysis.adequatePrecision ? Number(analysis.adequatePrecision.toFixed(2)) : null,
           },
-          lackOfFit: analysis.lackOfFit ? {
-            fRatio: Number((analysis.lackOfFit.f_lof ?? 0).toFixed(3)),
-            pValue: Number((analysis.lackOfFit.p_lof ?? 1).toFixed(4)),
-            significant: (analysis.lackOfFit.p_lof ?? 1) < 0.05,
-            interpretation: (analysis.lackOfFit.p_lof ?? 1) < 0.05
-              ? 'Warning: Lack of Fit is statistically significant (p < 0.05). Consider adding interaction or quadratic terms.'
-              : 'Lack of Fit is not significant (p >= 0.05). The current model structure adequately explains the data.',
-          } : 'Pure error cannot be estimated (no replicate center points found).',
+          lackOfFit: lofPayload,
+          excludedRuns: analysis.excludedRuns,
+          warnings: analysis.warnings,
           modelTerms: formattedTerms,
-          paretoRanking: (analysis.paretoData || []).slice(0, 8).map((p: any) => ({
-            term: p.term,
-            effectMagnitude: Number((p.effect ?? 0).toFixed(4)),
+          paretoRanking: (analysis.paretoData || []).slice(0, 8).map((p) => ({
+            term: p.name,
+            effectMagnitude: Number((p.absEffect ?? 0).toFixed(4)),
             tRatio: Number((p.tRatio ?? 0).toFixed(3)),
-            significant: p.isSignificant,
+            direction: p.direction,
+            significant: (p.tRatio ?? 0) > (analysis.tLimitPareto ?? Infinity),
           })),
         };
 
@@ -784,17 +968,13 @@ export function createDoeMcpServer(context: McpDatabaseContext) {
     async ({ projectId, gridPointsPerFactor = 10, weights = {} }) => {
       const startTime = Date.now();
       try {
-        const project = findProject(projectId);
-        if (!project) throw new Error(`Project '${projectId}' not found`);
+        const project = findProjectExact(projectId);
         if (project.responses.length === 0) throw new Error('No responses defined in project');
 
-        // Fit models for all responses
-        const models: Record<string, any> = {};
-        for (const r of project.responses) {
-          models[r.id] = computeAnalysis(project, r, r.excludedTerms || [], r.goal, r.targetValue);
-        }
+        // Fit models for all responses using each response's saved excludedTerms (P0.6)
+        const models = fitProjectModelsById(project);
 
-        // Generate search grid
+        // Generate search grid without factor truncation (P0.8 / MCP-11)
         const effectiveGridPoints = typeof gridPointsPerFactor === 'number' && !isNaN(gridPointsPerFactor) ? gridPointsPerFactor : 10;
         const resolution = Math.max(5, Math.min(25, effectiveGridPoints));
         const factorGrids: { id: string; name: string; values: (number | string)[] }[] = project.factors.map(f => {
@@ -852,28 +1032,7 @@ export function createDoeMcpServer(context: McpDatabaseContext) {
           }
         };
 
-        // Grid search candidates
-        let combinations: Record<string, number | string>[] = [{}];
-        for (const fg of factorGrids) {
-          const nextCombs: Record<string, number | string>[] = [];
-          for (const c of combinations) {
-            for (const v of fg.values) {
-              nextCombs.push({ ...c, [fg.id]: v });
-            }
-          }
-          combinations = nextCombs;
-          // Guard against runaway combinatorial explosion
-          if (combinations.length > 20000) break;
-        }
-
-        const candidates: {
-          factors: Record<string, number | string>;
-          predicted: Record<string, number>;
-          individualDesirabilities: Record<string, number>;
-          overallDesirability: number;
-        }[] = [];
-
-        for (const comb of combinations) {
+        const evaluateCombination = (comb: Record<string, number | string>) => {
           const predicted: Record<string, number> = {};
           const indDes: Record<string, number> = {};
           let weightedSum = 0;
@@ -893,23 +1052,55 @@ export function createDoeMcpServer(context: McpDatabaseContext) {
           }
 
           const overallDesirability = hasZero ? 0 : Math.exp(weightedSum / weightTotal);
-
-          // Human friendly factor map with factor names
           const namedFactors: Record<string, number | string> = {};
           project.factors.forEach(f => {
             namedFactors[f.name] = comb[f.id];
           });
 
-          candidates.push({
+          return {
+            rawFactors: { ...comb },
             factors: namedFactors,
             predicted,
             individualDesirabilities: indDes,
             overallDesirability: Number(overallDesirability.toFixed(4)),
-          });
+            rawOverallDesirability: overallDesirability,
+          };
+        };
+
+        // Complete-factor candidate set (never truncates later factors)
+        const combinations = buildCompleteSearchCandidates(project.factors, resolution, 5000);
+        const evaluated = combinations.map(evaluateCombination);
+        evaluated.sort((a, b) => b.rawOverallDesirability - a.rawOverallDesirability);
+
+        // Coordinate-ascent refinement on the top 3 candidates when the full grid was sampled
+        if (combinations.length >= 5000 && evaluated.length > 0) {
+          for (let s = 0; s < Math.min(3, evaluated.length); s++) {
+            let cur = evaluated[s];
+            for (let pass = 0; pass < 4; pass++) {
+              let improved = false;
+              for (const fg of factorGrids) {
+                for (const v of fg.values) {
+                  if (cur.rawFactors[fg.id] === v) continue;
+                  const nextEval = evaluateCombination({ ...cur.rawFactors, [fg.id]: v });
+                  if (nextEval.rawOverallDesirability > cur.rawOverallDesirability + 1e-9) {
+                    cur = nextEval;
+                    improved = true;
+                  }
+                }
+              }
+              if (!improved) break;
+            }
+            evaluated[s] = cur;
+          }
+          evaluated.sort((a, b) => b.rawOverallDesirability - a.rawOverallDesirability);
         }
 
-        candidates.sort((a, b) => b.overallDesirability - a.overallDesirability);
-        const topCandidates = candidates.slice(0, 5);
+        const topCandidates = evaluated.slice(0, 5).map(({ factors, predicted, individualDesirabilities, overallDesirability }) => ({
+          factors,
+          predicted,
+          individualDesirabilities,
+          overallDesirability,
+        }));
         const best = topCandidates[0];
 
         // Store top optimization candidates back to project
@@ -987,6 +1178,9 @@ export function createDoeMcpServer(context: McpDatabaseContext) {
         if (!resp) throw new Error(`Response '${responseId || 'default'}' not found`);
 
         const model = computeAnalysis(project, resp, resp.excludedTerms || [], resp.goal, resp.targetValue);
+        if (!model) {
+          throw new Error(`Insufficient measured data to simulate response '${resp.name}'`);
+        }
         const rmse = model.rmse || 0;
 
         // Box-Muller Gaussian random number generator
@@ -1020,7 +1214,7 @@ export function createDoeMcpServer(context: McpDatabaseContext) {
               const sdKey = Object.keys(factorStdDevs).find(k => k === f.id || k.toLowerCase() === f.name.toLowerCase());
               const sd = sdKey ? Number(factorStdDevs[sdKey]) : 0;
               const val = Number(nomVal) + boxMuller() * sd;
-              simSettings[f.id] = Math.max(f.min * 0.9, Math.min(f.max * 1.1, val));
+              simSettings[f.id] = val;
             }
           });
 

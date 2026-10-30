@@ -2,6 +2,7 @@
 // The engine's default model (main effects + 2FIs) leaves 5 error DF; Montgomery's final
 // model drops B, so the runs that differ only in B become replicates (8 DF pure error).
 import { describe, it } from 'vitest';
+import { computeLenth } from '../../../src/core/analysis/analysisCore';
 import { analyseFixture } from '../../helpers/fixtures';
 import { estimateOf, expectClose, itMatchesReference } from '../../helpers/reference';
 
@@ -23,9 +24,12 @@ describe('Montgomery Ex. 6.2, unreplicated 2^4 (published values)', () => {
     }
   });
 
-  // There is no core Lenth function to call yet, and the engine cannot reach these 15 contrasts
-  // (its model has no 3FIs). P0.4 adds Lenth to core; its unit test should use these values.
-  it.todo('STAT-2 (P0.4): Lenth on the 15 published contrasts gives PSE 2.625, ME 6.75, SME 13.70 (fixture: published.lenth)');
+  it('STAT-2 (P0.4): Lenth on the 15 published contrasts gives PSE 2.625, ME 6.75, SME 13.70 (fixture: published.lenth)', () => {
+    const lenth = computeLenth(pub.effects as Record<string, number>);
+    expectClose(lenth.PSE, pub.lenth.PSE, 'PSE');
+    expectClose(lenth.ME, pub.lenth.ME, 'ME', 0, 0.01);
+    expectClose(lenth.SME, pub.lenth.SME, 'SME', 0, 0.01);
+  });
 });
 
 describe('Montgomery Ex. 6.2, default model (reference fit)', () => {

@@ -59,18 +59,37 @@ for (const [id, label] of Object.entries(CASES)) {
   });
 
   describe(`${label}: STAT-1, values that read (X'X)⁻¹`, () => {
-    it.fails('STAT-1 (P0.3): leverages sum to the rank and lie in [0, 1]', () => C.checkLeverageInvariants(result, ref.rank));
-    it.fails('STAT-1 (P0.3): the leverage of every run matches the reference', () => C.checkLeverage(result, ref));
-    it.fails('STAT-1 (P0.3): standard errors, t ratios and p-values match the reference', () => C.checkInference(result, ref));
-    it.fails('STAT-1 (P0.3): standard errors equal those of the explicit reduced model', () => {
+    it('STAT-1 (P0.3): leverages sum to the rank and lie in [0, 1]', () => C.checkLeverageInvariants(result, ref.rank));
+    it('STAT-1 (P0.3): the leverage of every run matches the reference', () => C.checkLeverage(result, ref));
+    it('STAT-1 (P0.3): standard errors, t ratios and p-values match the reference', () => C.checkInference(result, ref));
+    it('STAT-1 (P0.3): standard errors equal those of the explicit reduced model', () => {
       for (const r of (reduced.parameterEstimates as any[]).filter((x) => !x.isReference)) {
         const full = (result.parameterEstimates as any[]).find((x) => x.term === r.term);
         C.expectClose(full.stdError, r.stdError, `${r.term} stdError`);
       }
     });
-    it.fails('STAT-1 (P0.3): VIFs match the reference', () => C.checkVif(result, ref));
-    it.fails('STAT-1 (P0.3): Type III effect tests match the reference', () => C.checkTypeIII(result, ref));
-    it.fails("STAT-1 (P0.3): studentized residuals and Cook's distance match the reference", () => C.checkResidualDiagnostics(result, ref));
-    it.fails('STAT-1 (P0.3): the Box-Cox profile matches the reference', () => C.checkBoxCox(result, ref));
+    it('STAT-1 (P0.3): VIFs match the reference', () => C.checkVif(result, ref));
+    it('STAT-1 (P0.3): Type III effect tests match the reference', () => C.checkTypeIII(result, ref));
+    it("STAT-1 (P0.3): studentized residuals and Cook's distance match the reference", () => C.checkResidualDiagnostics(result, ref));
+    it('STAT-1 (P0.3): the Box-Cox profile matches the reference', () => C.checkBoxCox(result, ref));
   });
 }
+
+describe('STAT-1 (P0.3): relative aliasing threshold under column scaling', () => {
+  it('does not falsely flag a full-rank design when columns are scaled by 1e3 or 1e-3', async () => {
+    const { solveOLS } = await import('../../../src/core/analysis/linalg');
+    const X = [
+      [1, -1000, -0.001],
+      [1,  1000, -0.001],
+      [1, -1000,  0.001],
+      [1,  1000,  0.001],
+    ];
+    const Y = [[10], [20], [30], [40]];
+    const sol = solveOLS(X, Y);
+    expect(sol.rank).toBe(3);
+    expect(sol.aliased).toEqual([false, false, false]);
+    C.expectClose(sol.beta[0], 25, 'intercept');
+    C.expectClose(sol.beta[1], 0.005, 'beta_1');
+    C.expectClose(sol.beta[2], 10000, 'beta_2');
+  });
+});

@@ -1,39 +1,83 @@
-import jstat from 'jstat';
-const jStat = (jstat as any).default || jstat;
 import { Factor } from '../types';
-import { getFactorContrasts } from '../analysis/analysisCore';
+
+export interface CandidateRun {
+  natural: Record<string, string | number>;
+  coded: number[]; // Model vector: [1 (Intercept), x1, x2, ...]
+}
 
 /**
- * Builds the linear model contrast row for a candidate setting combination
+ * Generates coded contrast columns for a factor value.
+ * - Numeric factors: scaled to [-1, +1]
+ * - 2-level Categorical factors: coded as [-1, +1]
+ * - Multi-level Categorical factors (L >= 3): L-1 sum-to-zero effect-coded columns
  */
-export function buildCandidateRow(
+export function encodeFactorContrasts(factor: Factor, val: string | number): number[] {
+  if (factor.type === 'categorical') {
+    const levels = factor.levels && factor.levels.length > 0 ? factor.levels : ['Level 1', 'Level 2'];
+    const L = levels.length;
+    const idx = levels.findIndex(lv => lv.trim().toLowerCase() === String(val).trim().toLowerCase());
+    const safeIdx = idx === -1 ? 0 : idx;
+
+    if (L <= 2) {
+      return [safeIdx === 1 ? 1 : -1];
+    }
+
+    // Effect coding (sum-to-zero): last level is reference (-1 across all L-1 columns)
+    const cols = new Array(L - 1).fill(0);
+    if (safeIdx === L - 1) {
+      for (let c = 0; c < L - 1; c++) cols[c] = -1;
+    } else {
+      cols[safeIdx] = 1;
+    }
+    return cols;
+  } else {
+    const numVal = Number(val);
+    if (!Number.isFinite(numVal)) return [0];
+    const mid = (factor.min + factor.max) / 2;
+    const halfRange = (factor.max - factor.min) / 2;
+    if (halfRange === 0) return [0];
+    return [(numVal - mid) / halfRange];
+  }
+}
+
+/**
+ * Builds the model expansion vector for a candidate point.
+ * Supports main effects (with multi-level categorical contrasts),
+ * optionally 2-factor interactions when candidate budget allows,
+ * and optionally quadratic terms for 3-level numeric candidates.
+ */
+export function buildCodedModelRow(
   factors: Factor[],
-  factorSettings: Record<string, any>,
-  includeInteractions: boolean = false
+  naturalPoint: Record<string, string | number>,
+  includeInteractions: boolean = false,
+  includeQuadratics: boolean = false
 ): number[] {
   const row: number[] = [1]; // Intercept
+  const factorContrasts: number[][] = [];
 
-  const factorContrastsList: number[][] = [];
-  factors.forEach(f => {
-    const rawVal = factorSettings[f.id];
-    const contrasts = getFactorContrasts(f, rawVal);
-    factorContrastsList.push(contrasts);
-    for (let c = 0; c < contrasts.length; c++) {
-      row.push(contrasts[c]);
-    }
-  });
+  for (const f of factors) {
+    const c = encodeFactorContrasts(f, naturalPoint[f.id]);
+    factorContrasts.push(c);
+    row.push(...c);
+  }
 
   if (includeInteractions) {
-    const k = factors.length;
-    for (let i = 0; i < k; i++) {
-      for (let j = i + 1; j < k; j++) {
-        const c1 = factorContrastsList[i];
-        const c2 = factorContrastsList[j];
-        for (let p = 0; p < c1.length; p++) {
-          for (let q = 0; q < c2.length; q++) {
-            row.push(c1[p] * c2[q]);
+    for (let i = 0; i < factors.length; i++) {
+      for (let j = i + 1; j < factors.length; j++) {
+        for (const c1 of factorContrasts[i]) {
+          for (const c2 of factorContrasts[j]) {
+            row.push(c1 * c2);
           }
         }
+      }
+    }
+  }
+
+  if (includeQuadratics) {
+    for (let i = 0; i < factors.length; i++) {
+      if (factors[i].type === 'numeric') {
+        const c = factorContrasts[i][0] ?? 0;
+        row.push(c * c);
       }
     }
   }
@@ -42,172 +86,318 @@ export function buildCandidateRow(
 }
 
 /**
- * Computes log-determinant of X^T X with ridge regularization for numerical stability
+ * Computes log(|X'X + ridge * I|) using Cholesky decomposition for candidate exchange.
  */
-export function computeLogDetXtX(X: number[][]): number {
-  if (X.length === 0 || X[0].length === 0) return -1e9;
+export function computeLogDetXtX(X: number[][], ridge: number = 1e-6): number {
   const n = X.length;
+  if (n === 0) return -Infinity;
   const p = X[0].length;
-  if (n < p) return -1e9;
 
-  // Compute XtX = X^T * X
-  const XtX: number[][] = Array.from({ length: p }, () => Array(p).fill(0));
+  const XtX: number[][] = Array.from({ length: p }, () => new Array(p).fill(0));
   for (let r = 0; r < n; r++) {
     const row = X[r];
     for (let i = 0; i < p; i++) {
       const xi = row[i];
-      if (xi === 0) continue;
       for (let j = i; j < p; j++) {
         XtX[i][j] += xi * row[j];
       }
     }
   }
-  // Fill lower symmetric
+  for (let i = 0; i < p; i++) {
+    XtX[i][i] += ridge;
+    for (let j = 0; j < i; j++) {
+      XtX[i][j] = XtX[j][i];
+    }
+  }
+
+  // Cholesky decomposition L * L' = XtX
+  const L: number[][] = Array.from({ length: p }, () => new Array(p).fill(0));
+  let logDet = 0;
+
+  for (let i = 0; i < p; i++) {
+    for (let j = 0; j <= i; j++) {
+      let sum = XtX[i][j];
+      for (let k = 0; k < j; k++) {
+        sum -= L[i][k] * L[j][k];
+      }
+      if (i === j) {
+        if (sum <= 1e-12) return -Infinity;
+        L[i][j] = Math.sqrt(sum);
+        logDet += 2 * Math.log(L[i][j]);
+      } else {
+        L[i][j] = sum / L[j][j];
+      }
+    }
+  }
+
+  return logDet;
+}
+
+/**
+ * Computes the exact (unregularised) log(|X'X|) via Cholesky decomposition.
+ * Returns `null` when X has fewer rows than columns (N < p) or is rank-deficient (singular).
+ */
+export function computeExactLogDetXtX(X: number[][]): number | null {
+  const n = X.length;
+  if (n === 0) return null;
+  const p = X[0].length;
+  if (p === 0 || n < p) return null;
+
+  const XtX: number[][] = Array.from({ length: p }, () => new Array(p).fill(0));
+  for (let r = 0; r < n; r++) {
+    const row = X[r];
+    for (let i = 0; i < p; i++) {
+      const xi = row[i];
+      for (let j = i; j < p; j++) {
+        XtX[i][j] += xi * row[j];
+      }
+    }
+  }
   for (let i = 0; i < p; i++) {
     for (let j = 0; j < i; j++) {
       XtX[i][j] = XtX[j][i];
     }
   }
 
-  // Slight ridge for numerical stability
-  for (let i = 0; i < p; i++) {
-    XtX[i][i] += 1e-4;
-  }
-
-  // Cholesky decomposition L * L^T for O(p^3) fast and exact log-det
-  const L: number[][] = Array.from({ length: p }, () => Array(p).fill(0));
+  const L: number[][] = Array.from({ length: p }, () => new Array(p).fill(0));
   let logDet = 0;
 
   for (let i = 0; i < p; i++) {
     for (let j = 0; j <= i; j++) {
-      let sum = 0;
+      let sum = XtX[i][j];
       for (let k = 0; k < j; k++) {
-        sum += L[i][k] * L[j][k];
+        sum -= L[i][k] * L[j][k];
       }
       if (i === j) {
-        const val = XtX[i][i] - sum;
-        if (val <= 1e-9) return -1e9; // Singular / non-positive-definite
-        const diag = Math.sqrt(val);
-        L[i][i] = diag;
-        logDet += 2 * Math.log(diag);
+        if (!Number.isFinite(sum) || sum <= 1e-10) {
+          return null;
+        }
+        L[i][j] = Math.sqrt(sum);
+        logDet += 2 * Math.log(L[i][j]);
       } else {
-        const lj = L[j][j];
-        if (lj <= 1e-9) return -1e9;
-        L[i][j] = (XtX[i][j] - sum) / lj;
+        L[i][j] = sum / L[j][j];
       }
     }
   }
 
-  return isNaN(logDet) ? -1e9 : logDet;
+  return Number.isFinite(logDet) ? logDet : null;
 }
 
 /**
- * Generates a D-Optimal subset of runs from the full Cartesian candidate grid.
- * Adapts model complexity based on run budget and uses coordinate exchange.
+ * Computes standard D-efficiency on the coded [-1, +1] scale for a stated model matrix X (P1.18 / DES-5, MCP-13):
+ *   D_eff = 100 * |X'X|^(1/p) / N
+ * Returns `null` ("not estimable") for singular designs (N < p or rank(X) < p).
+ * Never exceeds 100, and never applies an artificial floor (such as 25) or fallback (such as 95).
+ */
+export function computeDEfficiency(X: number[][]): number | null {
+  const n = X.length;
+  if (n === 0) return null;
+  const p = X[0].length;
+  if (p === 0 || n < p) return null;
+
+  const logDet = computeExactLogDetXtX(X);
+  if (logDet === null) return null;
+
+  // |X'X|^(1/p) / N = exp(log(|X'X|) / p) / N
+  const rawPct = (Math.exp(logDet / p) / n) * 100;
+  if (!Number.isFinite(rawPct) || rawPct <= 0) return null;
+
+  // Guard against floating-point rounding slightly above 100.0 on orthogonal designs
+  const bounded = Math.min(100, rawPct);
+  return Number(bounded.toFixed(2));
+}
+
+export interface DOptimalResult {
+  selectedIndices: number[];
+  selectedRuns: Record<string, string | number>[];
+  /** Standard D-efficiency in [0, 100] on the coded scale, or `null` when singular / not estimable. */
+  dEfficiency: number | null;
+  modelTermsCount: number;
+  warning?: string;
+}
+
+function isFactorArray(arr: readonly any[]): arr is Factor[] {
+  if (arr.length === 0) return false;
+  const first = arr[0];
+  return (
+    typeof first === 'object' &&
+    first !== null &&
+    typeof first.id === 'string' &&
+    typeof first.name === 'string' &&
+    (first.type === 'numeric' || first.type === 'categorical') &&
+    typeof first.min === 'number' &&
+    typeof first.max === 'number'
+  );
+}
+
+/**
+ * Selects an exact N-run D-optimal subset from a candidate set using
+ * Greedy Sequential Augmentation + Fedorov Point-Exchange.
+ * Supports both `(candidateRuns, factors, targetRuns)` and `(factors, candidateRuns, targetRuns)`.
  */
 export function generateDOptimalSubset(
-  allCandidateRuns: Record<string, string | number>[],
-  factors: Factor[],
-  targetRuns: number
-): { selectedIndices: number[]; dEfficiency: number } {
-  const M = allCandidateRuns.length;
-  const N = Math.min(M, Math.max(factors.length + 1, targetRuns));
+  firstArg: Factor[] | Record<string, string | number>[],
+  secondArg: Record<string, string | number>[] | Factor[],
+  targetRuns: number,
+  includeInteractionsOverride?: boolean
+): DOptimalResult {
+  let factors: Factor[];
+  let candidates: Record<string, string | number>[];
+  if (isFactorArray(firstArg)) {
+    factors = firstArg;
+    candidates = secondArg as Record<string, string | number>[];
+  } else {
+    candidates = firstArg as Record<string, string | number>[];
+    factors = secondArg as Factor[];
+  }
 
+  if (candidates.length === 0 || factors.length === 0) {
+    return { selectedIndices: [], selectedRuns: [], dEfficiency: null, modelTermsCount: 1 };
+  }
+
+  // Determine how many main-effect parameters exist
+  let pMain = 1; // Intercept
+  for (const f of factors) {
+    if (f.type === 'categorical') {
+      const L = f.levels && f.levels.length > 0 ? f.levels.length : 2;
+      pMain += Math.max(1, L - 1);
+    } else {
+      pMain += 1;
+    }
+  }
+
+  // Determine whether the requested run count was explicitly below pMain
+  const requestedN = Math.floor(targetRuns);
+  let N: number;
+  let underspecifiedWarning: string | undefined;
+  if (requestedN <= 0) {
+    N = pMain;
+  } else if (requestedN < pMain) {
+    N = requestedN;
+    underspecifiedWarning = `Requested ${requestedN} runs is fewer than the ${pMain} main-effect parameters; the design is singular (D-efficiency not estimable).`;
+  } else {
+    N = requestedN;
+  }
+
+  // Detect whether candidates include 3+ distinct levels for numeric factors (RSM / quadratic candidate grid)
+  const numericFactors = factors.filter(f => f.type === 'numeric');
+  const hasThreeLevelNumeric =
+    numericFactors.length > 0 &&
+    numericFactors.some(f => {
+      const distinct = new Set<number>();
+      for (const c of candidates) {
+        const v = Number(c[f.id]);
+        if (Number.isFinite(v)) distinct.add(Math.round(v * 1e6) / 1e6);
+        if (distinct.size >= 3) return true;
+      }
+      return false;
+    });
+  const pQuad = hasThreeLevelNumeric ? numericFactors.length : 0;
+  const includeQuadratics = hasThreeLevelNumeric && N >= pMain + pQuad;
+
+  // Include 2FI terms in the optimality criterion only when N is large enough to support them
+  const rowWithInt = buildCodedModelRow(factors, candidates[0], true, includeQuadratics);
+  const pFull = rowWithInt.length;
+  const includeInteractions =
+    includeInteractionsOverride !== undefined
+      ? includeInteractionsOverride
+      : N >= pFull;
+
+  const candidateRows = candidates.map(pt =>
+    buildCodedModelRow(factors, pt, includeInteractions, includeQuadratics)
+  );
+  const p = candidateRows[0].length;
+  const M = candidates.length;
+
+  // If N >= M, take all candidates (plus repeats if N > M) and compute actual D-efficiency
   if (N >= M) {
+    const selectedIndices: number[] = [];
+    for (let i = 0; i < N; i++) {
+      selectedIndices.push(i % M);
+    }
+    const chosenX = selectedIndices.map(idx => candidateRows[idx]);
     return {
-      selectedIndices: Array.from({ length: M }, (_, i) => i),
-      dEfficiency: 100
+      selectedIndices,
+      selectedRuns: selectedIndices.map(idx => candidates[idx]),
+      dEfficiency: computeDEfficiency(chosenX),
+      modelTermsCount: p,
+      warning: underspecifiedWarning,
     };
   }
 
-  // Calculate parameters for main effects model
-  let pMain = 1;
-  factors.forEach(f => {
-    pMain += f.type === 'categorical' && f.levels ? Math.max(1, f.levels.length - 1) : 1;
-  });
+  // Step 1: Greedy sequential initialization starting from most extreme corner point
+  const selectedIndices: number[] = [0];
+  const usedSet = new Set<number>([0]);
 
-  // Calculate parameters with interactions
-  let pInt = 0;
-  for (let i = 0; i < factors.length; i++) {
-    const df1 = factors[i].type === 'categorical' && factors[i].levels ? Math.max(1, factors[i].levels!.length - 1) : 1;
-    for (let j = i + 1; j < factors.length; j++) {
-      const df2 = factors[j].type === 'categorical' && factors[j].levels ? Math.max(1, factors[j].levels!.length - 1) : 1;
-      pInt += df1 * df2;
+  while (selectedIndices.length < N) {
+    let bestIdx = -1;
+    let bestScore = -Infinity;
+    const currentMatrix = selectedIndices.map(idx => candidateRows[idx]);
+
+    // Use a slightly larger ridge while n < p so greedy initialization prefers orthogonal directions
+    const ridge = selectedIndices.length + 1 < p ? 1e-2 : 1e-6;
+
+    for (let c = 0; c < M; c++) {
+      if (usedSet.has(c) && M >= N) continue;
+      currentMatrix.push(candidateRows[c]);
+      const score = computeLogDetXtX(currentMatrix, ridge);
+      currentMatrix.pop();
+
+      if (score > bestScore) {
+        bestScore = score;
+        bestIdx = c;
+      }
     }
+
+    if (bestIdx === -1) bestIdx = selectedIndices.length % M;
+    selectedIndices.push(bestIdx);
+    usedSet.add(bestIdx);
   }
 
-  const includeInteractions = N >= pMain + pInt + 2;
+  // Step 2: Fedorov single-point coordinate exchange refinement (up to 15 passes)
+  const exchangeRidge = N < p ? 1e-3 : 1e-6;
+  let currentScore = computeLogDetXtX(selectedIndices.map(idx => candidateRows[idx]), exchangeRidge);
 
-  // Precompute candidate rows
-  const candidateRows: number[][] = allCandidateRuns.map(settings =>
-    buildCandidateRow(factors, settings, includeInteractions)
-  );
+  for (let pass = 0; pass < 15; pass++) {
+    let improved = false;
 
-  // Initial stratified / spread selection
-  const selected = new Set<number>();
-  const step = M / N;
-  for (let i = 0; i < N; i++) {
-    const idx = Math.min(M - 1, Math.floor(i * step));
-    selected.add(idx);
-  }
-  let fillIdx = 0;
-  while (selected.size < N && fillIdx < M) {
-    selected.add(fillIdx);
-    fillIdx++;
-  }
-
-  let currentIndices = Array.from(selected);
-  let currentX = currentIndices.map(i => candidateRows[i]);
-  let currentScore = computeLogDetXtX(currentX);
-
-  // Exchange passes (up to 3 passes for near-instant execution)
-  const maxPasses = 3;
-  for (let pass = 0; pass < maxPasses; pass++) {
-    let passImproved = false;
-
-    for (let pos = 0; pos < N; pos++) {
-      const oldIdx = currentIndices[pos];
-      let bestCandidateIdx = oldIdx;
-      let bestCandidateScore = currentScore;
+    for (let i = 0; i < N; i++) {
+      const originalIdx = selectedIndices[i];
+      let bestReplacement = originalIdx;
+      let bestPassScore = currentScore;
 
       for (let c = 0; c < M; c++) {
-        if (selected.has(c)) continue;
+        if (c === originalIdx) continue;
+        if (selectedIndices.includes(c) && M >= N) continue;
 
-        currentIndices[pos] = c;
-        const testX = currentIndices.map(i => candidateRows[i]);
-        const testScore = computeLogDetXtX(testX);
+        selectedIndices[i] = c;
+        const trialMatrix = selectedIndices.map(idx => candidateRows[idx]);
+        const score = computeLogDetXtX(trialMatrix, exchangeRidge);
 
-        if (testScore > bestCandidateScore + 1e-4) {
-          bestCandidateScore = testScore;
-          bestCandidateIdx = c;
-          passImproved = true;
+        if (score > bestPassScore + 1e-7) {
+          bestPassScore = score;
+          bestReplacement = c;
         }
       }
 
-      if (bestCandidateIdx !== oldIdx) {
-        selected.delete(oldIdx);
-        selected.add(bestCandidateIdx);
-        currentIndices[pos] = bestCandidateIdx;
-        currentScore = bestCandidateScore;
-      } else {
-        currentIndices[pos] = oldIdx;
+      selectedIndices[i] = bestReplacement;
+      if (bestReplacement !== originalIdx) {
+        currentScore = bestPassScore;
+        improved = true;
       }
     }
 
-    if (!passImproved) break;
+    if (!improved) break;
   }
 
-  // Calculate approximate D-efficiency
-  const fullLogDet = computeLogDetXtX(candidateRows);
-  const p = candidateRows[0].length;
-  let dEff = 95;
-  if (fullLogDet > -1e8 && currentScore > -1e8 && p > 0) {
-    const logRatio = (currentScore - fullLogDet) / p - Math.log(N / M);
-    dEff = Math.min(100, Math.max(25, Math.round(Math.exp(logRatio) * 100)));
-  }
+  const chosenX = selectedIndices.map(idx => candidateRows[idx]);
+  const dEff = computeDEfficiency(chosenX);
 
   return {
-    selectedIndices: currentIndices.sort((a, b) => a - b),
-    dEfficiency: dEff
+    selectedIndices,
+    selectedRuns: selectedIndices.map(idx => candidates[idx]),
+    dEfficiency: dEff,
+    modelTermsCount: p,
+    warning: underspecifiedWarning,
   };
 }

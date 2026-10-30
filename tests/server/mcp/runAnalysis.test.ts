@@ -34,32 +34,57 @@ describe('MCP run_analysis', () => {
     expect(json.summary.runsAnalyzed).toBe(demoRef.n);
   });
 
-  it.fails('MCP-1 (P0.5): summary.pValue is the model p-value 1 − F_cdf(F; dfModel, dfError), not the model DF', async () => {
+  it('MCP-1 (P0.5): summary.pValue is the model p-value 1 − F_cdf(F; dfModel, dfError), not the model DF', async () => {
     const { json } = await mcp.callTool('run_analysis', { projectId: demo.id, responseId: 'Yield' });
     expect(json.summary.pValue).toBeCloseTo(demoRef.modelPValue!, 5);
+    expect(json.summary.dfModel).toBe(demoRef.dfModel);
   });
 
-  it.fails('MCP-6 (P0.5): every paretoRanking item has the term name and a non-zero effect', async () => {
+  it('MCP-6 (P0.5): every paretoRanking item has the term name and a non-zero effect', async () => {
     const { json } = await mcp.callTool('run_analysis', { projectId: demo.id, responseId: 'Yield' });
     expect(json.paretoRanking.length).toBeGreaterThan(0);
     for (const item of json.paretoRanking) {
       expect(typeof item.term, 'term').toBe('string');
       expect(item.effectMagnitude, `${item.term} effectMagnitude`).toBeGreaterThan(0);
+      expect(['Positive', 'Negative', 'Neutral']).toContain(item.direction);
+      expect(typeof item.significant).toBe('boolean');
     }
   });
 
-  it.fails('MCP-7 (P0.5): excludedTerms given by name removes that term', async () => {
-    const { json } = await mcp.callTool('run_analysis', { projectId: demo.id, responseId: 'Yield', excludedTerms: ['Temperature'] });
-    expect(json.modelTerms.map((t: any) => t.term)).not.toContain('Temperature');
+  it('MCP-7 (P0.5): excludedTerms given by name or reversed interaction removes that term and echoes applied exclusions', async () => {
+    const { json } = await mcp.callTool('run_analysis', {
+      projectId: demo.id,
+      responseId: 'Yield',
+      excludedTerms: ['Temperature', 'Catalyst Loading*Temperature'],
+    });
+    const termNames = json.modelTerms.map((t: any) => t.term);
+    expect(termNames).not.toContain('Temperature');
+    expect(termNames).not.toContain('Temperature*Catalyst Loading');
+    expect(json.excludedTerms).toEqual(['Temperature', 'Temperature*Catalyst Loading']);
   });
 
-  it.fails('MCP-8 (P0.5): an unreplicated design reports lack of fit as not testable', async () => {
+  it('MCP-7 (P0.5): unknown term in excludedTerms returns an error listing valid terms', async () => {
+    const { isError, text } = await mcp.callTool('run_analysis', {
+      projectId: demo.id,
+      responseId: 'Yield',
+      excludedTerms: ['NotARealFactor'],
+    });
+    expect(isError).toBe(true);
+    expect(text).toContain('NotARealFactor');
+    expect(text).toContain('Temperature');
+  });
+
+  it('MCP-8 (P0.5): an unreplicated design reports lack of fit as not testable', async () => {
     const { json } = await mcp.callTool('run_analysis', { projectId: unreplicated.id });
     expect(json.lackOfFit.testable).toBe(false);
+    expect(json.lackOfFit.pValue).toBeNull();
+    expect(typeof json.lackOfFit.reason).toBe('string');
   });
 
-  it.fails('MCP-9 (P0.5): a saturated 2 × 3 factorial returns a result instead of an error', async () => {
-    const { isError, text } = await mcp.callTool('run_analysis', { projectId: saturated.id });
+  it('MCP-9 (P0.5): a saturated 2 × 3 factorial returns a result instead of an error', async () => {
+    const { isError, text, json } = await mcp.callTool('run_analysis', { projectId: saturated.id });
     expect(isError, text).toBe(false);
+    expect(json.summary.pValue).toBeNull();
+    expect(json.lackOfFit.testable).toBe(false);
   });
 });

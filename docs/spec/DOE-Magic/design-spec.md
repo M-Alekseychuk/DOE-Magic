@@ -217,23 +217,23 @@ All project data is persisted as a store object `{ projects: Project[], folders:
 | Field | Type | Meaning and convention |
 |---|---|---|
 | `id` | string | Key in `Run.responses`. Sample ids are `r1`, `r2` |
-| `name` | string | Display. MCP resolves names, falling back to substring match (`doeMcpServer.ts:81-87`, MCP-4) |
+| `name` | string | Display. MCP write tools resolve response names by exact ID or unique case-insensitive exact name (`doeMcpServer.ts`, P1.14 / MCP-4) |
 | `goal` | `'maximize' \| 'minimize' \| 'target'` | Optimisation direction |
-| `targetValue` | number? | For `target`: the target. The UI sets it only when goal is `target` and clears it otherwise (`ProjectSetup.tsx:153, 443`). `analysisCore` also uses it as the upper bound for `maximize` and the lower bound for `minimize` (STAT-6, UI-27) |
+| `targetValue` | number? | For `target`: the target (including `0`, validated with `Number.isFinite`, P1.21 / STAT-10 / UI-10). The UI sets it only when goal is `target` and clears it otherwise (`ProjectSetup.tsx:153, 443`). `analysisCore` also uses it as the upper bound for `maximize` and the lower bound for `minimize` (STAT-6, UI-27) |
 | `unit` | string | Display only |
-| `excludedTerms` | string[]? | Term IDs (§4.2) removed from this response's model. This is the only persisted model setting. It is toggled in Analysis (`ProjectAnalysis.tsx:1627-1636`) and read by every `computeAnalysis` caller (STAT-7/UI-3: the Profiler ignores it for non-active responses) |
+| `excludedTerms` | string[]? | Term IDs (§4.2) removed from this response's model. This is the only persisted model setting. It is toggled in Analysis (`ProjectAnalysis.tsx:1627-1636`) and read by every `computeAnalysis` caller via `fitProjectModels` (`src/core/analysis/projectModels.ts`, P0.6 / STAT-7 / UI-3) |
 
 **Run** (`:29-35`)
 
 | Field | Type | Meaning and convention |
 |---|---|---|
 | `id` | string | uuid; samples use `run-1`…`run-27` |
-| `runOrder` | number | 1-based execution order. Uniqueness is not enforced (DATA-20). The UI generator randomises it with a biased sort (`ProjectDesign.tsx:987-988`). The core generator sets `runOrder = stdOrder`, so it does not randomise (`doeGenerator.ts:74-77`, DES-7) |
-| `stdOrder` | number | Standard order. Several UI design paths set it to 0 (DES-7) |
-| `factors` | `Record<factorId, string \| number>` | Numeric: a number in natural units. Categorical: the level label string. Matching is trimmed and case-insensitive, with a numeric level-index fallback, and an unknown label becomes level 0 (`analysisCore.ts:62-68`, STAT-11). Numeric coded values are clamped to ±2 and `NaN` codes as 0 (`analysisCore.ts:82-86`, STAT-11, STAT-14) |
-| `responses` | `Record<responseId, number \| null>` | `null` means not measured. The engine also treats `undefined` and `''` as missing (`analysisCore.ts:191`). UI entry converts to number or `null` (`ProjectDesign.tsx:1088-1098`); MCP and JSON import can store other types (MCP-5, STAT-26) |
+| `runOrder` | number | 1-based execution order. Generated designs assign `stdOrder = 1..N` in standard order and then shuffle `runOrder = 1..N` via seeded Fisher-Yates (`randomize` in `src/core/design/randomize.ts`, P1.19 / DES-7) |
+| `stdOrder` | number | 1-based standard order (`1..N`, unique across all design types, P1.19 / DES-7) |
+| `factors` | `Record<factorId, string \| number>` | Numeric: a finite number in natural units. Categorical: the level label string (matched case-insensitively after trimming). Before fitting, `validateRuns(project, response)` excludes and reports runs with missing/non-finite numeric factors or unknown categorical labels (`P1.11` / `STAT-11`). Valid numeric values are coded as `2(x − mid)/range` without clamping, and values outside `[min, max]` are flagged in `warnings` as extrapolated (`P1.11` / `STAT-14`) |
+| `responses` | `Record<responseId, number \| null>` | `null` means not measured. `validateRuns` excludes runs whose response is `null`, `undefined`, `''`, or not a finite number (such as `'12.5a'`, `P1.11` / `STAT-26`) |
 
-**Project** (`:37-53`)
+**Project** (`:37-54`)
 
 | Field | Type | Meaning and convention |
 |---|---|---|
@@ -242,12 +242,13 @@ All project data is persisted as a store object `{ projects: Project[], folders:
 | `name` | string | Display |
 | `description` | string | Required by the type, but imported files may omit it (UI-23) |
 | `factors`, `responses`, `runs` | arrays | See above. Deleting a factor or response does not clean dependent keys (DATA-11) |
-| `centerPoints` | number? | Requested centre runs. The Setup tab writes it (`ProjectSetup.tsx:179-182`). The UI generator applies it only to `factorial_2level` and `custom_d_optimal` (DES-6), even when every factor is categorical (DES-19); core never applies it to `custom_d_optimal` or D-optimal-subset fractions (DES-21). MCP `generate_doe_design` uses `project.centerPoints \|\| 3` when the call omits `centerPoints`, so a stored 0 becomes 3; an explicit `centerPoints: 0` in the call is honoured (MCP-10) |
+| `centerPoints` | number? | Requested centre runs (`0` or positive integer). Applied consistently across all design types by `buildCenterPointRuns` (`src/core/design/centerPoints.ts`, P1.20 / DES-6 / DES-19 / DES-20 / DES-21), distributing categorical centre runs across levels and adding none when no continuous factor exists |
 | `designType` | `DesignType`? | Absent means `factorial_2level` (`ProjectDesign.tsx:456`). Changing it does not regenerate the runs, so it can disagree with them |
+| `randomSeed` | number? | Optional 32-bit unsigned integer seed used by `randomize(runs, seed)` (`src/core/design/randomize.ts`, P1.19 / DES-7) to produce a reproducible Fisher-Yates run order |
 | `optimizationResults` | string? | **Two meanings** (MCP-12): the UI's English Markdown report from the Bayesian optimiser (`ProjectOptimization.tsx:636`), or MCP `optimize_desirability`'s one-line summary (`doeMcpServer.ts:923`). The last writer wins |
 | `optimizationCandidates` | `Record<factorId, string \| number>[]`? | Suggested settings. The UI writes Bayesian suggestions with numbers rounded to 2 decimals (`ProjectOptimization.tsx:571`, STAT-19). MCP writes the top 5 desirability settings, which can miss factors (`doeMcpServer.ts:916-922`, MCP-11). "Append" turns them into runs and clears the field (`ProjectOptimization.tsx:645-663`) |
 | `robustnessState` | `any` | Written only by the Robustness tab (`RobustnessSimulation.tsx:79-101`), including on first open (DATA-15). Shape below. MCP neither reads nor writes it |
-| `isArchived` | boolean? | Hidden from the main lists and shown under `#/?folder=archive` (`Dashboard.tsx:40-45`). "Delete" on a non-archived project archives it; on an archived one it hard-deletes (`ProjectContext.tsx:197-220`). MCP `delete_project` always hard-deletes (MCP-4) |
+| `isArchived` | boolean? | Hidden from the main lists and shown under `#/?folder=archive` (`Dashboard.tsx:40-45`). "Delete" on a non-archived project archives it; on an archived one it hard-deletes (`ProjectContext.tsx:197-220`, and MCP `delete_project`, P1.14 / MCP-4) |
 | `createdAt`, `updatedAt` | number | ms since epoch. `updatedAt` is set by the client `saveProject` (mutating its argument, DATA-14), by `POST /api/projects`, and by process A's MCP context. It is not set by socket writes or by the stdio MCP context (MCP-20) |
 
 `robustnessState` shape (as-is; the user inputs are stored as strings, the simulation results as numbers):
@@ -268,14 +269,18 @@ All project data is persisted as a store object `{ projects: Project[], folders:
 
 ### 4.2 Statistical model conventions (contract)
 
-- The model is the intercept, all main effects and all two-factor interactions, minus `Response.excludedTerms`. There are no quadratic terms (`analysisCore.ts:200-319`, STAT-3).
-- **Term IDs:** a main effect's ID is `Factor.id`. A two-factor interaction's ID is `${fa.id}*${fb.id}`, where `fa` comes before `fb` in `project.factors` (`analysisCore.ts:220, 278-279`). Reordering factors changes interaction IDs and silently orphans exclusions (DATA-11). A new term kind (for example quadratic) MUST have its ID format defined here before it is implemented.
-- Display column names (`Name`, `Name[level]`, `A*B`) are labels, not IDs (MCP-7).
-- **Factor coding** (`getFactorContrasts`, `analysisCore.ts:51-87`):
-  - Numeric: `2(x − mid)/range`, clamped to [−2, 2].
+- The model is the intercept, all main effects, all two-factor interactions, and (for response-surface designs or 3+-level non-screening datasets) quadratic terms for numeric factors with at least 3 distinct levels (`src/core/analysis/modelSpec.ts`, P0.9 / STAT-3), minus `Response.excludedTerms`.
+- **Term IDs:** a main effect's ID is `Factor.id`. A two-factor interaction's ID is `${fa.id}*${fb.id}`, where `fa` comes before `fb` in `project.factors`. A quadratic term's ID is `${f.id}^2` (and `${f.id}*${f.id}` is also accepted as an alias in `excludedTerms`), with display column name `${f.name}*${f.name}` and `f1Id = f.id`, `f2Id = f.id`. Reordering factors changes interaction IDs and silently orphans exclusions (DATA-11).
+- Display column names (`Name`, `Name[level]`, `A*B`, `A*A`) are labels, not IDs; `resolveExcludedTerms` accepts canonical IDs, display names, and reversed interaction names/IDs (`B*A`) (P0.5 / MCP-7).
+- **Run validation (`validateRuns`, P1.11 / STAT-11, STAT-14, STAT-26):** before building $X$ and $Y$, `validateRuns(project, response)` checks every run. Any run with a missing or non-finite numeric factor, an unknown categorical level label, or a missing/non-finite response value is excluded and recorded in `excludedRuns: { runId, runOrder, reason }[]`. Valid runs with a numeric factor outside `[min, max]` are kept, coded at their true value, and reported in `warnings: string[]` as extrapolated.
+- **Factor coding** (`getFactorContrasts`, `src/core/analysis/modelSpec.ts`):
+  - Numeric: `2(x − mid)/range`, unclamped (`P1.11` / `STAT-14`). Quadratic column: `(2(x − mid)/range)²`.
   - Two-level categorical: level 0 → −1, level 1 → +1.
   - Categorical with L ≥ 3 levels: sum-to-zero coding with L−1 columns. Level j < L−1 has +1 in column j; the last level is the reference with −1 in all columns.
-- Analysis results are never persisted. They are recomputed from the project by `computeAnalysis(project, response, excludedTerms, goal, targetValue)` (`analysisCore.ts:186`), which returns an untyped object (`:1153-1184`) or `null` when there is no data. Its field `p` is the model degrees of freedom, not a p-value (MCP-1; the HTML report prints it as "Model p-value", UI-31).
+- **D-efficiency (`computeDEfficiency`, `src/core/design/dOptimal.ts`, P1.18 / DES-5 / MCP-13):** reported on a $0$–$100$ percentage scale as $100 \cdot |X'X|^{1/p} / N$ for the stated coded model. Singular designs ($N < p$ or $\text{rank}(X) < p$) return `null` (displayed as `"Not estimable"`).
+- **Least-squares solver and aliasing** (`src/core/analysis/linalg.ts`, P0.3 / STAT-1): columns enter in model order and are orthogonalised with two-pass Gram-Schmidt QR. A column whose residual norm is `≤ 1e-9 · max(1, ‖col‖₂)` is flagged as aliased (`beta = 0`, row and column in `invXtX` = 0), and `(X_S'X_S)⁻¹ = R_S⁻¹(R_S⁻¹)'` is computed on the kept estimable columns `S`.
+- **Saturated models (`df_error = 0`, P0.4 / STAT-2, STAT-5, STAT-21):** Lenth's method (`computeLenth`) pools only active, non-aliased, 1-df contrasts on the `2β` scale, with `t = |2β| / PSE` and `F = t²`. Reference-level rows use `null` (never `undefined`) for `stdError`, `tRatio` and `pVal`; confidence and prediction intervals at the optimum are `null` when `df_error = 0`; and `boxCox` is `null` when `df_error < 2` or `sse ≤ 1e-12`.
+- Analysis results are never persisted. They are recomputed from the project by `computeAnalysis(project, response, excludedTerms, goal, targetValue)`, which returns a typed `AnalysisResult` or `null` when there is no data. `dfModel` holds the model degrees of freedom (`rank − 1`), and `modelPValue` holds the whole-model ANOVA $F$-test $p$-value (or `null` when `dfError === 0`, P0.5 / MCP-1 / UI-31).
 - Not persisted: the Analysis goal/target override (`customOptConfig`, `ProjectAnalysis.tsx:174`), the active tab and selected response (`ProjectView.tsx:21-22`, UI-25), optimiser settings and `targetRuns`.
 
 ### 4.3 Factor range and name conventions (DATA-22, DATA-23)
