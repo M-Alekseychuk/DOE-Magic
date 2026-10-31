@@ -54,7 +54,7 @@ const CASES = [
   ['OK', 'import-like text in a string in core', append('src/core/sampleProject.ts', "\nexport const note = \"Tip: import data from 'Excel' via the toolbar\";\n")],
   ['OK', 'the word document. in a core comment', append('src/core/types.ts', '\n// Shared types for the project document. Keep in sync with the UI.\n')],
   ['OK', '.js suffix naming a .ts file', replace('src/server/mcp/stdio.ts', "'./doeMcpServer'", "'./doeMcpServer.js'")],
-  ['OK', 'Vite ?url asset import', replace('src/web/Layout.tsx', "'./assets/logo.png'", "'./assets/logo.png?url'")],
+  ['OK', 'Vite ?url asset import', append('src/web/Layout.tsx', "\nimport './assets/logo.png?url';\n")],
   ['OK', 'OS clutter src/.DS_Store', write('src/.DS_Store', '')],
 ];
 

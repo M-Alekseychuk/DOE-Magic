@@ -244,7 +244,7 @@ export function computeAnalysis(
         const levelAverages = levels.map(lvl => {
           const matching = validRuns.filter(r => String(r.factors[factor.id] ?? '').trim().toLowerCase() === lvl.trim().toLowerCase());
           const count = matching.length;
-          const avg = count > 0 ? matching.reduce((s, r) => s + Number(r.responses[activeResponse.id]), 0) / count : 0;
+          const avg = count > 0 ? matching.reduce((s, r) => s + getRunResponseValue(r), 0) / count : 0;
           return { level: lvl, avg, count };
         });
 
@@ -281,8 +281,8 @@ export function computeAnalysis(
         const halfRange = Math.abs(factor.max - factor.min) / 2;
 
         validRuns.forEach(r => {
-          const v = Number(r.factors[factor.id]);
-          const resp = Number(r.responses[activeResponse.id]);
+          const v = Number(r.factors[factor.id] !== undefined ? r.factors[factor.id] : r.factors[factor.name]);
+          const resp = getRunResponseValue(r);
           if (halfRange > 1e-9 && Math.abs(v - mid) <= halfRange * 0.15) {
             centerSum += resp; centerCount++;
           } else if (v > mid + 1e-6) {
