@@ -33,6 +33,7 @@ export function generateExportHTML(
         optimalConditions: res.optimalConditions,
         rSquared: res.rSquared,
         adjRSquared: res.adjRSquared,
+        maxRSquared: res.maxRSquared,
         rmse: res.rmse,
         effects: res.effects,
         paretoData: res.paretoData,
@@ -1076,13 +1077,16 @@ export function generateExportHTML(
                     let fRatioStr = lof.f_lof === Infinity || lof.f_lof === null ? 'Inf' : (typeof lof.f_lof !== 'undefined' ? lof.f_lof.toFixed(4) : '—');
                     let dfErr = Math.max(0, lof.df_error || 0);
                     let msErr = dfErr > 0 ? (lof.sse / dfErr).toFixed(6) : '—';
+                    const maxR2Text = (lof.maxRSquared !== null && typeof lof.maxRSquared !== 'undefined')
+                        ? (currentLang === 'zh' ? ' (受重复纯误差限制的最大可达 R² 为 ' + lof.maxRSquared.toFixed(4) + ')' : ' (Max achievable R² is ' + lof.maxRSquared.toFixed(4) + ' due to replicate pure error)')
+                        : '';
                     let noteText = (pVal !== null && pVal >= 0.05)
                         ? (currentLang === 'zh'
-                            ? '<div style="margin-top:8px; padding:8px; background:#ecfdf5; border:1px solid #a7f3d0; border-radius:6px; font-size:11px; color:#065f46;"><strong>✓ 拟合充分:</strong> 失拟检验不显著 (p = ' + (pVal !== null ? pVal.toFixed(4) : '') + ' &gt; 0.05)。当前模型结构能够充分描述试验数据，未见未建模的二次曲率迹象。</div>'
-                            : '<div style="margin-top:8px; padding:8px; background:#ecfdf5; border:1px solid #a7f3d0; border-radius:6px; font-size:11px; color:#065f46;"><strong>✓ Adequate Fit:</strong> Lack of Fit is not significant (p = ' + (pVal !== null ? pVal.toFixed(4) : '') + ' &gt; 0.05). The current model structure adequately represents the data without evidence of unaccounted curvature.</div>')
+                            ? '<div style="margin-top:8px; padding:8px; background:#ecfdf5; border:1px solid #a7f3d0; border-radius:6px; font-size:11px; color:#065f46;"><strong>✓ 拟合充分:</strong> 失拟检验不显著 (p = ' + (pVal !== null ? pVal.toFixed(4) : '') + ' &gt; 0.05)。当前模型结构能够充分描述试验数据，未见未建模的二次曲率迹象。' + maxR2Text + '</div>'
+                            : '<div style="margin-top:8px; padding:8px; background:#ecfdf5; border:1px solid #a7f3d0; border-radius:6px; font-size:11px; color:#065f46;"><strong>✓ Adequate Fit:</strong> Lack of Fit is not significant (p = ' + (pVal !== null ? pVal.toFixed(4) : '') + ' &gt; 0.05). The current model structure adequately represents the data without evidence of unaccounted curvature.' + maxR2Text + '</div>')
                         : (currentLang === 'zh'
-                            ? '<div style="margin-top:8px; padding:8px; background:#fffbeb; border:1px solid #fde68a; border-radius:6px; font-size:11px; color:#92400e;"><strong>⚠ 注意:</strong> 失拟检验显著 (p = ' + (pVal !== null ? pVal.toFixed(4) : '') + ' ≤ 0.05)。表明可能存在未建模的二次非线性曲率或高阶交互作用。</div>'
-                            : '<div style="margin-top:8px; padding:8px; background:#fffbeb; border:1px solid #fde68a; border-radius:6px; font-size:11px; color:#92400e;"><strong>⚠ Notice:</strong> Lack of Fit is statistically significant (p = ' + (pVal !== null ? pVal.toFixed(4) : '') + ' ≤ 0.05). Unmodeled curvature or higher-order interactions may be present.</div>');
+                            ? '<div style="margin-top:8px; padding:8px; background:#fffbeb; border:1px solid #fde68a; border-radius:6px; font-size:11px; color:#92400e;"><strong>⚠ 注意:</strong> 失拟检验显著 (p = ' + (pVal !== null ? pVal.toFixed(4) : '') + ' ≤ 0.05)。表明可能存在未建模的二次非线性曲率或高阶交互作用。' + maxR2Text + '</div>'
+                            : '<div style="margin-top:8px; padding:8px; background:#fffbeb; border:1px solid #fde68a; border-radius:6px; font-size:11px; color:#92400e;"><strong>⚠ Notice:</strong> Lack of Fit is statistically significant (p = ' + (pVal !== null ? pVal.toFixed(4) : '') + ' ≤ 0.05). Unmodeled curvature or higher-order interactions may be present.' + maxR2Text + '</div>');
 
                     lofHtml = '<table style="width: 100%; min-width: 480px;"><thead><tr><th style="white-space: nowrap;">' + thErrSource + '</th><th style="text-align:right; white-space:nowrap;">' + thDF + '</th><th style="text-align:right; white-space:nowrap;">' + thSS + '</th><th style="text-align:right; white-space:nowrap;">' + thMeanSquare + '</th><th style="text-align:right; white-space:nowrap;">' + thFRatio + '</th><th class="col-pval">' + thPVal + '</th></tr></thead><tbody>' +
                         '<tr><td style="font-weight:600; white-space:nowrap;">' + lofLabel + '</td><td style="text-align:right; font-family:monospace; white-space:nowrap;">' + lof.df_lof + '</td><td style="text-align:right; font-family:monospace; white-space:nowrap;">' + lof.ss_lof.toFixed(6) + '</td><td style="text-align:right; font-family:monospace; white-space:nowrap;">' + lof.ms_lof.toFixed(6) + '</td><td style="text-align:right; font-family:monospace; font-weight:600; white-space:nowrap;">' + fRatioStr + '</td><td class="col-pval">' + pDisplay + '</td></tr>' +

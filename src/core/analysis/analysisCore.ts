@@ -86,6 +86,8 @@ export interface AnalysisResult {
   bestPred: number;
   rSquared: number;
   adjRSquared: number;
+  /** Theoretical upper limit on R² set by replicate pure error: 1 - ss_pure / sst, or null if no replicates exist. */
+  maxRSquared: number | null;
   /** Model degrees of freedom (rank - 1). */
   dfModel: number;
   /** Whole-model ANOVA F-test p-value: 1 - F_cdf(fRatio; dfModel, dfError), or null when dfError === 0. */
@@ -429,7 +431,11 @@ export function computeAnalysis(
       p_lof = 1 - jStat.centralF.cdf(f_lof, df_lof, df_pure);
     }
 
-    const lackOfFit = {
+    const maxRSquared: number | null = (sst > 0 && df_pure > 0)
+      ? Math.max(0, Math.min(1, 1 - (ss_pure / sst)))
+      : null;
+
+    const lackOfFit: LackOfFitResult = {
       ss_lof, df_lof, ms_lof, f_lof, p_lof,
       ss_pure, df_pure, ms_pure,
       sse, df_error, sst
@@ -1094,6 +1100,7 @@ export function computeAnalysis(
       bestPred, 
       rSquared, 
       adjRSquared, 
+      maxRSquared,
       dfModel,
       modelPValue,
       p: p_model, 

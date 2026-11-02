@@ -415,4 +415,60 @@ describe('Tier 4 fixes: P1.11, P1.18, P1.19, P1.20, P1.21, P1.4, P1.14', () => {
       }
     });
   });
+
+  describe('Max R² (1 - SS_pure / SST) diagnostic', () => {
+    it('computes maxRSquared accurately when replicate runs exist and returns null when no replicate runs exist', () => {
+      const f1: Factor = { id: 'x1', name: 'X1', unit: '', type: 'numeric', min: 10, max: 20 };
+      const f2: Factor = { id: 'x2', name: 'X2', unit: '', type: 'numeric', min: 10, max: 20 };
+      const resp: Response = { id: 'y', name: 'Yield', unit: '%', goal: 'maximize' };
+
+      // Design with replicate center points (15, 15)
+      const runsWithReplicates: Run[] = [
+        { id: '1', stdOrder: 1, runOrder: 1, factors: { x1: 10, x2: 10 }, responses: { y: 20 } },
+        { id: '2', stdOrder: 2, runOrder: 2, factors: { x1: 20, x2: 10 }, responses: { y: 30 } },
+        { id: '3', stdOrder: 3, runOrder: 3, factors: { x1: 10, x2: 20 }, responses: { y: 25 } },
+        { id: '4', stdOrder: 4, runOrder: 4, factors: { x1: 20, x2: 20 }, responses: { y: 45 } },
+        // Replicate center points with curvature (mean 36 vs planar 30) and slight noise
+        { id: '5', stdOrder: 5, runOrder: 5, factors: { x1: 15, x2: 15 }, responses: { y: 36 } },
+        { id: '6', stdOrder: 6, runOrder: 6, factors: { x1: 15, x2: 15 }, responses: { y: 38 } },
+        { id: '7', stdOrder: 7, runOrder: 7, factors: { x1: 15, x2: 15 }, responses: { y: 34 } }
+      ];
+
+      const projWithReps: Project = {
+        id: 'proj-reps',
+        name: 'Replicate Study',
+        description: '',
+        createdAt: 1,
+        updatedAt: 1,
+        factors: [f1, f2],
+        responses: [resp],
+        runs: runsWithReplicates
+      };
+
+      const analysisWithReps = computeAnalysis(projWithReps, resp);
+      expect(analysisWithReps).not.toBeNull();
+      expect(analysisWithReps!.lackOfFit.df_pure).toBe(2);
+      expect(analysisWithReps!.lackOfFit.ss_pure).toBeGreaterThan(0);
+      expect(analysisWithReps!.maxRSquared).not.toBeNull();
+      expect(analysisWithReps!.maxRSquared).toBeCloseTo(
+        1 - analysisWithReps!.lackOfFit.ss_pure / analysisWithReps!.lackOfFit.sst,
+        6
+      );
+      expect(analysisWithReps!.maxRSquared!).toBeGreaterThan(analysisWithReps!.rSquared);
+      expect(analysisWithReps!.maxRSquared!).toBeLessThanOrEqual(1.0);
+
+      // Design with NO replicate runs: df_pure === 0, so maxRSquared must be null
+      const projNoReps: Project = {
+        ...projWithReps,
+        id: 'proj-no-reps',
+        runs: runsWithReplicates.slice(0, 5) // all 5 points are distinct
+      };
+
+      const analysisNoReps = computeAnalysis(projNoReps, resp);
+      expect(analysisNoReps).not.toBeNull();
+      expect(analysisNoReps!.lackOfFit.df_pure).toBe(0);
+      expect(analysisNoReps!.maxRSquared).toBeNull();
+    });
+  });
 });
+

@@ -829,6 +829,7 @@ export function createDoeMcpServer(context: McpDatabaseContext) {
           summary: {
             rSquared: Number((analysis.rSquared ?? 0).toFixed(4)),
             adjRSquared: Number((analysis.adjRSquared ?? 0).toFixed(4)),
+            maxRSquared: analysis.maxRSquared !== null && analysis.maxRSquared !== undefined ? Number(analysis.maxRSquared.toFixed(4)) : null,
             rmse: Number((analysis.rmse ?? 0).toFixed(4)),
             dfModel: analysis.dfModel,
             dfError: analysis.dfError,
@@ -840,7 +841,10 @@ export function createDoeMcpServer(context: McpDatabaseContext) {
             runsAnalyzed: analysis.nRuns || validRuns.length,
             adequatePrecision: analysis.adequatePrecision ? Number(analysis.adequatePrecision.toFixed(2)) : null,
           },
-          lackOfFit: lofPayload,
+          lackOfFit: {
+            ...lofPayload,
+            maxRSquared: analysis.maxRSquared !== null && analysis.maxRSquared !== undefined ? Number(analysis.maxRSquared.toFixed(4)) : null,
+          },
           excludedRuns: analysis.excludedRuns,
           warnings: analysis.warnings,
           modelTerms: formattedTerms,

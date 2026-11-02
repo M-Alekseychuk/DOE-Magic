@@ -1675,6 +1675,14 @@ export default function ProjectAnalysis({ project, selectedResponseId, onRespons
                       <span>R²: <strong className="text-slate-800 dark:text-slate-200">{analysisResults.rSquared.toFixed(4)}</strong></span>
                       <span>•</span>
                       <span>Adj R²: <strong className="text-slate-800 dark:text-slate-200">{analysisResults.adjRSquared.toFixed(4)}</strong></span>
+                      {analysisResults?.maxRSquared !== null && analysisResults?.maxRSquared !== undefined && (
+                        <>
+                          <span>•</span>
+                          <span title={locale === 'zh' ? '最大 R²: 基于试验重复纯误差计算的理论上限 1 - SS(纯误差)/SST' : 'Max R²: Theoretical ceiling (1 - SS_pure / SST) given experimental replicate pure error'}>
+                            {locale === 'zh' ? '最大 R²' : 'Max R²'}: <strong className="text-slate-800 dark:text-slate-200">{analysisResults.maxRSquared.toFixed(4)}</strong>
+                          </span>
+                        </>
+                      )}
                       {analysisResults?.adequatePrecision !== undefined && (
                         <>
                           <span>•</span>
@@ -1845,6 +1853,7 @@ export default function ProjectAnalysis({ project, selectedResponseId, onRespons
                     <TableHelpTooltip title="Lack of Fit Test">
                       <p><strong className="text-white">Purpose:</strong> Tests whether the model form adequately describes the data or if higher-order curvature/interactions are missing.</p>
                       <p><strong className="text-white">Pure Error:</strong> Experimental noise measured from replicate runs (e.g. repeated center points).</p>
+                      <p><strong className="text-white">Max R²:</strong> Theoretical ceiling on explainable variation (1 - SS_pure / SST) set by replicate pure error.</p>
                       <p><strong className="text-white">p &gt; 0.05 (Green):</strong> Adequate fit! The model captures the response surface without significant unmodeled curvature.</p>
                       <p><strong className="text-white">p ≤ 0.05 (Amber):</strong> Significant lack of fit. Suggests expanding to quadratic or higher-order response surface model.</p>
                     </TableHelpTooltip>
@@ -1939,18 +1948,26 @@ export default function ProjectAnalysis({ project, selectedResponseId, onRespons
                     analysisResults.lackOfFit.p_lof >= 0.05 ? (
                       <div className="flex items-center gap-1.5 text-[9.5px] text-emerald-800 dark:text-emerald-300">
                         <CheckCircle2 className="w-3 h-3 text-emerald-600 dark:text-emerald-400 shrink-0" />
-                        <span>Lack of Fit is not significant (p = {analysisResults.lackOfFit.p_lof.toFixed(4)} &gt; 0.05). Model fits response surface adequately.</span>
+                        <span>
+                          {locale === 'zh'
+                            ? `失拟检验不显著 (p = ${analysisResults.lackOfFit.p_lof.toFixed(4)} > 0.05)。模型对响应面拟合充分。${analysisResults.maxRSquared !== null && analysisResults.maxRSquared !== undefined ? ` (受纯重复误差限制的最大可达 R² 为 ${analysisResults.maxRSquared.toFixed(4)})` : ''}`
+                            : `Lack of Fit is not significant (p = ${analysisResults.lackOfFit.p_lof.toFixed(4)} > 0.05). Model fits response surface adequately.${analysisResults.maxRSquared !== null && analysisResults.maxRSquared !== undefined ? ` (Max achievable R² is ${analysisResults.maxRSquared.toFixed(4)} due to pure replicate error)` : ''}`}
+                        </span>
                       </div>
                     ) : (
                       <div className="flex items-center gap-1.5 text-[9.5px] text-amber-800 dark:text-amber-300">
                         <AlertTriangle className="w-3 h-3 text-amber-600 dark:text-amber-400 shrink-0" />
-                        <span>Lack of Fit is significant (p = {analysisResults.lackOfFit.p_lof.toFixed(4)} ≤ 0.05). Curvature or higher-order terms suggested.</span>
+                        <span>
+                          {locale === 'zh'
+                            ? `失拟检验显著 (p = ${analysisResults.lackOfFit.p_lof.toFixed(4)} ≤ 0.05)。建议引入二次项或高阶交互作用。${analysisResults.maxRSquared !== null && analysisResults.maxRSquared !== undefined ? ` (最大可达 R² 为 ${analysisResults.maxRSquared.toFixed(4)})` : ''}`
+                            : `Lack of Fit is significant (p = ${analysisResults.lackOfFit.p_lof.toFixed(4)} ≤ 0.05). Curvature or higher-order terms suggested.${analysisResults.maxRSquared !== null && analysisResults.maxRSquared !== undefined ? ` (Max achievable R² is ${analysisResults.maxRSquared.toFixed(4)})` : ''}`}
+                        </span>
                       </div>
                     )
                   ) : (
                     <div className="flex items-center gap-1.5 text-[9.5px] text-slate-500 dark:text-slate-400">
                       <Info className="w-3 h-3 text-slate-400 shrink-0" />
-                      <span>Replicate runs (center points) required to separate Pure Error from Lack of Fit.</span>
+                      <span>{locale === 'zh' ? '计算纯误差需要包含重复试验点 (如中心点)。' : 'Replicate runs (e.g. center points) required to separate Pure Error from Lack of Fit.'}</span>
                     </div>
                   )}
                 </div>
