@@ -9,6 +9,11 @@ export const DEFAULT_LOGO_WIDTH = 100; // Percentage of available sidebar width 
 export function getStoredDefaultLogo(): string {
   try {
     const val = localStorage.getItem(DEFAULT_LOGO_STORAGE_KEY);
+    // If it's the legacy Jiuzhou logo, remove it so the new standard logo displays
+    if (val && val.startsWith('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAA3sAAAF/')) {
+      localStorage.removeItem(DEFAULT_LOGO_STORAGE_KEY);
+      return logoBase64;
+    }
     if (val && val.startsWith('data:image/')) return val;
   } catch {
     // fallback
@@ -18,7 +23,13 @@ export function getStoredDefaultLogo(): string {
 
 export function getStoredCustomLogo(): string | null {
   try {
-    return localStorage.getItem(CUSTOM_LOGO_STORAGE_KEY);
+    const val = localStorage.getItem(CUSTOM_LOGO_STORAGE_KEY);
+    // If it's the legacy Jiuzhou logo, remove it so the new standard logo displays
+    if (val && val.startsWith('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAA3sAAAF/')) {
+      localStorage.removeItem(CUSTOM_LOGO_STORAGE_KEY);
+      return null;
+    }
+    return val;
   } catch {
     return null;
   }

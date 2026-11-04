@@ -29,7 +29,7 @@ export default function Layout() {
     return localStorage.getItem('darkMode') === 'true';
   });
 
-  const [logoAspect, setLogoAspect] = useState<number>(2.32);
+  const [logoAspect, setLogoAspect] = useState<number>(2.41);
 
   useEffect(() => {
     if (activeLogo) {
@@ -73,7 +73,7 @@ export default function Layout() {
   const targetBoxWidth = Math.max(60, (maxAvailableWidth * logoWidth) / 100);
   const maxAllowedImgHeight = 125;
 
-  const aspect = logoAspect > 0 ? logoAspect : 2.32;
+  const aspect = logoAspect > 0 ? logoAspect : 2.41;
   let targetImgWidth = targetBoxWidth - paddingBorder;
   let targetImgHeight = targetImgWidth / aspect;
 
