@@ -17,7 +17,7 @@ export const translations: Record<SupportedLocale, Record<string, string>> = {
   en: {
     // General & Navigation
     'app_name': 'DOE Magic',
-    'app_version': 'v.1.5.2',
+    'app_version': 'v1.0.0',
     'current_experiment': 'Current Experiment',
     'none_selected': 'None Selected',
     'all_experiments': 'All Experiments',
@@ -258,7 +258,7 @@ export const translations: Record<SupportedLocale, Record<string, string>> = {
   zh: {
     // General & Navigation
     'app_name': 'DOE Magic',
-    'app_version': 'v.1.5.2',
+    'app_version': 'v1.0.0',
     'current_experiment': '当前实验',
     'none_selected': '未选择',
     'all_experiments': '所有实验',

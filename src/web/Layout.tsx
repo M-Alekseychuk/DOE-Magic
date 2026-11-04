@@ -173,7 +173,7 @@ export default function Layout() {
 
             <Link to="/" className="flex items-center gap-2 hover:opacity-90 transition-opacity">
               <span className="text-white font-bold text-lg tracking-tight text-center">{t('app_name', 'DOE Magic')}</span>
-              <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-mono">{t('app_version', 'v.1.5.2')}</span>
+              <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-mono">{t('app_version', 'v1.0.0')}</span>
             </Link>
           </div>
           <div className="text-[11px] uppercase tracking-widest font-bold text-brand-700 dark:text-blue-400 mb-1">{t('current_experiment', 'Current Experiment')}</div>
