@@ -2,6 +2,16 @@
 
 DOE Magic is a Design of Experiments (DOE) software for process development. You plan an experiment, enter results, analyse them with validated statistical models, compare responses, optimise across multiple objectives, test robustness with Monte Carlo simulation, and export audit-ready reports. AI assistants can perform the full workflow through the built-in MCP (Model Context Protocol) server.
 
+## Key Features
+
+- **Comprehensive Design Generation**: 2-level full and fractional factorials ($2^{k-p}$ with minimum aberration and design resolution), Definitive Screening Designs (DSD), Central Composite (CCD), Box-Behnken (BBD), Plackett-Burman (PB), and custom D-Optimal designs with replicate center points and reproducible random seeds.
+- **Validated Statistical Analysis & ANOVA**: Type III Partial Sum of Squares via two-pass Gram-Schmidt QR decomposition, Lenth's PSE method for saturated screening designs, Lack of Fit test with pure error separation, and Max $R^2$ ($1 - SS_{\text{pure}} / SST$) diagnostic.
+- **Interactive Profiler & Diagnostics**: Pareto chart of effects with Bonferroni limits, Half-Normal probability plots, interactive Prediction Profiler with real-time sliders, 2D contour plots, 3D response surface wireframes, Studentized residuals, and Box-Cox power transformations.
+- **Multi-Objective Desirability Optimization**: Simultaneous optimization across multiple responses using Derringer–Suich desirability functions (maximize, minimize, target) powered by Nelder-Mead simplex search across continuous, discrete, and categorical factors.
+- **Monte Carlo Robustness Simulation**: Process capability and defect rate ($C_{pk}$, % out of specification) estimation under parameter uncertainty and setpoint fluctuations.
+- **Model Context Protocol (MCP) Server**: Built-in MCP server (stdio and HTTP endpoints) enabling external AI agents to generate designs, inspect matrices, run regression analyses, and optimize parameters programmatically.
+- **Interoperability & Reporting**: Standalone interactive HTML report export with embedded vector SVG surface contours, Excel import/export, complete JSON project backup, bilingual support (English / 简体中文), and custom organization branding logo customization.
+
 > [!NOTE]
 > **Statistical Engine Validation:** The core mathematics engine has undergone systematic verification against textbook reference cases (Montgomery, Box & Behnken, Jones & Nachtsheim) and Python `statsmodels`:
 > 1. **Response Surface Methodology (RSM)**: Full quadratic models ($x_i^2$) are fitted for Central Composite (CCD), Box-Behnken (BBD), and D-optimal designs, correctly capturing surface curvature.
