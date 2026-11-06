@@ -1,13 +1,6 @@
 # DOE Magic (v1.0.0)
 
-DOE Magic is a Design of Experiments (DOE) workbench for pharmaceutical process development and open chemistry research (Open Process Chemistry Project — OPCP). You plan an experiment, enter results, analyse them with validated statistical models, compare responses, optimise across multiple objectives, test robustness with Monte Carlo simulation, and export audit-ready reports. AI assistants can perform the full workflow through the built-in MCP (Model Context Protocol) server.
-
-> [!WARNING]
-> **If you edit this project in Google AI Studio:** AI Studio pushes its *whole* workspace to GitHub and overwrites what is there.
-> 1. **Never push from an AI Studio workspace that is older than `main`.** After every merge, re-import the project from the `main` branch, or start a fresh AI Studio project from it, before you edit there again.
-> 2. **Before you switch workspaces:** in your current AI Studio app, open every real project and click **Export JSON** on its page. Keep the files. A new AI Studio project starts with only the demo project. The copy in your browser is not a backup (see [where your data is](#where-your-data-is)). In the new workspace, bring each project back with **Import Project** on the Dashboard.
->
-> Nobody has confirmed the exact AI Studio steps yet ([details](docs/context/DOE-Magic/ai-studio-origin.md)). If you are unsure, do not push; ask a developer to do it with you. After any AI Studio push, open the commit on GitHub. If it deletes files you did not mean to delete (`README.md`, `docs/`, anything else), or adds many files at the top level, say so right away; it can be undone.
+DOE Magic is a Design of Experiments (DOE) software for process development. You plan an experiment, enter results, analyse them with validated statistical models, compare responses, optimise across multiple objectives, test robustness with Monte Carlo simulation, and export audit-ready reports. AI assistants can perform the full workflow through the built-in MCP (Model Context Protocol) server.
 
 > [!NOTE]
 > **Statistical Engine Validation:** The core mathematics engine has undergone systematic verification against textbook reference cases (Montgomery, Box & Behnken, Jones & Nachtsheim) and Python `statsmodels`:
@@ -33,23 +26,27 @@ DOE Magic is a Design of Experiments (DOE) workbench for pharmaceutical process 
 
 You need [Node.js](https://nodejs.org/) 22.12 or newer (20.19 or newer also works). Older versions cannot run the production build.
 
-Get the code first. On Windows, use a short folder such as `C:\dm\DOE-Magic`, because long paths break the install:
+
+
+### Installation
+
+Either install latest version release (.exe)
+
+or
 
 ```bash
-git clone -c core.longpaths=true https://github.com/M-Alekseychuk/DOE-Magic.git C:\dm\DOE-Magic
-```
-
-Then, inside that folder:
-
-```bash
+# 1. Install dependencies
 npm install
-```
 
-```bash
+# 2. Start local development server (Port 3000)
 npm run dev
-```
 
-Open http://localhost:3000. The same process serves the web app, the data API and the MCP endpoints. If `npm install` fails with a path or "spawn" error, move the folder somewhere shorter ([why](docs/memory/DOE-Magic/windows-long-paths.md)).
+# 3. Type-check & lint
+npm run lint
+
+# 4. Production build
+npm run build
+```
 
 | Command | What it does |
 |---|---|
@@ -60,13 +57,6 @@ Open http://localhost:3000. The same process serves the web app, the data API an
 | `npm test` | Run the automated test suite (194 tests across 14 suites). Validates the statistical engine, design generators, MCP tools, and model invariants against textbook reference datasets |
 | `npm run check` | Type-check everything (`tsc --noEmit`) and verify layer boundaries and project folder rules (`scripts/check-boundaries.mjs`) |
 
-### Where your data is
-
-Your projects are stored on the server in `data.json`, in the folder the server was started from. With the commands above, that is the project folder. The browser keeps only a temporary copy, and the server overwrites it every time the page loads, so it is not a backup. `data.json` is not part of git. When it is missing, the server recreates it with only the demo project.
-
-To back up, click **Export JSON** on each project, or copy `data.json` while the server is stopped.
-
-A confirmed **Reset Sample Data** first copies `data.json` to `data.json.before-reset-<date and time>` in the same folder. To undo a reset, stop the server, copy that file over `data.json`, and start the server again.
 
 ## Where things are
 
@@ -115,15 +105,7 @@ docs/              project documentation (see below)
 
 > Do not create new files in the project's top folder. Do not write patch, fix or debug scripts; edit the source files directly. Put calculations in src/core, screens in src/web/features/<tab>. Do not move server.ts, index.html, vite.config.ts or src/main.tsx.
 
-## Documentation
 
-Start with **[Status and handoff](docs/task/DOE-Magic/status-and-handoff.md)**. It covers the current state, the verified fixes and the next steps.
+## License
 
-| Folder | Contents |
-|---|---|
-| [`docs/task/DOE-Magic/`](docs/task/DOE-Magic/) | [Goals](docs/task/DOE-Magic/goals.md) and the [status and handoff](docs/task/DOE-Magic/status-and-handoff.md) |
-| [`docs/spec/DOE-Magic/`](docs/spec/DOE-Magic/) | The [design spec](docs/spec/DOE-Magic/design-spec.md) (architecture rules) and the prioritised [roadmap and backlog](docs/spec/DOE-Magic/roadmap-backlog.md) |
-| [`docs/context/DOE-Magic/`](docs/context/DOE-Magic/) | How each part works today, with its known issues |
-| [`docs/memory/DOE-Magic/`](docs/memory/DOE-Magic/) | Lessons learned: mistakes not to repeat |
-
-AI coding assistants start from [`AGENTS.md`](AGENTS.md).
+GNU General Public License (GPL-3.0; https://www.gnu.org/licenses/gpl-3.0.html)
