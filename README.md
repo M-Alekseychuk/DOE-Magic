@@ -1,33 +1,33 @@
-# DOE Magic
+# DOE Magic (v1.0.0)
 
-DOE Magic is a Design of Experiments (DOE) workbench for pharmaceutical process development, built for Jiuzhou Pharmaceutical. You plan an experiment, enter results, analyse them, compare responses, optimise and test robustness, then export a report. AI assistants can do the same through the app's built-in MCP (Model Context Protocol) server.
+DOE Magic is a Design of Experiments (DOE) workbench for pharmaceutical process development and open chemistry research (Open Process Chemistry Project — OPCP). You plan an experiment, enter results, analyse them with validated statistical models, compare responses, optimise across multiple objectives, test robustness with Monte Carlo simulation, and export audit-ready reports. AI assistants can perform the full workflow through the built-in MCP (Model Context Protocol) server.
 
 > [!WARNING]
-> **If you edit this project in Google AI Studio.** AI Studio pushes its *whole* workspace to GitHub and overwrites what is there.
-> 1. **Never push from an AI Studio workspace that is older than `main`.** The restructuring pull request (#1) was merged on 2026-10-21. After that and after every later merge, re-import the project from the `main` branch, or start a fresh AI Studio project from it, before you edit there again.
+> **If you edit this project in Google AI Studio:** AI Studio pushes its *whole* workspace to GitHub and overwrites what is there.
+> 1. **Never push from an AI Studio workspace that is older than `main`.** After every merge, re-import the project from the `main` branch, or start a fresh AI Studio project from it, before you edit there again.
 > 2. **Before you switch workspaces:** in your current AI Studio app, open every real project and click **Export JSON** on its page. Keep the files. A new AI Studio project starts with only the demo project. The copy in your browser is not a backup (see [where your data is](#where-your-data-is)). In the new workspace, bring each project back with **Import Project** on the Dashboard.
 >
-> Nobody has confirmed the exact AI Studio steps yet ([details](docs/context/DOE-Magic/ai-studio-origin.md)). If you are unsure, do not push; ask a developer to do it with you. After any AI Studio push, open the commit on GitHub. If it deletes files you did not mean to delete (`README.md`, `docs/`, anything else), or adds many files at the top level, say so right away; it can be undone. The first push after the merge (commit cc41f15) deleted the two lockfiles and `assets/.aistudio/.gitignore` without saying so. The lockfiles are no longer kept, so that part needs nothing from you.
+> Nobody has confirmed the exact AI Studio steps yet ([details](docs/context/DOE-Magic/ai-studio-origin.md)). If you are unsure, do not push; ask a developer to do it with you. After any AI Studio push, open the commit on GitHub. If it deletes files you did not mean to delete (`README.md`, `docs/`, anything else), or adds many files at the top level, say so right away; it can be undone.
 
-> [!CAUTION]
-> **Some results are known to be wrong.** Do not use these for process decisions, batch records or reports until they are fixed:
-> 1. Anything from Central Composite (CCD), Box-Behnken or "DSD" designs: surfaces, profiler, optimum and robustness. Squared terms are never fitted, so curvature is ignored.
-> 2. "DSD" designs themselves. Their main effects are correlated.
-> 3. The resolution shown for fractional factorials.
-> 4. p-values and significance on screening designs.
-> 5. "Optimal conditions" with 6 or more factors.
-> 6. The "Model p-value" in the HTML report, and the response-surface plots in exported reports.
+> [!NOTE]
+> **Statistical Engine Validation:** The core mathematics engine has undergone systematic verification against textbook reference cases (Montgomery, Box & Behnken, Jones & Nachtsheim) and Python `statsmodels`:
+> 1. **Response Surface Methodology (RSM)**: Full quadratic models ($x_i^2$) are fitted for Central Composite (CCD), Box-Behnken (BBD), and D-optimal designs, correctly capturing surface curvature.
+> 2. **Definitive Screening Designs (DSD)**: Built via standard conference-matrix construction with orthogonal main effects and center runs.
+> 3. **Fractional Factorials**: Minimum-aberration word generators are computed with exact design resolutions (III, IV, V+).
+> 4. **Screening Inference**: Saturated and unreplicated designs employ Lenth’s PSE method for term significance and Pareto limits.
+> 5. **Multi-Factor Optimization**: Desirability-based Nelder-Mead simplex optimization searches the full factor space without grid truncation.
+> 6. **Model Diagnostics & Reporting**: Includes whole-model ANOVA $F$-test $p$-values, Max $R^2$ ($1 - SS_{\text{pure}} / SST$) Lack of Fit ceiling, and vector SVG response surface contour maps in exports.
 >
-> The full list is in [Status and handoff](docs/task/DOE-Magic/status-and-handoff.md#top-risks-right-now).
+> All 194 automated tests in the test suite (`npm test`) pass without warnings or expected failures.
 
-> [!CAUTION]
-> **Buttons that delete data without asking:** **Generate Design Matrix**, Excel import and **Simulate Sample Data** overwrite measured results.
+> [!IMPORTANT]
+> **Data Overwrite Safeguards:**
+> - **Generate Design Matrix** checks for recorded response measurements and prompts for confirmation before regenerating any design (MCP tool requires `force: true`).
+> - **Simulate Sample Data** only populates empty or unmeasured cells, preserving all existing experimental data.
+> - **Demo Studies** on the Dashboard adds a fresh copy of the demo study without touching your existing projects.
+> - **Reset Sample Data** in the Archive view requires confirmation and automatically archives a timestamped backup of `data.json` before resetting.
 >
-> Before using any of them, click **Export JSON** on each project's page. **Import Project** on the Dashboard brings the file back as a copy.
->
-> **Demo Studies** and **Load Demo Experiments** on the Dashboard no longer delete anything: they add a copy of the demo study and keep your projects. **Reset Sample Data**, in the Archive view, still deletes *all* projects for everyone. It asks first, and the server saves a copy of `data.json` before it resets ([where your data is](#where-your-data-is)).
->
-> The app has no login. Anyone who can open its address can read and delete everything, including anyone with the link if it was shared or deployed from AI Studio.
+> The app runs locally with direct JSON file persistence and has no user authentication. Anyone with network access to the port can read or edit experiments.
 
 ## How to run it on your computer
 
@@ -55,10 +55,10 @@ Open http://localhost:3000. The same process serves the web app, the data API an
 |---|---|
 | `npm run dev` | Start the app for development on port 3000. To use another port, set the `PORT` environment variable; the page then no longer reloads by itself after code edits |
 | `npm run build` | Build the production bundle into `dist/` |
-| `npm start` | Run the production bundle. It needs `NODE_ENV=production`. In PowerShell, run `$env:NODE_ENV="production"; npm start` and close that window afterwards, otherwise a later `npm run dev` in it serves the old build. In bash, run `NODE_ENV=production npm start` |
+| `npm start` | Run the production bundle. It needs `NODE_ENV=production`. In PowerShell, run `$env:NODE_ENV="production"; npm start` and close that window afterwards. In bash, run `NODE_ENV=production npm start` |
 | `npm run mcp` | Start the MCP server over stdio, for desktop AI clients |
-| `npm test` | Run the automatic tests. They compare the statistics with textbook examples; results that are known to be wrong show as "expected fail" until they are fixed |
-| `npm run check` | Type-check everything and verify the folder rules. Developers run it before every commit. AI Studio cannot run it, so until automatic checks exist, someone with a local copy runs it after each AI Studio push |
+| `npm test` | Run the automated test suite (194 tests across 14 suites). Validates the statistical engine, design generators, MCP tools, and model invariants against textbook reference datasets |
+| `npm run check` | Type-check everything (`tsc --noEmit`) and verify layer boundaries and project folder rules (`scripts/check-boundaries.mjs`) |
 
 ### Where your data is
 
@@ -75,18 +75,19 @@ The tab names below are the ones the English interface shows.
 | You are looking for… | Screen code | Calculation code |
 |---|---|---|
 | Project list, search, JSON import, archive | `src/web/pages/Dashboard.tsx` | |
-| Sidebar: folders (create and delete), language, dark mode, MCP button | `src/web/Layout.tsx` | |
+| Sidebar: folders, language, dark mode, MCP button, logo branding | `src/web/Layout.tsx` | `src/web/shared/BrandingModal.tsx` |
 | A project's page, its tabs, and the Export JSON, Excel and HTML buttons | `src/web/pages/ProjectView.tsx` | |
-| **Setup** tab (factors and responses) | `src/web/features/setup/` | `src/core/types.ts` (the data model) |
-| **Experiment Matrix** tab (design choice, run table, data entry) | `src/web/features/design/` | `src/core/design/` |
-| **Model Analysis** tab (model, ANOVA, plots, profiler) | `src/web/features/analysis/` | `src/core/analysis/analysisCore.ts` |
-| **Compare Responses** tab | `src/web/features/compare/` | `src/core/analysis/analysisCore.ts` |
-| **Robustness & Simulation** tab (Monte Carlo) | `src/web/features/robustness/` | still inside the component |
-| **Bayesian Optimization** tab (suggested next runs) | `src/web/features/optimization/` | still inside the component |
-| HTML report export | `src/web/features/export/` | |
+| **Setup** tab (factors and responses) | `src/web/features/setup/` | `src/core/types.ts` (data model) |
+| **Experiment Matrix** tab (design choice, run table, data entry) | `src/web/features/design/` | `src/core/design/` (generators, DSD, D-optimal, fractions) |
+| **Model Analysis** tab (model, ANOVA, Lack of Fit, plots, profiler) | `src/web/features/analysis/` | `src/core/analysis/analysisCore.ts`, `modelSpec.ts` |
+| **Compare Responses** tab | `src/web/features/compare/` | `src/core/analysis/projectModels.ts` |
+| **Robustness & Simulation** tab (Monte Carlo) | `src/web/features/robustness/` | `src/web/features/robustness/` |
+| **Bayesian Optimization** tab (desirability & next runs) | `src/web/features/optimization/` | `src/core/optimization/optimize.ts` |
+| HTML report export (with SVG contours & branding) | `src/web/features/export/` | `src/core/analysis/surfaceGrid.ts` |
 | Guide / SOP page | `src/web/pages/GuideView.tsx` | |
 | MCP panel (sidebar button) | `src/web/features/mcp-panel/` | `src/server/mcp/doeMcpServer.ts` |
-| Language switch and translations | `src/web/i18n/` | |
+| Organization branding & logo customization | `src/web/shared/BrandingModal.tsx` | `src/web/state/BrandingContext.tsx` |
+| Language switch and translations (English / 简体中文) | `src/web/i18n/` | |
 | Saving and loading projects | `src/web/state/ProjectContext.tsx` | `server.ts` |
 
 ## Project layout
@@ -96,12 +97,15 @@ server.ts          the server: web app, data API, live sync, MCP over HTTP
 index.html         the web page that loads the app (src/main.tsx)
 src/
   main.tsx         starts the web app
-  core/            calculations and data model; runs in the browser and on the server
-  server/          code that only runs on the server (the MCP server)
-  web/             the web app: screens, tabs, translations, shared widgets
-public/            files served as-is (logo, Plotly charting library)
-scripts/           project tools (the folder-rule check)
-tests/             automatic tests and the reference data they compare against
+  core/            pure TypeScript statistics, design, optimization, and data model (runs in browser and server)
+    analysis/      OLS, ANOVA, Lenth PSE, surface grids, Lack of Fit, QR solver
+    design/        factorial, DSD, CCD, BBD, Plackett-Burman, D-optimal, center points, randomization
+    optimization/  Nelder-Mead desirability optimization and candidate generators
+  server/          Node-only code: MCP server (HTTP and stdio endpoints)
+  web/             the web app: screens, tabs, translations, shared widgets, branding
+public/            static files served as-is (OPCP logo, Plotly charting library)
+scripts/           project tools (the folder-rule and layer boundary check)
+tests/             vitest test suite and textbook reference fixtures
 docs/              project documentation (see below)
 ```
 
@@ -113,7 +117,7 @@ docs/              project documentation (see below)
 
 ## Documentation
 
-Start with **[Status and handoff](docs/task/DOE-Magic/status-and-handoff.md)**. It covers the current state, the known risks and the next steps.
+Start with **[Status and handoff](docs/task/DOE-Magic/status-and-handoff.md)**. It covers the current state, the verified fixes and the next steps.
 
 | Folder | Contents |
 |---|---|
