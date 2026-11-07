@@ -1,7 +1,7 @@
+# DOE Magic (v1.0.0)
+
 [![License: AGPL v3](https://img.shields.io/badge/License-AGPL%20v3-blue.svg)](LICENSE)
 [![Version](https://img.shields.io/badge/version-v1.0.0-blue.svg)](package.json)
-
-# DOE Magic (v1.0.0)
 
 DOE Magic is a Design of Experiments (DOE) software for process development. You plan an experiment, enter results, analyse them with validated statistical models, compare responses, optimise across multiple objectives, test robustness with Monte Carlo simulation, and export audit-ready reports. AI assistants can perform the full workflow through the built-in MCP (Model Context Protocol) server.
 
@@ -120,6 +120,12 @@ docs/              project documentation (see below)
 > Do not create new files in the project's top folder. Do not write patch, fix or debug scripts; edit the source files directly. Put calculations in src/core, screens in src/web/features/<tab>. Do not move server.ts, index.html, vite.config.ts or src/main.tsx.
 
 
-## License
+## 🔒 Offline & Data Privacy
+
+This application runs **100% locally**. Nothing is ever sent to external servers or third-party cloud services. Local calculations and saved sessions reside solely on youe device.
+
+---
+
+## 📄 License
 
 GNU General Public License (GPL-3.0; https://www.gnu.org/licenses/gpl-3.0.html)
