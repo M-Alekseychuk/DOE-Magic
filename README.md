@@ -1,3 +1,6 @@
+[![License: AGPL v3](https://img.shields.io/badge/License-AGPL%20v3-blue.svg)](LICENSE)
+[![Version](https://img.shields.io/badge/version-v1.0.0-blue.svg)](package.json)
+
 # DOE Magic (v1.0.0)
 
 DOE Magic is a Design of Experiments (DOE) software for process development. You plan an experiment, enter results, analyse them with validated statistical models, compare responses, optimise across multiple objectives, test robustness with Monte Carlo simulation, and export audit-ready reports. AI assistants can perform the full workflow through the built-in MCP (Model Context Protocol) server.
